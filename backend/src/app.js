@@ -17,6 +17,9 @@ const path = require('path');
 
 const app = express();
 
+// Derrière un proxy (Render…) : req.protocol reflète le X-Forwarded-Proto (https)
+app.set('trust proxy', true);
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
