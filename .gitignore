@@ -1,0 +1,34 @@
+# Dépendances
+node_modules/
+
+# Variables d'environnement (CRÉDENTIELS — ne jamais publier)
+.env
+.env.local
+.env.production
+.env.*
+
+# Builds
+dist/
+build/
+
+# Fichiers uploadés (données utilisateurs)
+backend/uploads/
+
+# Copies imbriquées périmées
+backend/docuflow-afgc/
+frontend/docuflow-afgc/
+
+# Script contenant un mot de passe en clair
+backend/set_admin_password.js
+
+# Logs
+*.log
+npm-debug.log*
+
+# Système
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
