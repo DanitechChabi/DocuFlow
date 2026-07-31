@@ -16,15 +16,56 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
+// Liste des archivistes/admins (pour l'attribution des demandes), avec charge de travail
+exports.getArchivists = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const role = req.user.role;
+
+  if (!['archiviste', 'admin', 'superadmin'].includes(role)) {
+    return res.status(403).json({ message: 'Accès réservé au personnel' });
+  }
+
+  try {
+    const result = await db.query(
+      `SELECT u.id, u.full_name, u.email, u.role,
+              (SELECT COUNT(*) FROM requests r
+                WHERE r.assignee_id = u.id
+                  AND r.statut NOT IN ('livré', 'rejete', 'annulé')) AS open_tasks
+       FROM users u
+       WHERE u.role IN ('archiviste', 'admin', 'superadmin')
+         AND u.tenant_id = $1
+       ORDER BY u.full_name ASC`,
+      [tenantId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la récupération des archivistes' });
+  }
+};
+
 exports.createUser = async (req, res) => {
   const { username, password, full_name, email, section, role } = req.body;
   const tenantId = req.user.tenant_id;
 
   try {
-    const userCheck = await db.query(
-      'SELECT * FROM users WHERE (username = $1 OR email = $2) AND tenant_id = $3',
-      [username, email, tenantId]
-    );
+    let userCheck;
+    try {
+      userCheck = await db.query(
+        'SELECT * FROM users WHERE (username = $1 OR email = $2) AND tenant_id = $3',
+        [username, email, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        // Colonne tenant_id absente (mode mono-tenant)
+        userCheck = await db.query(
+          'SELECT * FROM users WHERE username = $1 OR email = $2',
+          [username, email]
+        );
+      } else {
+        throw err;
+      }
+    }
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ message: "L'utilisateur ou l'email existe déjà dans cette entreprise" });
     }
@@ -56,10 +97,19 @@ exports.updateUserRole = async (req, res) => {
   const tenantId = req.user.tenant_id;
 
   try {
-    await db.query(
-      'UPDATE users SET role = $1 WHERE id = $2 AND tenant_id = $3',
-      [role, id, tenantId]
-    );
+    // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
+    try {
+      await db.query(
+        'UPDATE users SET role = $1 WHERE id = $2 AND tenant_id = $3',
+        [role, id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        await db.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+      } else {
+        throw err;
+      }
+    }
     res.json({ message: "Rôle de l'utilisateur mis à jour avec succès" });
   } catch (err) {
     console.error(err);
@@ -71,10 +121,19 @@ exports.deleteUser = async (req, res) => {
   const { id } = req.params;
   const tenantId = req.user.tenant_id;
   try {
-    await db.query(
-      'DELETE FROM users WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
-    );
+    // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
+    try {
+      await db.query(
+        'DELETE FROM users WHERE id = $1 AND tenant_id = $2',
+        [id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        await db.query('DELETE FROM users WHERE id = $1', [id]);
+      } else {
+        throw err;
+      }
+    }
     res.json({ message: 'Utilisateur supprimé avec succès' });
   } catch (err) {
     console.error(err);

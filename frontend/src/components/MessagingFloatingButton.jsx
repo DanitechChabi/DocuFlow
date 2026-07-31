@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MessageCircle, X, ChevronRight } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import { authService } from '../services/authService';
 import { messageService } from '../services/messageService';
 import MessagingPanel from './MessagingPanel';

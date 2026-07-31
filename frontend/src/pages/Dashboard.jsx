@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
 import RequestForm from '../components/RequestForm';
 import RequestTable from '../components/RequestTable';
@@ -10,8 +10,8 @@ import { requestDetailsService } from '../services/requestDetailsService';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import {
-  Plus, LayoutDashboard, FileText, Package, Clock, TrendingUp,
-  ShieldCheck, AlertCircle, CheckCircle, ArrowUpRight, RefreshCw, Menu
+  Plus, FileText, Package, Clock,
+  AlertCircle, ArrowUpRight, RefreshCw, Menu, Search, ClipboardList
 } from 'lucide-react';
 
 const SkeletonCard = ({ delay = 0 }) => (
@@ -32,18 +32,19 @@ const Dashboard = () => {
   const [requests, setRequests] = useState([]);
   const [stats, setStats] = useState({});
   const [logs, setLogs] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [details, setDetails] = useState(null);
-  const [detailsLoading, setDetailsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   const user = authService.getCurrentUser();
   const settings = useSettings();
   const logoSrc = settings.site_logo_url || 'https://th.bing.com/th/id/R.d7f2f165ad7ca819fe72a5f20a08a7c7?rik=cmptSS4F09F1Hw&riu=http%3a%2f%2fapiga.africa%2fimg%2fafgc.jpg&ehk=BW9PLt5Ge5oLmVWHbZvaEzZCStjt7IWIJj4n%2bEJym5M%3d&risl=&pid=ImgRaw&r=0';
   const isAdmin = user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin';
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
       const data = isAdmin
@@ -55,9 +56,9 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!isAdmin) return;
     try {
       const data = await requestService.getStats();
@@ -65,9 +66,9 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Erreur lors du chargement des stats', err);
     }
-  };
+  }, [isAdmin]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!isAdmin) return;
     try {
       const data = await requestService.getAuditLogs();
@@ -75,31 +76,50 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Erreur lors du chargement de l\'historique', err);
     }
-  };
+  }, [isAdmin]);
 
-  useEffect(() => {
+  const fetchTasks = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await requestService.getMyTasks();
+      setTasks(data);
+    } catch (err) {
+      console.error('Erreur lors du chargement des tâches', err);
+    }
+  }, [isAdmin]);
+
+  const refreshAll = useCallback(() => {
     fetchRequests();
     fetchStats();
     fetchLogs();
-  }, []);
+    fetchTasks();
+  }, [fetchRequests, fetchStats, fetchLogs, fetchTasks]);
+
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
 
   const handleOpenDetails = async (id) => {
     setSelectedRequest(id);
-    setDetailsLoading(true);
     try {
       const data = await requestDetailsService.getDetails(id);
       setDetails(data);
     } catch (err) {
       alert('Erreur lors du chargement des détails');
-    } finally {
-      setDetailsLoading(false);
     }
   };
 
   const handleCloseDetails = () => {
     setSelectedRequest(null);
     setDetails(null);
-    fetchRequests();
+    refreshAll();
+  };
+
+  const statCardStyles = {
+    orange: { bg: 'bg-orange-50', text: 'text-orange-600' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-600' },
+    green: { bg: 'bg-green-50', text: 'text-green-600' },
+    red: { bg: 'bg-red-50', text: 'text-red-600' },
   };
 
   const statCards = [
@@ -114,7 +134,8 @@ const Dashboard = () => {
     dashboard: 'Tableau de bord',
     requests: 'Mes demandes',
     all_requests: 'Gestion des archives',
-    history: 'Historique des flux'
+    history: 'Historique des flux',
+    my_tasks: 'Mes tâches'
   }[activeTab];
 
   return (
@@ -149,7 +170,7 @@ const Dashboard = () => {
         </div>
         <div className="flex items-center gap-2">
           <NotificationBell />
-          <button onClick={fetchRequests} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+          <button onClick={refreshAll} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <RefreshCw size={18} className="text-slate-500" />
           </button>
         </div>
@@ -172,7 +193,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center gap-4">
               <NotificationBell />
-              <button onClick={fetchRequests} className="btn-secondary flex items-center gap-2 p-3" title="Rafraîchir">
+              <button onClick={refreshAll} className="btn-secondary flex items-center gap-2 p-3" title="Rafraîchir">
                 <RefreshCw size={18} className="text-slate-500" />
               </button>
               {user?.role === 'demandeur' && (
@@ -227,6 +248,7 @@ const Dashboard = () => {
                       const count = isAdmin
                         ? (stats[key] || 0)
                         : requests.filter(r => r.statut === key).length;
+                      const styles = statCardStyles[color];
                       return (
                         <div key={key} className="bg-white rounded-2xl p-5 md:p-6 border border-slate-100 hover:shadow-lg transition-all duration-300 group cursor-default animate-fade-in-up"
                           style={{ animationDelay: `${(idx + 1) * 100}ms` }}>
@@ -235,7 +257,7 @@ const Dashboard = () => {
                               <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{label}</p>
                               <h3 className="text-3xl md:text-4xl font-black text-slate-900">{count}</h3>
                             </div>
-                            <div className={`p-2.5 md:p-3 bg-${color}-50 text-${color}-600 rounded-2xl group-hover:scale-110 transition-all duration-300`}>
+                            <div className={`p-2.5 md:p-3 rounded-2xl group-hover:scale-110 transition-all duration-300 ${styles.bg} ${styles.text}`}>
                               <Icon size={22} />
                             </div>
                           </div>
@@ -250,17 +272,33 @@ const Dashboard = () => {
 
           {/* Main content */}
           <div className="space-y-6 animate-fade-in-up delay-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 md:gap-3">
-                {isAdmin
-                  ? <><Package size={20} className="text-afgc-secondary" /> <span>File d'attente</span></>
-                  : <><FileText size={20} className="text-afgc-primary" /> <span>Mes requêtes</span></>
-                }
-              </h2>
-              {loading && (
-                <div className="flex items-center gap-2 text-xs md:text-sm text-slate-400">
-                  <div className="w-4 h-4 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin"></div>
-                  Chargement...
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 md:gap-3">
+                  {activeTab === 'my_tasks'
+                    ? <><ClipboardList size={20} className="text-afgc-secondary" /> <span>Mes tâches</span></>
+                    : isAdmin
+                      ? <><Package size={20} className="text-afgc-secondary" /> <span>File d'attente</span></>
+                      : <><FileText size={20} className="text-afgc-primary" /> <span>Mes requêtes</span></>
+                  }
+                </h2>
+                {loading && (
+                  <div className="flex items-center gap-2 text-xs md:text-sm text-slate-400">
+                    <div className="w-4 h-4 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin"></div>
+                    Chargement...
+                  </div>
+                )}
+              </div>
+              {activeTab !== 'history' && (
+                <div className="relative w-full sm:w-72">
+                  <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Rechercher une demande : entreprise, dossier, acte, motif…"
+                    className="input-premium pl-12"
+                  />
                 </div>
               )}
             </div>
@@ -269,16 +307,20 @@ const Dashboard = () => {
               {activeTab === 'history' ? (
                 <HistoryTable logs={logs} onRequestClick={handleOpenDetails} />
               ) : (
-                <RequestTable requests={requests} role={user?.role} onRefresh={fetchRequests} onOpenDetails={handleOpenDetails} />
+                <RequestTable
+                  requests={activeTab === 'my_tasks' ? tasks : requests}
+                  onOpenDetails={handleOpenDetails}
+                  search={search}
+                />
               )}
             </div>
           </div>
         </div>
 
         {/* Modals */}
-        <RequestForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={fetchRequests} />
+        <RequestForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={refreshAll} />
         {selectedRequest && (
-          <RequestDetailsModal request={details?.request} history={details?.history || []} role={user?.role} onClose={handleCloseDetails} />
+          <RequestDetailsModal request={details?.request} history={details?.history || []} stateHistory={details?.stateHistory || []} role={user?.role} onClose={handleCloseDetails} />
         )}
       </main>
     </div>

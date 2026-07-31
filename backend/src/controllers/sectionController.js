@@ -37,10 +37,19 @@ exports.deleteSection = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
     const db = require('../config/db');
-    await db.query(
-      'DELETE FROM sections WHERE id = $1 AND tenant_id = $2',
-      [id, tenantId]
-    );
+    // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
+    try {
+      await db.query(
+        'DELETE FROM sections WHERE id = $1 AND tenant_id = $2',
+        [id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        await db.query('DELETE FROM sections WHERE id = $1', [id]);
+      } else {
+        throw err;
+      }
+    }
     res.json({ message: 'Section supprimée avec succès' });
   } catch (err) {
     console.error(err);

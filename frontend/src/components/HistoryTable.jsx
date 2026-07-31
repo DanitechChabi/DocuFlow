@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, User, ShieldCheck, ExternalLink, History } from 'lucide-react';
+import { Clock, ShieldCheck, ExternalLink, History } from 'lucide-react';
 
 const HistoryTable = ({ logs, onRequestClick }) => {
   return (

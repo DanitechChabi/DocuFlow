@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, MessageCircle, ArrowLeft, User, ChevronRight, Search, Paperclip, File, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Send, MessageCircle, ArrowLeft, ChevronRight, Paperclip, File, Download } from 'lucide-react';
 import { messageService } from '../services/messageService';
 import { authService } from '../services/authService';
 import { uploadService } from '../services/uploadService';
@@ -201,13 +201,6 @@ const MessagingPanel = ({ isOpen, onClose }) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return bytes + ' o';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -310,7 +303,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
             <div className="p-4 space-y-1.5">
               {loading ? (
                 <div className="flex justify-center py-12">
-                  <div className="w-8 h-8 border-3 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
+                  <div className="w-8 h-8 border-[3px] border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
                 </div>
               ) : (
                 users.map((u) => (
@@ -439,7 +432,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                     onKeyDown={handleSendKeyDown}
                     placeholder={pendingFiles.length > 0 ? 'Ajouter un message...' : 'Écrivez votre message...'}
                     disabled={sending || filesUploading}
-                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-afgc-secondary/30 focus:border-afgc-secondary transition-all text-slate-800 disabled:opacity-50"
+                    className="flex-1 input-premium disabled:opacity-50"
                   />
                   <button
                     onClick={handleSend}

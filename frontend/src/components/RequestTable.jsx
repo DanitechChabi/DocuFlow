@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Clock, Hash, ChevronRight, AlertCircle, Filter } from 'lucide-react';
+import { FileText, Clock, Hash, ChevronRight, Filter } from 'lucide-react';
 
 const statusConfig = {
   'en attente': { label: 'En attente', cls: 'status-badge-pending' },
@@ -7,6 +7,7 @@ const statusConfig = {
   'livré': { label: 'Livré', cls: 'status-badge-delivered' },
   'a traiter': { label: 'À traiter', cls: 'status-badge-progress' },
   'rejete': { label: 'Rejeté', cls: 'status-badge-rejected' },
+  'annulé': { label: 'Annulé', cls: 'status-badge-annulled' },
 };
 
 const FILTERS = [
@@ -16,14 +17,24 @@ const FILTERS = [
   { key: 'transmis', label: 'Transmis' },
   { key: 'livré', label: 'Livré' },
   { key: 'rejete', label: 'Rejeté' },
+  { key: 'annulé', label: 'Annulé' },
 ];
 
-const RequestTable = ({ requests, role, onRefresh, onOpenDetails }) => {
+const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
   const [filter, setFilter] = useState('all');
 
-  const filteredRequests = filter === 'all'
-    ? requests
-    : requests.filter(r => r.statut === filter);
+  const searchTerm = String(search || '').trim().toLowerCase();
+
+  const filteredRequests = requests.filter(r => {
+    const matchStatus = filter === 'all' || r.statut === filter;
+    if (!searchTerm) return matchStatus;
+    // Recherche sur entreprise, références, motif, type, statut, demandeur, priorité
+    const haystack = [
+      r.nom_entreprise, r.num_dossier, r.num_acte, String(r.annee || ''),
+      r.type_document, r.motif, r.statut, r.requester_name, r.priorite,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return matchStatus && haystack.includes(searchTerm);
+  });
 
   const counts = {};
   requests.forEach(r => {
@@ -32,8 +43,8 @@ const RequestTable = ({ requests, role, onRefresh, onOpenDetails }) => {
 
   return (
     <div>
-      {/* Filter bar */}
-      <div className="px-4 md:px-6 pt-4 pb-2 border-b border-slate-100">
+      {/* Barre de recherche + filtres */}
+      <div className="px-4 md:px-6 pt-2 pb-2 border-b border-slate-100">
         <div className="flex items-center gap-2 overflow-x-auto -mx-2 px-2 pb-2 scrollbar-none">
           <Filter size={14} className="text-slate-400 flex-shrink-0" />
           {FILTERS.map((f) => {
@@ -72,6 +83,7 @@ const RequestTable = ({ requests, role, onRefresh, onOpenDetails }) => {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Références</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Motif & Priorité</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Statut</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assigné à</th>
               <th className="px-6 py-4 text-right"><span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</span></th>
             </tr>
           </thead>
@@ -119,6 +131,11 @@ const RequestTable = ({ requests, role, onRefresh, onOpenDetails }) => {
                       {status.label}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-slate-600">
+                      {req.assignee_name || <span className="text-slate-300">—</span>}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-afgc-secondary opacity-0 group-hover:opacity-100 transition-all duration-200">
                       Détails <ChevronRight size={14} />
@@ -129,13 +146,15 @@ const RequestTable = ({ requests, role, onRefresh, onOpenDetails }) => {
             })}
             {filteredRequests.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-12 text-center">
+                <td colSpan={6} className="p-12 text-center">
                   <FileText size={40} className="mx-auto mb-3 text-slate-200" />
                   <p className="text-slate-400 font-medium text-sm">Aucune demande trouvée</p>
                   <p className="text-xs text-slate-300">
-                    {filter !== 'all'
-                      ? `Aucune demande avec le statut « ${filter} »`
-                      : 'Les nouvelles demandes apparaîtront ici'}
+                    {searchTerm
+                      ? `Aucune demande ne correspond à « ${search.trim()} »`
+                      : filter !== 'all'
+                        ? `Aucune demande avec le statut « ${filter} »`
+                        : 'Les nouvelles demandes apparaîtront ici'}
                   </p>
                 </td>
               </tr>

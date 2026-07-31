@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, X, Save, FileText, Calendar, Hash, Building2, AlertCircle, Upload, File, Paperclip } from 'lucide-react';
+import { X, Save, FileText, Calendar, Hash, Building2, AlertCircle, Upload, File } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 
@@ -97,38 +97,38 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
           <div className="sm:col-span-2 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom de l'entreprise</label>
             <div className="relative">
-              <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input className="input-premium pl-10" value={formData.nom_entreprise}
+              <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input className="input-premium pl-12" value={formData.nom_entreprise}
                 onChange={(e) => setFormData({...formData, nom_entreprise: e.target.value})} required
-                placeholder="Raison sociale" />
+                placeholder="Entrez la raison sociale" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Numéro de dossier</label>
             <div className="relative">
-              <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input className="input-premium pl-10" value={formData.num_dossier}
+              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input className="input-premium pl-12" value={formData.num_dossier}
                 onChange={(e) => setFormData({...formData, num_dossier: e.target.value})} required
-                placeholder="Ex: DOS-2024-001" />
+                placeholder="Entrez le n° de dossier (ex: DOS-2024-001)" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Numéro d'acte</label>
             <div className="relative">
-              <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input className="input-premium pl-10" value={formData.num_acte}
+              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input className="input-premium pl-12" value={formData.num_acte}
                 onChange={(e) => setFormData({...formData, num_acte: e.target.value})} required
-                placeholder="Ex: ACT-2024-045" />
+                placeholder="Entrez le n° d'acte (ex: ACT-2024-045)" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Année</label>
             <div className="relative">
-              <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input type="number" className="input-premium pl-10" value={formData.annee}
+              <Calendar size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input type="number" className="input-premium pl-12" value={formData.annee}
                 onChange={(e) => setFormData({...formData, annee: parseInt(e.target.value)})}
                 required min={1900} max={2100} />
             </div>
@@ -136,7 +136,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Type de document</label>
-            <select className="input-premium appearance-none bg-white" value={formData.type_document}
+            <select className="input-premium" value={formData.type_document}
               onChange={(e) => setFormData({...formData, type_document: e.target.value})}>
               <option value="">Sélectionner...</option>
               <option value="Statuts">Statuts</option>
@@ -150,7 +150,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
 
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Motif</label>
-            <select className="input-premium appearance-none bg-white" value={formData.motif}
+            <select className="input-premium" value={formData.motif}
               onChange={(e) => setFormData({...formData, motif: e.target.value})}>
               <option value="Actualisation">Actualisation</option>
               <option value="Création">Création d'entreprise</option>

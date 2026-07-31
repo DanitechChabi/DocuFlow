@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,
     tenant_id INTEGER NOT NULL REFERENCES tenants(id),
-    user_id INTEGER REFERENCES users(id),
+    id_user INTEGER REFERENCES users(id),
     title VARCHAR(255) NOT NULL,
     message TEXT,
     is_read BOOLEAN DEFAULT FALSE,
@@ -143,7 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_participants ON messages(tenant_id, sender_id, receiver_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON notifications(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(tenant_id, user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(tenant_id, id_user, is_read);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);

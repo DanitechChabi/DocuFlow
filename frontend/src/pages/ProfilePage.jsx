@@ -4,13 +4,12 @@ import { userService } from '../services/userService';
 import { sectionService } from '../services/sectionService';
 import { authService } from '../services/authService';
 import {
-  User, Mail, Building2, Shield, Calendar, Lock, Save, ArrowLeft,
-  KeyRound, CheckCircle, AlertCircle, Eye, EyeOff, RefreshCw
+  User, Building2, Shield, Calendar, Lock, Save, ArrowLeft,
+  KeyRound, CheckCircle, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
 
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,6 +182,7 @@ const ProfilePage = () => {
                   value={formData.full_name}
                   onChange={(e) => setFormData({...formData, full_name: e.target.value})}
                   required
+                  placeholder="Entrez votre nom complet"
                   className="input-premium"
                 />
               </div>
@@ -194,6 +194,7 @@ const ProfilePage = () => {
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   required
+                  placeholder="Entrez votre adresse email"
                   className="input-premium"
                 />
               </div>
@@ -205,7 +206,7 @@ const ProfilePage = () => {
                 <select
                   value={formData.section}
                   onChange={(e) => setFormData({...formData, section: e.target.value})}
-                  className="input-premium appearance-none bg-white"
+                  className="input-premium"
                 >
                   <option value="">-- Sélectionnez votre section --</option>
                   {sections.map(s => (
@@ -262,10 +263,10 @@ const ProfilePage = () => {
                 <div className="relative">
                   <input type={showPwd.current ? 'text' : 'password'} value={passwordData.current_password}
                     onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})}
-                    required className="input-premium pr-10" />
+                    required placeholder="Entrez votre mot de passe actuel" className="input-premium pr-12" />
                   <button type="button" onClick={() => setShowPwd({...showPwd, current: !showPwd.current})}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPwd.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPwd.current ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -274,10 +275,10 @@ const ProfilePage = () => {
                 <div className="relative">
                   <input type={showPwd.new ? 'text' : 'password'} value={passwordData.new_password}
                     onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
-                    required minLength={6} className="input-premium pr-10" />
+                    required minLength={6} placeholder="Entrez un nouveau mot de passe (6 caractères min.)" className="input-premium pr-12" />
                   <button type="button" onClick={() => setShowPwd({...showPwd, new: !showPwd.new})}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPwd.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPwd.new ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -286,11 +287,11 @@ const ProfilePage = () => {
                 <div className="relative">
                   <input type={showPwd.confirm ? 'text' : 'password'} value={passwordData.confirm_password}
                     onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
-                    required
-                    className={`input-premium pr-10 ${passwordData.confirm_password && passwordData.new_password !== passwordData.confirm_password ? 'border-red-400 ring-1 ring-red-400' : ''}`} />
+                    required placeholder="Répétez le nouveau mot de passe"
+                    className={`input-premium pr-12 ${passwordData.confirm_password && passwordData.new_password !== passwordData.confirm_password ? 'border-red-400 ring-1 ring-red-400' : ''}`} />
                   <button type="button" onClick={() => setShowPwd({...showPwd, confirm: !showPwd.confirm})}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPwd.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPwd.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 {passwordData.confirm_password && passwordData.new_password !== passwordData.confirm_password && (

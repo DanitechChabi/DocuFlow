@@ -16,10 +16,12 @@ router.post('/', requestController.createRequest);
 router.get('/my-requests', requestController.getUserRequests);
 
 // Routes réservées aux Archivistes et Admins
-router.get('/:id/verify-mfile', roleMiddleware(ADMIN_ROLES), requestController.verifyMfile);
+router.get('/my-tasks', roleMiddleware(ADMIN_ROLES), requestController.getMyTasks);
 router.get('/stats', roleMiddleware(ADMIN_ROLES), requestController.getStats);
 router.get('/history', roleMiddleware(ADMIN_ROLES), requestController.getAuditLogs);
 router.get('/all', roleMiddleware(ADMIN_ROLES), requestController.getAllRequests);
+router.get('/:id/verify-mfile', roleMiddleware(ADMIN_ROLES), requestController.verifyMfile);
 router.patch('/:id/status', roleMiddleware(ADMIN_ROLES), requestController.updateRequestStatus);
+router.patch('/:id/assign', roleMiddleware(ADMIN_ROLES), requestController.assignRequest);
 
 module.exports = router;

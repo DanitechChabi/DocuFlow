@@ -299,9 +299,9 @@ const SuperAdminPage = () => {
           <div className="space-y-6 animate-fade-in-up">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-full md:max-w-sm">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="input-premium pl-9"
+                  className="input-premium pl-12"
                   placeholder="Rechercher..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -447,13 +447,13 @@ const SuperAdminPage = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nom du site</label>
                     <input className="input-premium" value={branding.site_name}
                       onChange={(e) => setBranding({...branding, site_name: e.target.value})}
-                      placeholder="DocuFlow" />
+                      placeholder="Entrez le nom du site" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Description</label>
                     <input className="input-premium" value={branding.site_description}
                       onChange={(e) => setBranding({...branding, site_description: e.target.value})}
-                      placeholder="Plateforme de gestion documentaire" />
+                      placeholder="Entrez une description du site" />
                   </div>
                   <button onClick={handleSaveBranding} disabled={brandSaving}
                     className="btn-primary w-full flex items-center justify-center gap-2 mt-4">
@@ -652,19 +652,19 @@ const SuperAdminPage = () => {
               <div className="grid grid-cols-2 gap-5">
                 <div className="col-span-2 space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nom complet</label>
-                  <input className="input-premium" value={newUser.full_name} onChange={e => setNewUser({...newUser, full_name: e.target.value})} required />
+                  <input className="input-premium" placeholder="Entrez le nom complet (ex: Jean Dupont)" value={newUser.full_name} onChange={e => setNewUser({...newUser, full_name: e.target.value})} required />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Identifiant</label>
-                  <input className="input-premium" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
+                  <input className="input-premium" placeholder="Entrez l'identifiant de connexion" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Email</label>
-                  <input type="email" className="input-premium" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} required />
+                  <input type="email" className="input-premium" placeholder="Entrez l'adresse email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} required />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mot de passe</label>
-                  <input type="password" className="input-premium" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required minLength={6} />
+                  <input type="password" className="input-premium" placeholder="Entrez un mot de passe (6 caractères min.)" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required minLength={6} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Section</label>
@@ -763,7 +763,7 @@ const SuperAdminPage = () => {
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Slug</label>
                   <input className="input-premium" value={tenantForm.slug}
                     onChange={e => setTenantForm({...tenantForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})}
-                    placeholder="afgc" required />
+                    placeholder="Entrez le slug (ex: afgc)" required />
                   <p className="text-[10px] text-slate-400 mt-1">Identifiant unique utilisé dans l'URL</p>
                 </div>
                 <div className="space-y-1.5">

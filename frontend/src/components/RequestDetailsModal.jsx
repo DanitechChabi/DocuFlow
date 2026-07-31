@@ -1,12 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Clock, FileText, Search, CheckCircle,
-  AlertCircle, Save, Shield, Paperclip, Download, Upload, File
+  AlertCircle, Save, Shield, Paperclip, Download, Upload, File, UserCircle2
 } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 
-const RequestDetailsModal = ({ request, history, role, onClose }) => {
+// Machine à états côté client (miroir du backend requestStateMachine)
+const TRANSITIONS = {
+  'en attente': ['a traiter', 'rejete', 'annulé'],
+  'a traiter': ['transmis', 'rejete', 'annulé'],
+  'transmis': ['livré', 'rejete', 'annulé'],
+  'livré': [],
+  'rejete': [],
+  'annulé': [],
+};
+const STATUS_LABELS = {
+  'en attente': 'En attente',
+  'a traiter': 'À traiter',
+  'transmis': 'Transmis',
+  'livré': 'Livré',
+  'rejete': 'Rejeté',
+  'annulé': 'Annulé',
+};
+const TERMINAL_STATUSES = new Set(['livré', 'rejete', 'annulé']);
+
+const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClose }) => {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [mfileData, setMfileData] = useState(null);
@@ -15,17 +34,14 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [archivists, setArchivists] = useState([]);
+  const [assigneeId, setAssigneeId] = useState('');
+  const [assigning, setAssigning] = useState(false);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (request) {
-      setStatus(request.statut || '');
-      setNotes(request.notes_internes || '');
-      loadFiles();
-    }
-  }, [request]);
+  const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
 
-  const loadFiles = async () => {
+  const loadFiles = useCallback(async () => {
     if (!request?.id) return;
     setFilesLoading(true);
     try {
@@ -36,7 +52,21 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
     } finally {
       setFilesLoading(false);
     }
-  };
+  }, [request?.id]);
+
+  useEffect(() => {
+    if (request) {
+      setStatus(request.statut || '');
+      setNotes(request.notes_internes || '');
+      setAssigneeId(request.assignee_id ? String(request.assignee_id) : '');
+      loadFiles();
+      if (isAdmin) {
+        requestService.getArchivists()
+          .then(setArchivists)
+          .catch(() => {});
+      }
+    }
+  }, [request, loadFiles, isAdmin]);
 
   const handleUploadFiles = async (e) => {
     const selected = Array.from(e.target.files || []);
@@ -83,7 +113,38 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
       alert('Mise à jour effectuée avec succès');
       onClose();
     } catch (err) {
-      alert('Erreur lors de la sauvegarde');
+      alert(err.response?.data?.message || 'Erreur lors de la sauvegarde');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleAssign = async (e) => {
+    const nextAssigneeId = e.target.value;
+    setAssigneeId(nextAssigneeId);
+    if (!nextAssigneeId) return;
+    setAssigning(true);
+    try {
+      await requestService.assignRequest(request.id, Number(nextAssigneeId));
+      alert('Demande assignée avec succès');
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.message || "Erreur lors de l'assignation");
+      setAssigneeId(request.assignee_id ? String(request.assignee_id) : '');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!confirm("Confirmer l'annulation de cette demande ?")) return;
+    setIsUpdating(true);
+    try {
+      await requestService.updateStatus(request.id, { status: 'annulé' });
+      alert('Demande annulée');
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.message || "Erreur lors de l'annulation");
     } finally {
       setIsUpdating(false);
     }
@@ -91,17 +152,33 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
 
   if (!request) return null;
 
-  const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
-
   const statusColor = {
     'en attente': 'border-l-orange-400',
     'transmis': 'border-l-green-400',
     'livré': 'border-l-blue-400',
     'a traiter': 'border-l-purple-400',
     'rejete': 'border-l-red-400',
+    'annulé': 'border-l-slate-400',
   };
 
+  const allowedStatuses = isAdmin
+    ? (TRANSITIONS[request.statut] || [])
+    : [];
+  const isTerminalRequest = TERMINAL_STATUSES.has(request.statut);
+
   const formatDate = (d) => d ? new Date(d).toLocaleString('fr-FR') : '—';
+
+  const statusBadgeClass = (s) => {
+    const map = {
+      'en attente': 'status-badge-pending',
+      'a traiter': 'status-badge-progress',
+      'transmis': 'status-badge-transmitted',
+      'livré': 'status-badge-delivered',
+      'rejete': 'status-badge-rejected',
+      'annulé': 'status-badge-annulled',
+    };
+    return map[s] || 'bg-slate-100 text-slate-600';
+  };
   const formatSize = (bytes) => {
     if (!bytes) return '';
     if (bytes < 1024) return bytes + ' o';
@@ -145,6 +222,38 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
         <div className="p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main info */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+            {/* Machine à états : étapes horodatées */}
+            {stateHistory && stateHistory.length > 0 && (
+              <div>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5 flex items-center gap-2">
+                  <Shield size={14} /> Étapes de la demande
+                </h3>
+                <div className="space-y-4">
+                  {stateHistory.map((h, idx) => (
+                    <div key={h.id} className="flex gap-4 animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                      <div className="flex flex-col items-center">
+                        <div className={`w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-afgc-secondary border-afgc-secondary' : 'bg-white border-slate-300'}`}></div>
+                        {idx < stateHistory.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 mt-1"></div>}
+                      </div>
+                      <div className="pb-6">
+                        <p className="text-sm font-bold text-slate-700">{h.action}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {h.user_name} · {formatDate(h.timestamp)}
+                        </p>
+                        {h.previous_status && h.new_status && h.previous_status !== h.new_status && (
+                          <p className="text-xs mt-1">
+                            <span className={`status-badge !px-2 !py-0.5 !text-[10px] ${statusBadgeClass(h.previous_status)}`}>{STATUS_LABELS[h.previous_status] || h.previous_status}</span>
+                            <span className="mx-1 text-slate-400">→</span>
+                            <span className={`status-badge !px-2 !py-0.5 !text-[10px] ${statusBadgeClass(h.new_status)}`}>{STATUS_LABELS[h.new_status] || h.new_status}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Timeline / History */}
             {history && history.length > 0 && (
               <div>
@@ -168,6 +277,19 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
               </div>
             )}
 
+            {/* Demandeur : annulation de sa propre demande */}
+            {!isAdmin && !isTerminalRequest && (
+              <div className="pt-6 border-t border-slate-100">
+                <button
+                  onClick={handleCancelRequest}
+                  disabled={isUpdating}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-bold text-sm transition-all disabled:opacity-50"
+                >
+                  <X size={16} /> Annuler la demande
+                </button>
+              </div>
+            )}
+
             {/* Admin section */}
             {isAdmin && (
               <div className="space-y-6 pt-6 border-t border-slate-100">
@@ -175,23 +297,51 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
                   <Shield size={14} /> Traitement archiviste
                 </h3>
 
+                {/* Assignation */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Assignée à</label>
+                  <div className="relative">
+                    <UserCircle2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <select
+                      className="input-premium pl-12"
+                      value={assigneeId}
+                      onChange={handleAssign}
+                      disabled={assigning}
+                    >
+                      <option value="">— Non assignée —</option>
+                      {archivists.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.full_name} · {a.open_tasks || 0} en cours
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Statut — étapes autorisées par la machine à états */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 ml-1">Statut</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['en attente', 'a traiter', 'transmis', 'livré', 'rejete'].map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setStatus(s)}
-                        className={`px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all uppercase tracking-wider ${
-                          status === s
-                            ? 'bg-afgc-primary text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  {isTerminalRequest ? (
+                    <p className="text-sm text-slate-500">
+                      Demande terminée — état final : <b>{STATUS_LABELS[request.statut] || request.statut}</b>.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {allowedStatuses.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setStatus(s)}
+                          className={`px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all uppercase tracking-wider ${
+                            status === s
+                              ? 'bg-afgc-primary text-white shadow-sm'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {STATUS_LABELS[s] || s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -222,13 +372,18 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <button onClick={handleSave} disabled={isUpdating}
-                    className="btn-primary flex items-center justify-center gap-2 flex-1">
-                    {isUpdating ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : <Save size={18} />}
-                    {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
-                  </button>
+                  {!isTerminalRequest && (
+                    <button
+                      onClick={handleSave}
+                      disabled={isUpdating || !allowedStatuses.includes(status)}
+                      className="btn-primary flex items-center justify-center gap-2 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUpdating ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : <Save size={18} />}
+                      {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                    </button>
+                  )}
 
                   <button onClick={handleVerifyMfile} disabled={isVerifying}
                     className="btn-secondary flex items-center justify-center gap-2 flex-1">
@@ -267,11 +422,18 @@ const RequestDetailsModal = ({ request, history, role, onClose }) => {
                     request.statut === 'transmis' ? 'status-badge-transmitted' :
                     request.statut === 'livré' ? 'status-badge-delivered' :
                     request.statut === 'a traiter' ? 'status-badge-progress' :
-                    request.statut === 'rejete' ? 'status-badge-rejected' : 'bg-slate-100 text-slate-600'
+                    request.statut === 'rejete' ? 'status-badge-rejected' :
+                    request.statut === 'annulé' ? 'status-badge-annulled' : 'bg-slate-100 text-slate-600'
                   }`}>
-                    {request.statut}
+                    {STATUS_LABELS[request.statut] || request.statut}
                   </span>
                 </div>
+                {request.assignee_name && (
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Assignée à</p>
+                    <p className="text-sm font-bold text-slate-700 mt-0.5">{request.assignee_name}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Priorité</p>
                   <p className="text-sm font-bold text-slate-700 mt-0.5">{request.priorite}</p>

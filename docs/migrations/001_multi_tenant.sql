@@ -47,9 +47,14 @@ ALTER TABLE notifications ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1;
 ALTER TABLE audit_logs ALTER COLUMN tenant_id SET NOT NULL;
 
--- Table request_history
-ALTER TABLE request_history ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1;
-ALTER TABLE request_history ALTER COLUMN tenant_id SET NOT NULL;
+-- Table request_history (si elle existe)
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'request_history') THEN
+        ALTER TABLE request_history ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1;
+        ALTER TABLE request_history ALTER COLUMN tenant_id SET NOT NULL;
+    END IF;
+END $$;
 
 -- Table request_details (si elle existe)
 DO $$
@@ -94,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_sections_tenant ON sections(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_participants ON messages(tenant_id, sender_id, receiver_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON notifications(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(tenant_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(tenant_id, id_user);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);

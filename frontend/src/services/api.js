@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:30001/api';
+// URL de l'API : surchargeable en déploiement via VITE_API_URL (ex. https://api.example.com/api)
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:30001/api';
 
 const api = axios.create({
   baseURL: API_URL,

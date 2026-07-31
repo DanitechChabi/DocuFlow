@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
 import {
   LayoutDashboard, Info, HelpCircle, Scale, User, Mail, Phone,
-  MapPin, Globe, GraduationCap, Briefcase, Code, ChevronDown, ExternalLink,
+  MapPin, Globe, GraduationCap, Code, ChevronDown, ExternalLink,
   FileText, MessageCircle, Building2, ShieldCheck, HardDrive
 } from 'lucide-react';
 

@@ -75,11 +75,11 @@ const LoginPage = () => {
                 <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
-                  className="input-premium pl-11"
+                  className="input-premium pl-12"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  placeholder="Nom d'utilisateur"
+                  placeholder="Entrez votre identifiant"
                   autoComplete="username"
                 />
               </div>
@@ -91,11 +91,11 @@ const LoginPage = () => {
                 <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
                 <input
                   type={showPwd ? 'text' : 'password'}
-                  className="input-premium pl-11 pr-11"
+                  className="input-premium pl-12 pr-12"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="••••••••"
+                  placeholder="Entrez votre mot de passe"
                   autoComplete="current-password"
                 />
                 <button

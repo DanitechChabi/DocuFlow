@@ -71,6 +71,10 @@
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.6; }
 }
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; filter: blur(16px); }
+  50%      { opacity: 0.7; filter: blur(20px); }
+}
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-6px); }
@@ -106,6 +110,9 @@
 }
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
+}
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
@@ -189,31 +196,62 @@
   transform: scale(0.97);
 }
 
-.input-premium {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: white;
-  border: 1px solid var(--color-slate-200);
-  border-radius: 0.75rem;
-  outline: none;
-  transition: all 0.2s;
-  color: var(--color-slate-800);
-  font-weight: 500;
-}
-.input-premium:focus {
-  border-color: var(--color-afgc-secondary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-}
+/* Champs de formulaire — base unique.
+   Placés dans @layer components (pattern Tailwind v4) pour que les utilitaires
+   (pl-12, pr-12, …) puissent les surcharger. Hors layer, ils les écraseraient. */
+@layer components {
+  .input-premium {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 3rem;
+    padding: 0.625rem 1rem;
+    background-color: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 0.75rem;
+    outline: none;
+    transition: all 0.2s;
+    color: var(--color-slate-800);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5rem;
+  }
+  input.input-premium {
+    height: 3rem;
+  }
+  select.input-premium {
+    height: 3rem;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.875rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+    cursor: pointer;
+  }
+  .input-premium::placeholder {
+    color: var(--color-slate-300);
+  }
+  .input-premium:focus {
+    border-color: var(--color-afgc-secondary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  }
 
-.input-disabled {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background-color: var(--color-slate-100);
-  border: 1px solid var(--color-slate-200);
-  border-radius: 0.75rem;
-  color: var(--color-slate-400);
-  font-weight: 500;
-  cursor: not-allowed;
+  .input-disabled {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 3rem;
+    padding: 0.625rem 1rem;
+    background-color: var(--color-slate-100);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 0.75rem;
+    color: var(--color-slate-400);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5rem;
+    cursor: not-allowed;
+  }
 }
 
 /* Status badges */
@@ -267,6 +305,13 @@
   border: 1px solid #fecaca;
 }
 .status-badge-rejected::before { background-color: #dc2626; }
+
+.status-badge-annulled {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+.status-badge-annulled::before { background-color: #64748b; }
 
 /* Skeleton */
 .skeleton {

@@ -4,18 +4,35 @@ exports.getRequestDetails = async (req, res) => {
   const { id } = req.params;
   const tenantId = req.user.tenant_id;
   try {
-    const requestResult = await tenantDb.query(
-      tenantId,
-      'SELECT * FROM requests WHERE id = $1',
-      [id]
-    );
+    const db = require('../config/db');
+    // Requête avec JOIN (nom de l'assigné) — tenant_id qualifié car join
+    let requestResult;
+    try {
+      requestResult = await db.query(
+        `SELECT r.*, u2.full_name as assignee_name
+         FROM requests r
+         LEFT JOIN users u2 ON r.assignee_id = u2.id
+         WHERE r.id = $1 AND r.tenant_id = $2`,
+        [id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        requestResult = await db.query(
+          `SELECT r.*, u2.full_name as assignee_name
+           FROM requests r
+           LEFT JOIN users u2 ON r.assignee_id = u2.id
+           WHERE r.id = $1`,
+          [id]
+        );
+      } else {
+        throw err;
+      }
+    }
     const request = requestResult.rows[0];
 
     if (!request) {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
-
-    const db = require('../config/db');
     // Requête avec tentative tenant_id, fallback si colonne absente
     let logsResult;
     try {
@@ -42,9 +59,30 @@ exports.getRequestDetails = async (req, res) => {
       }
     }
 
+    // Historique d'états structuré (machine à états) depuis request_history
+    let stateResult;
+    try {
+      stateResult = await db.query(
+        `SELECT rh.* FROM request_history rh
+         WHERE rh.request_id = $1 AND rh.tenant_id = $2
+         ORDER BY rh.timestamp ASC`,
+        [id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42703') {
+        stateResult = await db.query(
+          `SELECT rh.* FROM request_history rh WHERE rh.request_id = $1 ORDER BY rh.timestamp ASC`,
+          [id]
+        );
+      } else {
+        throw err;
+      }
+    }
+
     res.json({
       request,
-      history: logsResult.rows
+      history: logsResult.rows,
+      stateHistory: stateResult.rows
     });
   } catch (err) {
     console.error(err);

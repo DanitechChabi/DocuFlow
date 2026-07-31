@@ -13,6 +13,18 @@ export const requestService = {
     const response = await api.get('/requests/all');
     return response.data;
   },
+  getMyTasks: async () => {
+    const response = await api.get('/requests/my-tasks');
+    return response.data;
+  },
+  assignRequest: async (requestId, assigneeId) => {
+    const response = await api.patch(`/requests/${requestId}/assign`, { assignee_id: assigneeId });
+    return response.data;
+  },
+  getArchivists: async () => {
+    const response = await api.get('/users/archivists');
+    return response.data;
+  },
   verifyMfile: async (requestId) => {
     const response = await api.get(`/requests/${requestId}/verify-mfile`);
     return response.data;

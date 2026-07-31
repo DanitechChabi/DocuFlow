@@ -12,6 +12,9 @@ router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
 router.put('/profile/password', userController.changePassword);
 
+// Archivistes (attribution des demandes) — accessibles au personnel
+router.get('/archivists', userController.getArchivists);
+
 // Routes admin — réservées au SuperAdmin
 router.use(roleMiddleware(['superadmin']));
 

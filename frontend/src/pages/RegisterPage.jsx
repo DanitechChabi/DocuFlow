@@ -109,22 +109,22 @@ const RegisterPage = () => {
                 value={formData.full_name}
                 onChange={handleChange}
                 required
-                placeholder="Jean Dupont"
+                placeholder="Entrez votre nom complet"
               />
             </div>
 
             <div className="col-span-1 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom d'utilisateur</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   name="username"
-                  className="input-premium pl-9"
+                  className="input-premium pl-12"
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  placeholder="jdupont"
+                  placeholder="Entrez votre nom d'utilisateur"
                 />
               </div>
             </div>
@@ -132,15 +132,15 @@ const RegisterPage = () => {
             <div className="col-span-1 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email</label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="email"
                   name="email"
-                  className="input-premium pl-9"
+                  className="input-premium pl-12"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  placeholder="jdupont@afgc.com"
+                  placeholder="Entrez votre adresse email"
                 />
               </div>
             </div>
@@ -148,10 +148,10 @@ const RegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Section</label>
               <div className="relative">
-                <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <select
                   name="section"
-                  className="input-premium pl-9 appearance-none bg-white"
+                  className="input-premium pl-12"
                   value={formData.section}
                   onChange={handleChange}
                   required
@@ -167,16 +167,16 @@ const RegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="password"
                   name="password"
-                  className="input-premium pl-9"
+                  className="input-premium pl-12"
                   value={formData.password}
                   onChange={handleChange}
                   required
                   minLength={6}
-                  placeholder="Minimum 6 caractères"
+                  placeholder="Entrez un mot de passe (6 caractères min.)"
                 />
               </div>
             </div>

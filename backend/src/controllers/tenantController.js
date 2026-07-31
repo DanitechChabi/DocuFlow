@@ -1,6 +1,9 @@
 const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
 
+// Erreur « relation n'existe pas » : table tenants absente (base non migrée / mono-tenant)
+const isMissingTable = (err) => err.code === '42P01' || err.code === '42703';
+
 exports.getAllTenants = async (req, res) => {
   try {
     const result = await db.query(
@@ -8,6 +11,10 @@ exports.getAllTenants = async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
+    // Base non migrée : aucun multi-tenant, on renvoie la liste vide sans erreur 500
+    if (isMissingTable(err)) {
+      return res.json([]);
+    }
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des entreprises' });
   }
@@ -25,6 +32,9 @@ exports.getTenant = async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
+    if (isMissingTable(err)) {
+      return res.status(404).json({ message: 'Entreprise non trouvée' });
+    }
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération de l\'entreprise' });
   }
@@ -49,6 +59,9 @@ exports.createTenant = async (req, res) => {
     if (err.code === '23505') {
       return res.status(400).json({ message: 'Ce slug est déjà utilisé' });
     }
+    if (isMissingTable(err)) {
+      return res.status(400).json({ message: 'Le module multi-entreprise n\'est pas activé sur cette base. Appliquez la migration docs/migrations/001_multi_tenant.sql.' });
+    }
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la création de l\'entreprise' });
   }
@@ -72,6 +85,9 @@ exports.updateTenantStatus = async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (err) {
+    if (isMissingTable(err)) {
+      return res.status(404).json({ message: 'Entreprise non trouvée' });
+    }
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la mise à jour' });
   }
@@ -84,6 +100,9 @@ exports.deleteTenant = async (req, res) => {
     await db.query('DELETE FROM tenants WHERE id = $1', [id]);
     res.json({ message: 'Entreprise supprimée' });
   } catch (err) {
+    if (isMissingTable(err)) {
+      return res.status(404).json({ message: 'Entreprise non trouvée' });
+    }
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression' });
   }

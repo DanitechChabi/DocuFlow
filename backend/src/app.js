@@ -51,7 +51,8 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = '127.0.0.1';
+// 0.0.0.0 : indispensable en déploiement cloud (Render, Railway…) pour écouter sur toutes les interfaces
+const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
   console.log(`-------------------------------------------------`);

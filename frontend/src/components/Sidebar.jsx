@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FileSearch, History, LogOut, User, Building2, ShieldCheck, X, Info } from 'lucide-react';
+import { LayoutDashboard, FileSearch, History, LogOut, Building2, ShieldCheck, X, Info, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -16,6 +16,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   ];
 
   if (user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin') {
+    menuItems.push({ id: 'my_tasks', label: 'Mes tâches', icon: <ClipboardList size={20} /> });
     menuItems.push({ id: 'history', label: 'Historique', icon: <History size={20} /> });
     menuItems.push({ id: 'all_requests', label: 'Toutes les demandes', icon: <Building2 size={20} /> });
   }
