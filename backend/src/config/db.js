@@ -1,9 +1,14 @@
 const { Pool } = require('pg');
 require('dotenv').config({ path: './.env' });
 
-// SSL requis par Neon/Cloud-hosted (production). `DB_SSL=true` active une
-// connexion chiffrée. En local (PostgreSQL classique sans SSL), on laisse false.
-const ssl = process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
+// SSL : `DB_SSL=true` l'active explicitement. Pour les hôtes cloud qui
+// l'exigent (Neon, Supabase…), on le détecte automatiquement — évite un oubli
+// qui ferait échouer toutes les requêtes en production. Local : pas de SSL.
+const dbHost = process.env.DB_HOST || '';
+const ssl =
+  process.env.DB_SSL === 'true' || /neon\.tech$/i.test(dbHost)
+    ? { rejectUnauthorized: false }
+    : false;
 
 const pool = new Pool({
   user: process.env.DB_USER,
