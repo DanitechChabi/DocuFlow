@@ -3,6 +3,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config({ path: './.env' });
 
+// Sections créées par défaut à la création d'une entreprise
+const DEFAULT_SECTIONS = ['Comptabilité', 'Commercial', 'DAI', 'DRI', 'DGI', 'DNCMP'];
+
+// Normalise un code entreprise : minuscules, sans accents, espaces → tirets
+function normalizeSlug(value) {
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 exports.register = async (req, res) => {
   const { username, password, full_name, email, section, tenant_slug } = req.body;
 
@@ -82,13 +97,42 @@ exports.register = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, tenant_slug } = req.body;
 
   try {
-    const userResult = await db.query(
-      'SELECT * FROM users WHERE username = $1',
-      [username]
-    );
+    let userResult;
+    try {
+      if (tenant_slug) {
+        // Connexion scoped à une entreprise (page /<code>/login)
+        const tenantResult = await db.query(
+          'SELECT id, status FROM tenants WHERE slug = $1',
+          [tenant_slug]
+        );
+        const tenant = tenantResult.rows[0];
+        if (!tenant) {
+          return res.status(404).json({ message: 'Entreprise non trouvée' });
+        }
+        if (tenant.status === 'suspended') {
+          return res.status(403).json({ message: 'Cette entreprise est suspendue. Contactez le support.' });
+        }
+        userResult = await db.query(
+          'SELECT * FROM users WHERE username = $1 AND tenant_id = $2',
+          [username, tenant.id]
+        );
+      } else {
+        userResult = await db.query(
+          'SELECT * FROM users WHERE username = $1',
+          [username]
+        );
+      }
+    } catch (err) {
+      // Colonne tenant_id absente (base non migrée) → login sans scoping
+      if (err.code === '42703') {
+        userResult = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+      } else {
+        throw err;
+      }
+    }
     const user = userResult.rows[0];
 
     if (!user) {
@@ -123,5 +167,129 @@ exports.login = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur serveur lors de la connexion' });
+  }
+};
+
+// Crée une entreprise + son compte super admin + réglages/sections par défaut
+exports.registerCompany = async (req, res) => {
+  const { company_name, slug, admin_username, admin_password, admin_full_name, admin_email, contact_email } = req.body;
+
+  if (!company_name || !slug || !admin_username || !admin_password || !admin_full_name || !admin_email) {
+    return res.status(400).json({ message: 'Tous les champs sont requis' });
+  }
+  if (String(admin_password).length < 6) {
+    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+  }
+
+  const normalizedSlug = normalizeSlug(slug);
+  if (!normalizedSlug) {
+    return res.status(400).json({ message: 'Code entreprise invalide' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Tenant actif
+    let tenant;
+    try {
+      const tenantResult = await client.query(
+        `INSERT INTO tenants (name, slug, email_domain, contact_email, status)
+         VALUES ($1, $2, NULL, $3, 'active')
+         RETURNING id, name, slug`,
+        [company_name, normalizedSlug, contact_email || null]
+      );
+      tenant = tenantResult.rows[0];
+    } catch (err) {
+      if (err.code === '23505') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Ce code entreprise est déjà utilisé' });
+      }
+      throw err;
+    }
+
+    // 2. Super admin
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(admin_password, salt);
+    await client.query(
+      `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role)
+       VALUES ($1, $2, $3, $4, $5, 'superadmin')`,
+      [tenant.id, admin_username, hashedPassword, admin_full_name, admin_email]
+    );
+
+    // 3. Réglages par défaut
+    await client.query(
+      `INSERT INTO settings (tenant_id, key, value) VALUES
+        ($1, 'site_name', $2),
+        ($1, 'site_description', $3)
+       ON CONFLICT (tenant_id, key) DO NOTHING`,
+      [tenant.id, company_name, 'Plateforme de gestion documentaire']
+    );
+
+    // 4. Sections par défaut
+    for (const sectionName of DEFAULT_SECTIONS) {
+      await client.query(
+        'INSERT INTO sections (tenant_id, name) VALUES ($1, $2) ON CONFLICT (tenant_id, name) DO NOTHING',
+        [tenant.id, sectionName]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      message: 'Entreprise créée avec succès. Votre compte administrateur est prêt.',
+      slug: tenant.slug,
+      name: tenant.name,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(err);
+    res.status(500).json({ message: "Erreur lors de la création de l'entreprise" });
+  } finally {
+    client.release();
+  }
+};
+
+// Infos publiques d'une entreprise + ses réglages (pour la page de connexion dédiée)
+exports.getCompanyPublic = async (req, res) => {
+  const { slug } = req.params;
+  try {
+    const tenantResult = await db.query(
+      'SELECT id, name, slug, status FROM tenants WHERE slug = $1',
+      [slug]
+    );
+    const tenant = tenantResult.rows[0];
+    if (!tenant) {
+      return res.status(404).json({ message: 'Entreprise non trouvée' });
+    }
+
+    const settingsResult = await db.query(
+      "SELECT key, value FROM settings WHERE tenant_id = $1 AND key IN ('site_name', 'site_description', 'site_logo')",
+      [tenant.id]
+    );
+    const settings = {};
+    settingsResult.rows.forEach((row) => { settings[row.key] = row.value; });
+
+    if (settings.site_logo && !settings.site_logo.startsWith('http')) {
+      const host = req.headers.host || '127.0.0.1:30001';
+      const protocol = req.protocol || 'http';
+      settings.site_logo_url = `${protocol}://${host}/uploads/${settings.site_logo}`;
+    } else {
+      settings.site_logo_url = settings.site_logo || null;
+    }
+    delete settings.site_logo;
+
+    res.json({
+      slug: tenant.slug,
+      name: tenant.name,
+      status: tenant.status,
+      settings,
+    });
+  } catch (err) {
+    if (err.code === '42P01' || err.code === '42703') {
+      return res.status(404).json({ message: 'Entreprise non trouvée' });
+    }
+    console.error(err);
+    res.status(500).json({ message: "Erreur lors du chargement de l'entreprise" });
   }
 };

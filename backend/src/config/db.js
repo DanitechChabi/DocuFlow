@@ -30,4 +30,6 @@ pool.on('error', (err) => {
 
 module.exports = {
   query: (text, params) => pool.query(text, params),
+  // Exporté pour les transactions (BEGIN/COMMIT/ROLLBACK via pool.connect())
+  pool,
 };
