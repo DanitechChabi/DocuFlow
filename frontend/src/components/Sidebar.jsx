@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FileSearch, History, LogOut, Building2, ShieldCheck, X, Info, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, FileSearch, History, LogOut, Building2, ShieldCheck, X, Info, ClipboardList, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -13,6 +13,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={20} /> },
     { id: 'requests', label: 'Mes demandes', icon: <FileSearch size={20} /> },
+    { id: 'documents', label: 'Documents', icon: <FolderOpen size={20} /> },
   ];
 
   if (user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin') {
@@ -34,6 +35,8 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
       navigate('/super-admin-portal');
     } else if (item.id === 'about') {
       navigate('/about');
+    } else if (item.id === 'documents') {
+      navigate('/documents');
     } else {
       setActiveTab(item.id);
     }

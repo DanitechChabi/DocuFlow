@@ -12,6 +12,7 @@ const messageRoutes = require('./routes/messageRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const documentRoutes = require('./routes/documentRoutes');
 
 const path = require('path');
 
@@ -44,6 +45,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Dossier des fichiers uploadés
 app.use('/uploads/files', express.static(path.join(__dirname, '../uploads/files')));

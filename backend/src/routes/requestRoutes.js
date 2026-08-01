@@ -23,5 +23,6 @@ router.get('/all', roleMiddleware(ADMIN_ROLES), requestController.getAllRequests
 router.get('/:id/verify-mfile', roleMiddleware(ADMIN_ROLES), requestController.verifyMfile);
 router.patch('/:id/status', roleMiddleware(ADMIN_ROLES), requestController.updateRequestStatus);
 router.patch('/:id/assign', roleMiddleware(ADMIN_ROLES), requestController.assignRequest);
+router.patch('/:id/document', roleMiddleware(ADMIN_ROLES), requestController.linkDocument);
 
 module.exports = router;

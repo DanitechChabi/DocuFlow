@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Clock, FileText, Search, CheckCircle,
-  AlertCircle, Save, Shield, Paperclip, Download, Upload, File, UserCircle2
+  AlertCircle, Save, Shield, Paperclip, Download, Upload, File, UserCircle2,
+  FolderOpen, Link2, Unlink, Loader2, RefreshCw
 } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
+import { documentService } from '../services/documentService';
 
 // Machine à états côté client (miroir du backend requestStateMachine)
 const TRANSITIONS = {
@@ -38,6 +40,12 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const [assigneeId, setAssigneeId] = useState('');
   const [assigning, setAssigning] = useState(false);
   const fileInputRef = useRef(null);
+  const [gedDoc, setGedDoc] = useState(null);
+  const [gedBusy, setGedBusy] = useState(false);
+  const [gedError, setGedError] = useState('');
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkResults, setLinkResults] = useState([]);
 
   const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
 
@@ -67,6 +75,68 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       }
     }
   }, [request, loadFiles, isAdmin]);
+
+  // Document lié dans le référentiel GED
+  useEffect(() => {
+    if (request?.document_id) {
+      documentService.getDocument(request.document_id)
+        .then(setGedDoc)
+        .catch(() => setGedDoc(null));
+    } else {
+      setGedDoc(null);
+    }
+  }, [request?.id, request?.document_id]);
+
+  // Recherche débouncée pour "lier un document"
+  useEffect(() => {
+    if (!linkOpen || !linkSearch.trim()) {
+      setLinkResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await documentService.getDocuments({ q: linkSearch.trim(), page_size: 8 });
+        setLinkResults(res.documents || []);
+      } catch {
+        setLinkResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [linkOpen, linkSearch]);
+
+  const handleIndexFromRequest = async () => {
+    setGedBusy(true);
+    setGedError('');
+    try {
+      const res = await documentService.indexFromRequest(request.id);
+      setGedDoc(res.document);
+    } catch (err) {
+      setGedError(err.response?.data?.message || "Erreur lors de l'indexation");
+    } finally {
+      setGedBusy(false);
+    }
+  };
+
+  const handlePickDocument = async (doc) => {
+    try {
+      await documentService.linkDocumentToRequest(request.id, doc.id);
+      setGedDoc(doc);
+      setLinkOpen(false);
+      setLinkSearch('');
+      setLinkResults([]);
+    } catch (err) {
+      setGedError(err.response?.data?.message || 'Erreur lors de la liaison');
+    }
+  };
+
+  const handleUnlinkDocument = async () => {
+    try {
+      await documentService.unlinkDocumentFromRequest(request.id);
+      setGedDoc(null);
+    } catch (err) {
+      setGedError(err.response?.data?.message || 'Erreur lors du retrait du lien');
+    }
+  };
 
   const handleUploadFiles = async (e) => {
     const selected = Array.from(e.target.files || []);
@@ -399,13 +469,62 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                   <div className={`p-4 rounded-xl border text-sm ${mfileData.exists ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}`}>
                     <div className="flex items-center gap-2 font-bold mb-1">
                       {mfileData.exists ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-                      {mfileData.exists ? 'Document trouvé dans Mfile' : 'Document introuvable'}
+                      {mfileData.message || (mfileData.exists ? 'Document trouvé' : 'Document introuvable')}
                     </div>
                     {mfileData.fileUrl && (
                       <p className="text-xs mt-1 opacity-75">URL : {mfileData.fileUrl}</p>
                     )}
                   </div>
                 )}
+
+                {/* Référentiel documentaire (GED) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 ml-1 flex items-center gap-1.5"><FolderOpen size={13} /> Référentiel documentaire</label>
+                  {gedError && <p className="text-xs font-bold text-red-500">{gedError}</p>}
+                  {gedDoc ? (
+                    <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-afgc-secondary">{gedDoc.reference_mfile}</p>
+                          <p className="text-xs text-slate-500 truncate">{gedDoc.nom_entreprise} · {gedDoc.num_dossier}/{gedDoc.num_acte} · {gedDoc.statut}</p>
+                        </div>
+                        <button onClick={handleUnlinkDocument} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 flex-shrink-0" title="Retirer le lien">
+                          <Unlink size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <button onClick={handleIndexFromRequest} disabled={gedBusy} className="btn-secondary flex items-center justify-center gap-2">
+                        {gedBusy ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                        {gedBusy ? 'Indexation...' : 'Indexer dans le référentiel'}
+                      </button>
+                      <button onClick={() => setLinkOpen((v) => !v)} className="btn-secondary flex items-center justify-center gap-2">
+                        <Link2 size={18} /> {linkOpen ? 'Fermer la recherche' : 'Lier un document existant'}
+                      </button>
+                      {linkOpen && (
+                        <div className="relative">
+                          <input
+                            className="input-premium"
+                            placeholder="Référence, entreprise, n° dossier…"
+                            value={linkSearch}
+                            onChange={(e) => setLinkSearch(e.target.value)}
+                          />
+                          {linkResults.length > 0 && (
+                            <div className="absolute z-10 mt-1 w-full bg-white rounded-xl border border-slate-200 shadow-elevated max-h-56 overflow-y-auto">
+                              {linkResults.map((d) => (
+                                <button key={d.id} onClick={() => handlePickDocument(d)} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm">
+                                  <span className="font-bold text-afgc-secondary">{d.reference_mfile}</span>
+                                  <span className="text-slate-500"> · {d.nom_entreprise} · {d.num_dossier}/{d.num_acte}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

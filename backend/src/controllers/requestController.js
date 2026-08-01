@@ -1,8 +1,9 @@
 const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
-const mfileService = require('../services/mfileService');
 const requestStateMachine = require('../services/requestStateMachine');
 const mailService = require('../services/mailService');
+const storage = require('../services/storageService');
+const { indexRequestToDocuments } = require('../services/documentIndexService');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
@@ -140,21 +141,61 @@ exports.verifyMfile = async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
-    const mfileCheck = await mfileService.verifyDocument({
-      nom_entreprise: request.nom_entreprise,
-      num_dossier: request.num_dossier,
-      num_acte: request.num_acte,
-      annee: request.annee
-    });
+    // Vérification dans le référentiel documentaire (plus de mock)
+    // db.query direct : db-tenant injecte tenant_id en double sur ORDER BY + LIMIT
+    const docResult = await db.query(
+      `SELECT * FROM documents
+       WHERE num_dossier = $1 AND num_acte = $2 AND tenant_id = $3
+       ORDER BY created_at DESC LIMIT 1`,
+      [request.num_dossier, request.num_acte, tenantId]
+    );
+    const document = docResult.rows[0] || null;
+
+    let fileUrl = null;
+    if (document) {
+      const fileRes = await db.query(
+        'SELECT * FROM document_files WHERE document_id = $1 ORDER BY version DESC LIMIT 1',
+        [document.id]
+      );
+      const f = fileRes.rows[0];
+      if (f) fileUrl = storage.fileUrl(req, f.stored_name, f.cloudinary_public_id);
+    }
 
     res.json({
-      exists: mfileCheck.exists,
-      fileUrl: mfileCheck.fileUrl || null,
-      message: mfileCheck.exists ? 'Document trouvé dans mfile' : 'Document non trouvé dans mfile'
+      exists: !!document,
+      document,
+      fileUrl,
+      message: document ? 'Document trouvé dans le référentiel' : 'Document non trouvé dans le référentiel'
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Erreur lors de la vérification mfile' });
+    res.status(500).json({ message: 'Erreur lors de la vérification du document' });
+  }
+};
+
+exports.linkDocument = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const { id } = req.params;
+  const { document_id } = req.body;
+
+  try {
+    if (document_id == null) {
+      await tenantDb.query(tenantId, 'UPDATE requests SET document_id = NULL WHERE id = $1', [id]);
+      return res.json({ message: 'Lien retiré' });
+    }
+    const docRes = await tenantDb.query(tenantId, 'SELECT * FROM documents WHERE id = $1', [document_id]);
+    if (!docRes.rows[0]) return res.status(404).json({ message: 'Document non trouvé' });
+
+    const result = await tenantDb.query(
+      tenantId,
+      'UPDATE requests SET document_id = $1 WHERE id = $2',
+      [document_id, id]
+    );
+    if (!result.rowCount) return res.status(404).json({ message: 'Demande non trouvée' });
+    res.json({ message: 'Demande liée au document', document_id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la liaison' });
   }
 };
 
@@ -337,6 +378,15 @@ exports.updateRequestStatus = async (req, res) => {
         await db.query(query + ` WHERE id = $${paramCount - 1}`, [...params, id]);
       } else {
         throw err;
+      }
+    }
+
+    // 3bis. À la livraison, indexer les fichiers dans le référentiel documentaire
+    if (status === 'livré') {
+      try {
+        await indexRequestToDocuments(tenantId, id, userId);
+      } catch (err) {
+        console.error('[request] indexation automatique échouée :', err.message);
       }
     }
 
