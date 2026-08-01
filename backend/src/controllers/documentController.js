@@ -292,11 +292,14 @@ exports.indexFromRequest = async (req, res) => {
 exports.listFolders = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
-    const result = await tenantDb.query(
-      tenantId,
+    // db.query direct : le helper db-tenant confond le WHERE de la sous-requête
+    // avec un WHERE externe et insère un AND invalide (même limite que getArchivists)
+    const result = await db.query(
       `SELECT f.*, (SELECT COUNT(*) FROM documents d WHERE d.dossier_id = f.id) AS doc_count
        FROM document_folders f
-       ORDER BY f.name ASC`
+       WHERE f.tenant_id = $1
+       ORDER BY f.name ASC`,
+      [tenantId]
     );
     res.json(result.rows);
   } catch (err) {
