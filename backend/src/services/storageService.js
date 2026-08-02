@@ -6,7 +6,7 @@
  * Sinon, fallback sur le disque local (uploads/files/).
  */
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;  // Utiliser fs.promises pour les opérations async
 const cloudinary = require('cloudinary').v2;
 
 const USE_CLOUDINARY = !!(
@@ -28,8 +28,23 @@ if (USE_CLOUDINARY) {
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 const FILES_DIR = path.join(UPLOADS_DIR, 'files');
-if (!fs.existsSync(FILES_DIR)) {
-  fs.mkdirSync(FILES_DIR, { recursive: true });
+
+// Créer les dossiers au démarrage (mode sync car au chargement du module)
+const fsSync = require('fs');
+if (!fsSync.existsSync(FILES_DIR)) {
+  fsSync.mkdirSync(FILES_DIR, { recursive: true });
+}
+
+/**
+ * Ressource Cloudinary correspondant à un type MIME.
+ * L'upload en resource_type 'auto' classe les images en 'image',
+ * les vidéos en 'video' et tout le reste (PDF, docs, textes…) en 'raw'.
+ */
+function resourceTypeFromMime(mimeType) {
+  if (!mimeType) return 'image';
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  return 'raw';
 }
 
 /**
@@ -37,51 +52,78 @@ if (!fs.existsSync(FILES_DIR)) {
  *
  * @param {object} file   - { path, filename, originalname, mimetype, size }
  * @param {object} opts   - { folder, keepLocal }
- * @returns {Promise<{storedName, cloudinaryPublicId, url}>}
+ * @returns {Promise<{storedName, cloudinaryPublicId, url, resourceType}>}
  */
 async function saveFile(file, { folder = 'documents', keepLocal = false } = {}) {
   if (USE_CLOUDINARY) {
-    const result = await cloudinary.uploader.upload(file.path, { folder });
+    // resource_type explicite selon le mime : les PDF (et doc/xls/txt/zip) sont
+    // stockés en 'raw' pour préserver le fichier original. 'auto' classerait les
+    // PDF en 'image' (accessible uniquement via transformation, rasterisé en PNG).
+    const resourceType = resourceTypeFromMime(file.mimetype);
+    const result = await cloudinary.uploader.upload(file.path, { folder, resource_type: resourceType });
     // Le fichier temporaire local n'est plus nécessaire (sauf si on veut le conserver)
     if (!keepLocal) {
-      fs.unlink(file.path, () => {});
+      try {
+        await fs.unlink(file.path);
+      } catch (err) {
+        console.warn('[storage] Impossible de supprimer le fichier temporaire:', err.message);
+      }
     }
     return {
       storedName: result.public_id,
       cloudinaryPublicId: result.public_id,
-      url: cloudinary.url(result.public_id, { secure: true }),
+      resourceType,
+      // secure_url fourni par Cloudinary : version + format exacts (fiabilité maximale)
+      secureUrl: result.secure_url || null,
+      url: result.secure_url || cloudinary.url(result.public_id, { secure: true, resource_type: resourceType }),
     };
   }
   // Mode local : multer a déjà écrit le fichier dans uploads/files/
   return {
     storedName: file.filename,
     cloudinaryPublicId: null,
+    resourceType: null,
+    secureUrl: null,
     url: null, // construit par fileUrl(req, ...)
   };
 }
 
 /**
  * Supprime un fichier (Cloudinary ou disque local).
+ * resourceType : 'image' | 'video' | 'raw' (Cloudinary ne retrouve un asset
+ * raw qu'avec le bon resource_type, sinon erreur).
  */
-async function deleteFile({ storedName, cloudinaryPublicId }) {
+async function deleteFile({ storedName, cloudinaryPublicId, resourceType }) {
   if (USE_CLOUDINARY && cloudinaryPublicId) {
-    await cloudinary.uploader.destroy(cloudinaryPublicId);
+    // resourceType peut être un mime_type (image/png…) ou déjà 'image'|'video'|'raw'
+    await cloudinary.uploader.destroy(cloudinaryPublicId, { resource_type: resourceTypeFromMime(resourceType) });
     return;
   }
   const p = path.join(FILES_DIR, storedName || '');
-  if (storedName && fs.existsSync(p)) {
-    fs.unlinkSync(p);
+  if (storedName) {
+    try {
+      await fs.unlink(p);
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        console.warn('[storage] Erreur suppression fichier:', err.message);
+      }
+    }
   }
 }
 
 /**
  * URL publique d'un fichier (https si Cloudinary, sinon via req).
+ * @param {object} req     - requête Express (pour construire l'URL locale)
+ * @param {object} fileRow - ligne document_files (stored_name, cloudinary_public_id,
+ *                           mime_type, secure_url)
+ * Utilise le secure_url stocké à l'upload (version + format exacts de Cloudinary) ;
+ * fallback sur reconstruction pour les anciens fichiers sans secure_url.
  */
-function fileUrl(req, storedName, cloudinaryPublicId) {
-  if (USE_CLOUDINARY && cloudinaryPublicId) {
-    return cloudinary.url(cloudinaryPublicId, { secure: true });
+function fileUrl(req, fileRow) {
+  if (USE_CLOUDINARY && fileRow.cloudinary_public_id) {
+    return fileRow.secure_url || cloudinary.url(fileRow.cloudinary_public_id, { secure: true, resource_type: resourceTypeFromMime(fileRow.mime_type) });
   }
-  return `${req.protocol}://${req.get('host')}/uploads/files/${storedName}`;
+  return `${req.protocol}://${req.get('host')}/uploads/files/${fileRow.stored_name}`;
 }
 
-module.exports = { saveFile, deleteFile, fileUrl, USE_CLOUDINARY };
+module.exports = { saveFile, deleteFile, fileUrl, USE_CLOUDINARY, resourceTypeFromMime };

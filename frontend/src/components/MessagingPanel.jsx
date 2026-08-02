@@ -136,7 +136,9 @@ const MessagingPanel = ({ isOpen, onClose }) => {
         original_name: f.original_name,
         stored_name: f.stored_name,
         mime_type: f.mime_type,
-        file_size: f.file_size
+        file_size: f.file_size,
+        cloudinary_public_id: f.cloudinary_public_id || null,
+        secure_url: f.secure_url || null,
       }));
       const msg = await messageService.sendMessage(activeUser.id, content, filesMeta);
       setMessages(prev => prev.map(m =>

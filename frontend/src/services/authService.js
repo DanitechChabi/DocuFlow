@@ -26,8 +26,15 @@ export const authService = {
     localStorage.removeItem('user');
   },
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem('user');
+      return user ? JSON.parse(user) : null;
+    } catch (err) {
+      console.error('Failed to parse user from localStorage:', err);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      return null;
+    }
   },
 
   updateUser: (userData) => {

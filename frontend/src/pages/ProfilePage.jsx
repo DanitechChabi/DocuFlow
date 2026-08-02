@@ -25,12 +25,14 @@ const ProfilePage = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    let mounted = true;
     const load = async () => {
       try {
         const [profileData, sectionsData] = await Promise.all([
           userService.getProfile(),
           sectionService.getSections()
         ]);
+        if (!mounted) return;
         setProfile(profileData);
         setFormData({
           full_name: profileData.full_name || '',
@@ -39,12 +41,13 @@ const ProfilePage = () => {
         });
         setSections(sectionsData);
       } catch (err) {
-        setErrorMsg('Erreur lors du chargement du profil');
+        if (mounted) setErrorMsg('Erreur lors du chargement du profil');
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
     load();
+    return () => { mounted = false; };
   }, []);
 
   const clearMessages = () => {

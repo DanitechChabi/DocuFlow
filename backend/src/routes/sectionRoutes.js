@@ -4,7 +4,8 @@ const sectionController = require('../controllers/sectionController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
-// Route publique — accessible sans authentification (pour le formulaire d'inscription)
+// GET / — route publique : liste des sections, utilisée par le formulaire
+// d'inscription (sans authentification). Ne renvoie que des noms de sections.
 router.get('/', sectionController.getSections);
 
 // Routes protégées — nécessitent authentification et rôle SuperAdmin

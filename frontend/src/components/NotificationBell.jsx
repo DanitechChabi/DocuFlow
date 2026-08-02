@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 
-const NotificationBell = () => {
+const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [coords, setCoords] = useState({ top: 0, right: 0 });
+  const [coords, setCoords] = useState({ top: 0, right: 16 }); // DEFAULT right:16 (viewport gutter)
   const btnRef = useRef(null);
 
   const fetchNotifications = async () => {
@@ -27,16 +27,35 @@ const NotificationBell = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const computeCoords = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    // Always anchor to viewport right edge with 16px gutter (responsive)
+    // Use rect.top for vertical position
+    setCoords({
+      top: rect.bottom + 8,
+      right: 16,
+    });
+  }, []);
+
   const handleToggle = () => {
-    if (!isOpen && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setCoords({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
+    if (!isOpen) {
+      computeCoords();
     }
     setIsOpen(!isOpen);
   };
+
+  // Recompute position on resize/orientation change while dropdown is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleResize = () => computeCoords();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [isOpen, computeCoords]);
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -64,6 +83,8 @@ const NotificationBell = () => {
       <button
         ref={btnRef}
         onClick={handleToggle}
+        data-tour={dataTour}
+        {...rest}
         className={`p-2.5 relative transition-all duration-200 rounded-xl ${
           isOpen ? 'bg-slate-100 text-afgc-primary' : 'text-slate-400 hover:text-afgc-primary hover:bg-slate-100'
         }`}
@@ -84,7 +105,7 @@ const NotificationBell = () => {
 
           {/* Dropdown */}
           <div
-            className="fixed z-[9999] w-96 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-elevated border border-slate-100 animate-scale-in overflow-hidden"
+            className="fixed z-[9999] w-[min(24rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-elevated border border-slate-100 animate-scale-in overflow-hidden"
             style={{ top: coords.top, right: coords.right }}
           >
             {/* Header */}

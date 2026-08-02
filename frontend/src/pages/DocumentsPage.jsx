@@ -256,6 +256,7 @@ const DocumentsPage = () => {
         <DocumentDetailsModal
           documentId={detailDoc}
           isAdmin={isAdmin}
+          folders={folders}
           onClose={() => setDetailDoc(null)}
           onChanged={() => { load(); }}
         />

@@ -35,7 +35,8 @@ const upload = multer({
   }
 });
 
-// Routes publiques
+// GET / — route publique : branding (nom, description, logo) utilisé par la
+// page de connexion avant authentification. L'écriture reste réservée au superadmin.
 router.get('/', settingsController.getSettings);
 
 // Routes protégées (superadmin)

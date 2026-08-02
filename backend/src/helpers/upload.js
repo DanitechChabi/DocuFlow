@@ -1,5 +1,7 @@
 /**
  * Helper multer pour l'upload de fichiers (demandes et messagerie)
+ * Ce module est conservé pour compatibilité mais le stockage est maintenant
+ * géré par storageService (Cloudinary ou local).
  */
 const multer = require('multer');
 const path = require('path');

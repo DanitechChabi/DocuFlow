@@ -20,23 +20,31 @@ async function query(tenantId, text, params = []) {
   const condition = `tenant_id = $${idx}`;
 
   // Construire la requête scope en fonction de la présence d'une clause WHERE
+  // Injecte la condition UNIFORME AVANT la première clause de terminaison (ORDER BY / LIMIT / GROUP BY / HAVING)
   const buildScoped = () => {
+    // Chercher la première occurrence de n'importe quelle clause de terminaison
+    const terminatorRegex = /\s+(ORDER\s+BY|LIMIT|GROUP\s+BY|HAVING)\s/i;
+    const terminatorMatch = text.match(terminatorRegex);
+
     if (/WHERE/i.test(text)) {
-      let s = text
-        .replace(/\s+ORDER\s+BY\s/i, ` AND ${condition} ORDER BY `)
-        .replace(/\s+LIMIT\s/i, ` AND ${condition} LIMIT `)
-        .replace(/\s+GROUP\s+BY\s/i, ` AND ${condition} GROUP BY `)
-        .replace(/\s+HAVING\s/i, ` AND ${condition} HAVING `);
-      if (s === text) s = text + ` AND ${condition}`;
-      return { text: s, params: [...params, safeTenantId] };
+      if (terminatorMatch) {
+        const insertPos = terminatorMatch.index;
+        const before = text.slice(0, insertPos);
+        const after = text.slice(insertPos); // starts with whitespace + keyword
+        const s = `${before} AND ${condition}${after}`;
+        return { text: s, params: [...params, safeTenantId] };
+      }
+      return { text: text + ` AND ${condition}`, params: [...params, safeTenantId] };
     }
 
-    let s = text
-      .replace(/\s+ORDER\s+BY\s/i, ` WHERE ${condition} ORDER BY `)
-      .replace(/\s+LIMIT\s/i, ` WHERE ${condition} LIMIT `)
-      .replace(/\s+GROUP\s+BY\s/i, ` WHERE ${condition} GROUP BY `);
-    if (s === text) s = text + ` WHERE ${condition}`;
-    return { text: s, params: [...params, safeTenantId] };
+    if (terminatorMatch) {
+      const insertPos = terminatorMatch.index;
+      const before = text.slice(0, insertPos);
+      const after = text.slice(insertPos);
+      const s = `${before} WHERE ${condition}${after}`;
+      return { text: s, params: [...params, safeTenantId] };
+    }
+    return { text: text + ` WHERE ${condition}`, params: [...params, safeTenantId] };
   };
 
   const scoped = buildScoped();

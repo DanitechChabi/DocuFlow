@@ -1,12 +1,19 @@
 const db = require('../config/db');
+const tenantDb = require('../config/db-tenant');
+const storage = require('../services/storageService');
+const path = require('path');
+const fs = require('fs');
+
+const FILES_DIR = path.join(__dirname, '../../uploads/files');
 
 exports.uploadRequestFiles = async (req, res) => {
   const { requestId } = req.params;
   const userId = req.user.id;
+  const tenantId = req.user.tenant_id;
 
   try {
-    // Vérifier que la demande existe
-    const request = await db.query('SELECT id FROM requests WHERE id = $1', [requestId]);
+    // Vérifier que la demande existe et appartient au tenant
+    const request = await tenantDb.query(tenantId, 'SELECT id FROM requests WHERE id = $1', [requestId]);
     if (request.rows.length === 0) {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
@@ -17,12 +24,18 @@ exports.uploadRequestFiles = async (req, res) => {
 
     const files = [];
     for (const file of req.files) {
+      // Utiliser le storage service (Cloudinary ou local)
+      const info = await storage.saveFile(file, { folder: 'request_files' });
+
       const result = await db.query(
-        `INSERT INTO request_files (request_id, original_name, stored_name, mime_type, file_size, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [requestId, file.originalname, file.filename, file.mimetype, file.size, userId]
+        `INSERT INTO request_files (request_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [requestId, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null]
       );
-      files.push(result.rows[0]);
+      files.push({
+        ...result.rows[0],
+        url: storage.fileUrl(req, { ...result.rows[0], stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: file.mimetype, secure_url: info.secureUrl })
+      });
     }
 
     res.status(201).json({ files });
@@ -34,8 +47,15 @@ exports.uploadRequestFiles = async (req, res) => {
 
 exports.getRequestFiles = async (req, res) => {
   const { requestId } = req.params;
+  const tenantId = req.user.tenant_id;
 
   try {
+    // Vérifier que la demande appartient au tenant
+    const request = await tenantDb.query(tenantId, 'SELECT id FROM requests WHERE id = $1', [requestId]);
+    if (request.rows.length === 0) {
+      return res.status(404).json({ message: 'Demande non trouvée' });
+    }
+
     const result = await db.query(
       `SELECT rf.*, u.full_name as uploaded_by_name
        FROM request_files rf
@@ -45,10 +65,10 @@ exports.getRequestFiles = async (req, res) => {
       [requestId]
     );
 
-    // Ajouter l'URL de téléchargement
+    // Ajouter l'URL de téléchargement via storageService
     const files = result.rows.map(f => ({
       ...f,
-      url: `${req.protocol}://${req.get('host')}/uploads/files/${f.stored_name}`
+      url: storage.fileUrl(req, f)
     }));
 
     res.json(files);
@@ -60,6 +80,7 @@ exports.getRequestFiles = async (req, res) => {
 
 exports.deleteRequestFile = async (req, res) => {
   const { fileId } = req.params;
+  const tenantId = req.user.tenant_id;
 
   try {
     const result = await db.query('SELECT * FROM request_files WHERE id = $1', [fileId]);
@@ -68,12 +89,19 @@ exports.deleteRequestFile = async (req, res) => {
     }
 
     const file = result.rows[0];
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '../../uploads/files', file.stored_name);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+
+    // Vérifier que le fichier appartient à une demande du tenant
+    const requestCheck = await tenantDb.query(tenantId, 'SELECT id FROM requests WHERE id = $1', [file.request_id]);
+    if (requestCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Accès refusé' });
     }
+
+    // Supprimer le fichier (Cloudinary ou local)
+    await storage.deleteFile({
+      storedName: file.stored_name,
+      cloudinaryPublicId: file.cloudinary_public_id,
+      resourceType: file.mime_type
+    });
 
     await db.query('DELETE FROM request_files WHERE id = $1', [fileId]);
     res.json({ message: 'Fichier supprimé' });
@@ -89,14 +117,17 @@ exports.uploadMessageFile = async (req, res) => {
       return res.status(400).json({ message: 'Aucun fichier fourni' });
     }
 
-    const file = req.file;
+    const info = await storage.saveFile(req.file, { folder: 'message_attachments' });
+
     res.status(201).json({
       id: null, // sera lié au message après envoi
-      original_name: file.originalname,
-      stored_name: file.filename,
-      mime_type: file.mimetype,
-      file_size: file.size,
-      url: `${req.protocol}://${req.get('host')}/uploads/files/${file.filename}`
+      original_name: req.file.originalname,
+      stored_name: info.storedName,
+      cloudinary_public_id: info.cloudinaryPublicId,
+      mime_type: req.file.mimetype,
+      file_size: req.file.size,
+      secure_url: info.secureUrl,
+      url: storage.fileUrl(req, { stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: req.file.mimetype, secure_url: info.secureUrl })
     });
   } catch (err) {
     console.error(err);
@@ -112,8 +143,8 @@ exports.linkMessageFiles = async (req, res) => {
     const files = [];
     for (const storedName of stored_names) {
       const result = await db.query(
-        `INSERT INTO message_attachments (message_id, original_name, stored_name, mime_type, file_size)
-         SELECT $1, original_name, stored_name, mime_type, file_size
+        `INSERT INTO message_attachments (message_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, secure_url)
+         SELECT $1, original_name, stored_name, cloudinary_public_id, mime_type, file_size, secure_url
          FROM request_files WHERE stored_name = $2
          RETURNING *`,
         [messageId, storedName]
@@ -138,7 +169,7 @@ exports.getMessageFiles = async (req, res) => {
 
     const files = result.rows.map(f => ({
       ...f,
-      url: `${req.protocol}://${req.get('host')}/uploads/files/${f.stored_name}`
+      url: storage.fileUrl(req, f)
     }));
 
     res.json(files);

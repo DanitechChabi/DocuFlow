@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS requests (
     motif VARCHAR(100) NOT NULL,
     priorite VARCHAR(20) DEFAULT 'normale',
     statut VARCHAR(30) DEFAULT 'en attente', -- 'en attente', 'transmis', 'a traiter', 'livré', 'rejete'
+    archived BOOLEAN DEFAULT FALSE, -- archivée (masquée du tableau de bord) par l'ultra-admin
     notes_internes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     date_livraison TIMESTAMP,

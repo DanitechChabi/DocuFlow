@@ -74,7 +74,12 @@ const CompanyRegisterPage = () => {
         setError(data.message || 'Une erreur est survenue');
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Une erreur est survenue lors de la création de l'entreprise");
+      const msg = err.response?.data?.message;
+      if (err.response?.status === 500) {
+        setError("Erreur serveur lors de la création. Vérifiez que la base de données est accessible et à jour.");
+      } else {
+        setError(msg || "Une erreur est survenue lors de la création de l'entreprise");
+      }
     } finally {
       setLoading(false);
     }

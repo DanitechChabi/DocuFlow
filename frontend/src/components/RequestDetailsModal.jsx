@@ -7,6 +7,7 @@ import {
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { documentService } from '../services/documentService';
+import { toast } from './Toast';
 
 // Machine à états côté client (miroir du backend requestStateMachine)
 const TRANSITIONS = {
@@ -146,7 +147,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       await uploadService.uploadRequestFiles(request.id, selected);
       await loadFiles();
     } catch (err) {
-      alert("Erreur lors de l'upload des fichiers");
+      toast.error("Erreur lors de l'upload des fichiers");
     } finally {
       setUploadingFiles(false);
       e.target.value = '';
@@ -159,7 +160,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       await uploadService.deleteRequestFile(fileId);
       setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch (err) {
-      alert('Erreur lors de la suppression');
+      toast.error('Erreur lors de la suppression');
     }
   };
 
@@ -170,7 +171,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       const res = await requestService.verifyMfile(request.id);
       setMfileData(res);
     } catch (err) {
-      alert('Erreur lors de la vérification Mfile');
+      toast.error('Erreur lors de la vérification Mfile');
     } finally {
       setIsVerifying(false);
     }
@@ -180,10 +181,10 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
     setIsUpdating(true);
     try {
       await requestService.updateStatus(request.id, { status, notes_internes: notes });
-      alert('Mise à jour effectuée avec succès');
+      toast.success('Mise à jour effectuée avec succès');
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la sauvegarde');
+      toast.error(err.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setIsUpdating(false);
     }
@@ -192,14 +193,14 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const handleAssign = async (e) => {
     const nextAssigneeId = e.target.value;
     setAssigneeId(nextAssigneeId);
-    if (!nextAssigneeId) return;
+    if (!nextAssigneeId) return; // User selected "— Non assignée —" — unassign not supported yet
     setAssigning(true);
     try {
       await requestService.assignRequest(request.id, Number(nextAssigneeId));
-      alert('Demande assignée avec succès');
+      toast.success('Demande assignée avec succès');
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Erreur lors de l'assignation");
+      toast.error(err.response?.data?.message || "Erreur lors de l'assignation");
       setAssigneeId(request.assignee_id ? String(request.assignee_id) : '');
     } finally {
       setAssigning(false);
@@ -211,10 +212,10 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
     setIsUpdating(true);
     try {
       await requestService.updateStatus(request.id, { status: 'annulé' });
-      alert('Demande annulée');
+      toast.success('Demande annulée');
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Erreur lors de l'annulation");
+      toast.error(err.response?.data?.message || "Erreur lors de l'annulation");
     } finally {
       setIsUpdating(false);
     }

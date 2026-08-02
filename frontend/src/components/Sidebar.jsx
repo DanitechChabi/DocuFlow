@@ -11,9 +11,9 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   const logoSrc = settings.site_logo_url || 'https://th.bing.com/th/id/R.d7f2f165ad7ca819fe72a5f20a08a7c7?rik=cmptSS4F09F1Hw&riu=http%3a%2f%2fapiga.africa%2fimg%2fafgc.jpg&ehk=BW9PLt5Ge5oLmVWHbZvaEzZCStjt7IWIJj4n%2bEJym5M%3d&risl=&pid=ImgRaw&r=0';
 
   const menuItems = [
-    { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={20} /> },
+    { id: 'dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={20} />, tourId: 'sidebar' },
     { id: 'requests', label: 'Mes demandes', icon: <FileSearch size={20} /> },
-    { id: 'documents', label: 'Documents', icon: <FolderOpen size={20} /> },
+    { id: 'documents', label: 'Documents', icon: <FolderOpen size={20} />, tourId: 'documents' },
   ];
 
   if (user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin') {
@@ -23,7 +23,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   }
 
   if (user?.role === 'superadmin') {
-    menuItems.push({ id: 'super_admin', label: 'Gestion système', icon: <ShieldCheck size={20} /> });
+    menuItems.push({ id: 'super_admin', label: 'Gestion système', icon: <ShieldCheck size={20} />, tourId: 'super-admin' });
   }
 
   menuItems.push({ id: 'about', label: 'À propos', icon: <Info size={20} /> });
@@ -80,6 +80,7 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
           <button
             key={item.id}
             onClick={() => handleNav(item)}
+            data-tour={item.tourId}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative ${
               activeTab === item.id
                 ? 'bg-gradient-to-r from-afgc-secondary/20 to-blue-500/10 text-white shadow-sm'

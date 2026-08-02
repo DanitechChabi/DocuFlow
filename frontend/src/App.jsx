@@ -9,8 +9,10 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import MessagingFloatingButton from './components/MessagingFloatingButton';
+import ToastContainer from './components/Toast';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { authService } from './services/authService';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = authService.getCurrentUser();
@@ -27,10 +29,12 @@ function App() {
   return (
     <Router>
       <SettingsProvider>
+      <ErrorBoundary>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/:slug/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/:slug/register" element={<RegisterPage />} />
         <Route path="/register-company" element={<CompanyRegisterPage />} />
         <Route
           path="/dashboard"
@@ -68,6 +72,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
       <MessagingFloatingButton />
+      <ToastContainer />
+      </ErrorBoundary>
       </SettingsProvider>
     </Router>
   );

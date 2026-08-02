@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { sectionService } from '../services/sectionService';
@@ -19,32 +19,38 @@ const RegisterPage = () => {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const settings = useSettings();
+  const { slug } = useParams(); // Récupérer le tenant_slug de l'URL /:slug/register
 
   useEffect(() => {
+    let mounted = true;
     const loadSections = async () => {
       try {
         const data = await sectionService.getSections();
-        setSections(data);
+        if (mounted) setSections(data);
       } catch (err) {
         console.error('Erreur chargement sections', err);
       }
     };
     loadSections();
+    return () => { mounted = false; };
   }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const data = await authService.register(formData);
+      const data = await authService.register({ ...formData, tenant_slug: slug });
       if (data.user) {
         setSuccess(true);
-        setTimeout(() => navigate('/login'), 1500);
+        setTimeout(() => navigateRef.current(slug ? `/${slug}/login` : '/login'), 1500);
       } else {
         setError(data.message || 'Une erreur est survenue');
       }
@@ -206,7 +212,7 @@ const RegisterPage = () => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
               Déjà un compte ?{' '}
-              <Link to="/login" className="text-afgc-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
+              <Link to={slug ? `/${slug}/login` : '/login'} className="text-afgc-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
                 Se connecter
               </Link>
             </p>

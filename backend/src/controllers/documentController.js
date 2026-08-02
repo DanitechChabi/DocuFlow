@@ -89,7 +89,7 @@ exports.listDocuments = async (req, res) => {
       `SELECT d.*, f.name AS dossier_name,
          (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id) AS files_count
        FROM documents d
-       LEFT JOIN document_folders f ON f.id = d.dossier_id
+       LEFT JOIN document_folders f ON f.id = d.dossier_id AND f.tenant_id = d.tenant_id
        WHERE ${where}
        ORDER BY d.created_at DESC
        LIMIT $${vals.length + 1} OFFSET $${vals.length + 2}`,
@@ -110,35 +110,39 @@ exports.getDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
-    // db.query direct : tenant_id est ambigu dans un JOIN (d, f, u en ont un)
+    // Utiliser des JOINs qualifiés pour éviter l'ambiguïté tenant_id
     const docRes = await db.query(
       `SELECT d.*, f.name AS dossier_name, u.full_name AS created_by_name
        FROM documents d
-       LEFT JOIN document_folders f ON f.id = d.dossier_id
-       LEFT JOIN users u ON u.id = d.created_by
+       LEFT JOIN document_folders f ON f.id = d.dossier_id AND f.tenant_id = d.tenant_id
+       LEFT JOIN users u ON u.id = d.created_by AND u.tenant_id = d.tenant_id
        WHERE d.id = $1 AND d.tenant_id = $2`,
       [id, tenantId]
     );
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
 
+    // document_files / document_history n'ont pas de colonne tenant_id :
+    // le périmètre multi-tenant passe par le document parent (documents.tenant_id)
     const filesRes = await db.query(
       `SELECT df.*, u.full_name AS uploaded_by_name
        FROM document_files df
-       LEFT JOIN users u ON u.id = df.uploaded_by
+       LEFT JOIN documents doc ON doc.id = df.document_id AND doc.tenant_id = $2
+       LEFT JOIN users u ON u.id = df.uploaded_by AND u.tenant_id = doc.tenant_id
        WHERE df.document_id = $1
        ORDER BY df.version DESC`,
-      [id]
+      [id, tenantId]
     );
-    const files = filesRes.rows.map((f) => ({ ...f, url: storage.fileUrl(req, f.stored_name, f.cloudinary_public_id) }));
+    const files = filesRes.rows.map((f) => ({ ...f, url: storage.fileUrl(req, f) }));
 
     const histRes = await db.query(
       `SELECT h.*, u.full_name AS user_name
        FROM document_history h
-       LEFT JOIN users u ON u.id = h.user_id
+       LEFT JOIN documents doc ON doc.id = h.document_id AND doc.tenant_id = $2
+       LEFT JOIN users u ON u.id = h.user_id AND u.tenant_id = doc.tenant_id
        WHERE h.document_id = $1
        ORDER BY h.created_at DESC`,
-      [id]
+      [id, tenantId]
     );
 
     res.json({ ...doc, files, history: histRes.rows });
@@ -183,20 +187,51 @@ exports.updateDocument = async (req, res) => {
 exports.deleteDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
-  try {
-    const check = await tenantDb.query(tenantId, 'SELECT id FROM documents WHERE id = $1', [id]);
-    if (!check.rows[0]) return res.status(404).json({ message: 'Document non trouvé' });
+  const client = await db.pool.connect();
 
-    const filesRes = await db.query('SELECT * FROM document_files WHERE document_id = $1', [id]);
-    for (const f of filesRes.rows) {
-      await storage.deleteFile({ storedName: f.stored_name, cloudinaryPublicId: f.cloudinary_public_id });
+  try {
+    await client.query('BEGIN');
+
+    // Vérifier que le document existe et appartient au tenant
+    const check = await client.query('SELECT id FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+    if (!check.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Document non trouvé' });
     }
-    await tenantDb.query(tenantId, 'UPDATE requests SET document_id = NULL WHERE document_id = $1', [id]);
-    await tenantDb.query(tenantId, 'DELETE FROM documents WHERE id = $1', [id]);
+
+    // Récupérer les fichiers pour suppression ultérieure
+    const filesRes = await client.query('SELECT * FROM document_files WHERE document_id = $1', [id]);
+
+    // Supprimer les références dans requests
+    await client.query('UPDATE requests SET document_id = NULL WHERE document_id = $1 AND tenant_id = $2', [id, tenantId]);
+
+    // Supprimer les fichiers de la base
+    await client.query('DELETE FROM document_files WHERE document_id = $1', [id]);
+
+    // Supprimer l'historique
+    await client.query('DELETE FROM document_history WHERE document_id = $1', [id]);
+
+    // Supprimer le document
+    await client.query('DELETE FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+
+    await client.query('COMMIT');
+
+    // Supprimer les fichiers du stockage après validation de la transaction
+    for (const f of filesRes.rows) {
+      try {
+        await storage.deleteFile({ storedName: f.stored_name, cloudinaryPublicId: f.cloudinary_public_id, resourceType: f.mime_type });
+      } catch (storageErr) {
+        console.warn('[document] Erreur suppression fichier stockage:', storageErr.message);
+      }
+    }
+
     res.json({ message: 'Document supprimé' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression du document' });
+  } finally {
+    client.release();
   }
 };
 
@@ -233,7 +268,7 @@ exports.deleteFile = async (req, res) => {
     const fileRow = fileRes.rows[0];
     if (!fileRow) return res.status(404).json({ message: 'Fichier non trouvé' });
 
-    await storage.deleteFile({ storedName: fileRow.stored_name, cloudinaryPublicId: fileRow.cloudinary_public_id });
+    await storage.deleteFile({ storedName: fileRow.stored_name, cloudinaryPublicId: fileRow.cloudinary_public_id, resourceType: fileRow.mime_type });
     await db.query('DELETE FROM document_files WHERE id = $1', [fileId]);
 
     const maxRes = await db.query('SELECT COALESCE(MAX(version), 1) AS v FROM document_files WHERE document_id = $1', [id]);
@@ -292,10 +327,11 @@ exports.indexFromRequest = async (req, res) => {
 exports.listFolders = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
-    // db.query direct : le helper db-tenant confond le WHERE de la sous-requête
-    // avec un WHERE externe et insère un AND invalide (même limite que getArchivists)
+    // Utiliser db.query avec jointure explicite pour éviter les problèmes de multi-tenant
+    // Filtrer documents par tenant_id dans la sous-requête
     const result = await db.query(
-      `SELECT f.*, (SELECT COUNT(*) FROM documents d WHERE d.dossier_id = f.id) AS doc_count
+      `SELECT f.*,
+              (SELECT COUNT(*) FROM documents d WHERE d.dossier_id = f.id AND d.tenant_id = $1) AS doc_count
        FROM document_folders f
        WHERE f.tenant_id = $1
        ORDER BY f.name ASC`,

@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import DocumentFormModal from './DocumentFormModal';
+import ConfirmDialog from './ConfirmDialog';
+import { toast } from './Toast';
 
 const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé': 'Archivé' };
 const STATUS_CLASSES = { 'disponible': 'status-badge-delivered', 'prêt': 'status-badge-progress', 'archivé': 'status-badge-annulled' };
@@ -28,6 +30,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [statusComment, setStatusComment] = useState('');
   const [statusBusy, setStatusBusy] = useState(false);
   const fileInputRef = useRef(null);
+  const [deleteFileTarget, setDeleteFileTarget] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +54,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
     setUploading(true);
     try {
       await documentService.addFiles(documentId, newFiles);
+      toast.success(`${newFiles.length} fichier(s) ajouté(s)`);
       setNewFiles([]);
       await load();
       if (onChanged) onChanged();
@@ -62,13 +66,20 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   };
 
   const handleDeleteFile = async (fileId) => {
-    if (!window.confirm('Supprimer cette version du document ?')) return;
+    setDeleteFileTarget(fileId);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!deleteFileTarget) return;
     try {
-      await documentService.deleteFile(documentId, fileId);
+      await documentService.deleteFile(documentId, deleteFileTarget);
+      toast.success('Fichier supprimé');
+      setDeleteFileTarget(null);
       await load();
       if (onChanged) onChanged();
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la suppression');
+      setDeleteFileTarget(null);
     }
   };
 
@@ -77,6 +88,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
     setStatusBusy(true);
     try {
       await documentService.setStatus(documentId, newStatus, statusComment || undefined);
+      toast.success('Statut mis à jour');
       setStatusComment('');
       await load();
       if (onChanged) onChanged();
@@ -271,6 +283,16 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
           onSuccess={() => { setShowEdit(false); load(); if (onChanged) onChanged(); }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteFileTarget}
+        title="Supprimer ce fichier ?"
+        message="Cette action est irréversible. Le fichier sera supprimé du stockage définitivement."
+        confirmLabel="Supprimer"
+        type="danger"
+        onConfirm={confirmDeleteFile}
+        onClose={() => setDeleteFileTarget(null)}
+      />
     </div>
   );
 };

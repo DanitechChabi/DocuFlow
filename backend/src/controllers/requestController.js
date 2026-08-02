@@ -158,7 +158,7 @@ exports.verifyMfile = async (req, res) => {
         [document.id]
       );
       const f = fileRes.rows[0];
-      if (f) fileUrl = storage.fileUrl(req, f.stored_name, f.cloudinary_public_id);
+      if (f) fileUrl = storage.fileUrl(req, f);
     }
 
     res.json({
@@ -220,33 +220,16 @@ exports.getAllRequests = async (req, res) => {
   const tenantId = req.user.tenant_id;
 
   try {
-    // Filtrage tenant explicite (qualifié) : le helper db-tenant ne peut pas qualifier
-    // tenant_id dans une requête JOIN (r et u auraient tous deux cette colonne)
-    let result;
-    try {
-      result = await db.query(
-        `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
-         FROM requests r
-         JOIN users u ON r.id_user = u.id
-         LEFT JOIN users u2 ON r.assignee_id = u2.id
-         WHERE r.tenant_id = $1
-         ORDER BY r.created_at DESC`,
-        [tenantId]
-      );
-    } catch (err) {
-      // Colonne tenant_id absente (mode mono-tenant)
-      if (err.code === '42703') {
-        result = await db.query(
-          `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
-           FROM requests r
-           JOIN users u ON r.id_user = u.id
-           LEFT JOIN users u2 ON r.assignee_id = u2.id
-           ORDER BY r.created_at DESC`
-        );
-      } else {
-        throw err;
-      }
-    }
+    // Filtrage tenant explicite avec colonnes qualifiées pour éviter l'ambiguïté
+    const result = await db.query(
+      `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
+       FROM requests r
+       JOIN users u ON r.id_user = u.id AND u.tenant_id = r.tenant_id
+       LEFT JOIN users u2 ON r.assignee_id = u2.id AND u2.tenant_id = r.tenant_id
+       WHERE r.tenant_id = $1
+       ORDER BY r.created_at DESC`,
+      [tenantId]
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -525,33 +508,16 @@ exports.getMyTasks = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    let result;
-    try {
-      result = await db.query(
-        `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
-         FROM requests r
-         JOIN users u ON r.id_user = u.id
-         LEFT JOIN users u2 ON r.assignee_id = u2.id
-         WHERE r.tenant_id = $1 AND r.assignee_id = $2
-           AND r.statut NOT IN ('livré', 'rejete', 'annulé')
-         ORDER BY r.created_at DESC`,
-        [tenantId, userId]
-      );
-    } catch (err) {
-      if (err.code === '42703') {
-        result = await db.query(
-          `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
-           FROM requests r
-           JOIN users u ON r.id_user = u.id
-           LEFT JOIN users u2 ON r.assignee_id = u2.id
-           WHERE r.assignee_id = $1 AND r.statut NOT IN ('livré', 'rejete', 'annulé')
-           ORDER BY r.created_at DESC`,
-          [userId]
-        );
-      } else {
-        throw err;
-      }
-    }
+    const result = await db.query(
+      `SELECT r.*, u.full_name as requester_name, u2.full_name as assignee_name
+       FROM requests r
+       JOIN users u ON r.id_user = u.id AND u.tenant_id = r.tenant_id
+       LEFT JOIN users u2 ON r.assignee_id = u2.id AND u2.tenant_id = r.tenant_id
+       WHERE r.tenant_id = $1 AND r.assignee_id = $2
+         AND r.statut NOT IN ('livré', 'rejete', 'annulé')
+       ORDER BY r.created_at DESC`,
+      [tenantId, userId]
+    );
     res.json(result.rows);
   } catch (err) {
     console.error(err);

@@ -21,4 +21,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Auto-logout sur 401 (token expiré ou invalide)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

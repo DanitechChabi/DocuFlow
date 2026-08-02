@@ -24,8 +24,10 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error('Unexpected error on idle client', err.message);
+  // Don't crash on transient pool errors (e.g. Neon idle disconnects).
+  // Only exit if the pool is completely broken.
+  console.warn('[db] Pool idle error — will recover on next query');
 });
 
 module.exports = {

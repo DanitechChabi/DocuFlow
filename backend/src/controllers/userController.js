@@ -30,6 +30,7 @@ exports.getArchivists = async (req, res) => {
       `SELECT u.id, u.full_name, u.email, u.role,
               (SELECT COUNT(*) FROM requests r
                 WHERE r.assignee_id = u.id
+                  AND r.tenant_id = $1
                   AND r.statut NOT IN ('livré', 'rejete', 'annulé')) AS open_tasks
        FROM users u
        WHERE u.role IN ('archiviste', 'admin', 'superadmin')
@@ -47,6 +48,12 @@ exports.getArchivists = async (req, res) => {
 exports.createUser = async (req, res) => {
   const { username, password, full_name, email, section, role } = req.body;
   const tenantId = req.user.tenant_id;
+
+  // Validation du rôle
+  const allowedRoles = ['demandeur', 'archiviste', 'admin'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ message: 'Rôle invalide. Rôles autorisés : demandeur, archiviste, admin' });
+  }
 
   try {
     let userCheck;
@@ -68,6 +75,11 @@ exports.createUser = async (req, res) => {
     }
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ message: "L'utilisateur ou l'email existe déjà dans cette entreprise" });
+    }
+
+    // Validation de la force du mot de passe
+    if (String(password).length < 6) {
+      return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -95,8 +107,42 @@ exports.updateUserRole = async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
   const tenantId = req.user.tenant_id;
+  const allowedRoles = ['demandeur', 'archiviste', 'admin'];
+
+  // Validation du rôle
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ message: 'Rôle invalide. Rôles autorisés : demandeur, archiviste, admin' });
+  }
+
+  // Empêcher de modifier son propre rôle
+  if (parseInt(id) === req.user.id) {
+    return res.status(400).json({ message: 'Vous ne pouvez pas modifier votre propre rôle' });
+  }
 
   try {
+    // Vérifier que l'utilisateur cible existe et appartient au même tenant
+    let targetUser;
+    try {
+      const targetResult = await db.query('SELECT id, role FROM users WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+      targetUser = targetResult.rows[0];
+    } catch (err) {
+      if (err.code === '42703') {
+        const targetResult = await db.query('SELECT id, role FROM users WHERE id = $1', [id]);
+        targetUser = targetResult.rows[0];
+      } else {
+        throw err;
+      }
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Empêcher de modifier le rôle d'un superadmin
+    if (targetUser.role === 'superadmin') {
+      return res.status(403).json({ message: 'Impossible de modifier le rôle d\'un superadmin' });
+    }
+
     // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
     try {
       await db.query(
@@ -120,7 +166,36 @@ exports.updateUserRole = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
   const tenantId = req.user.tenant_id;
+
+  // Empêcher l'auto-suppression
+  if (parseInt(id) === req.user.id) {
+    return res.status(400).json({ message: 'Vous ne pouvez pas supprimer votre propre compte' });
+  }
+
   try {
+    // Vérifier que l'utilisateur cible existe et appartient au même tenant
+    let targetUser;
+    try {
+      const targetResult = await db.query('SELECT id, role FROM users WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+      targetUser = targetResult.rows[0];
+    } catch (err) {
+      if (err.code === '42703') {
+        const targetResult = await db.query('SELECT id, role FROM users WHERE id = $1', [id]);
+        targetUser = targetResult.rows[0];
+      } else {
+        throw err;
+      }
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Empêcher la suppression d'un superadmin
+    if (targetUser.role === 'superadmin') {
+      return res.status(403).json({ message: 'Impossible de supprimer un compte superadmin' });
+    }
+
     // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
     try {
       await db.query(

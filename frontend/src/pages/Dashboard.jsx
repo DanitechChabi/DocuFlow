@@ -4,11 +4,14 @@ import RequestForm from '../components/RequestForm';
 import RequestTable from '../components/RequestTable';
 import HistoryTable from '../components/HistoryTable';
 import NotificationBell from '../components/NotificationBell';
+import OnboardingTour from '../components/OnboardingTour';
+import { DEFAULT_TOUR_STEPS, SUPERADMIN_TOUR_STEPS } from '../components/OnboardingTour';
 import RequestDetailsModal from '../components/RequestDetailsModal';
 import { requestService } from '../services/requestService';
 import { requestDetailsService } from '../services/requestDetailsService';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
+import { toast } from '../components/Toast';
 import {
   Plus, FileText, Package, Clock,
   AlertCircle, ArrowUpRight, RefreshCw, Menu, Search, ClipboardList
@@ -105,7 +108,7 @@ const Dashboard = () => {
       const data = await requestDetailsService.getDetails(id);
       setDetails(data);
     } catch (err) {
-      alert('Erreur lors du chargement des détails');
+      toast.error('Erreur lors du chargement des détails');
     }
   };
 
@@ -139,7 +142,8 @@ const Dashboard = () => {
   }[activeTab];
 
   return (
-    <div className="h-dvh bg-slate-50 flex flex-col lg:flex-row overflow-hidden">
+    <>
+      <div className="h-dvh bg-slate-50 flex flex-col lg:flex-row overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -183,7 +187,7 @@ const Dashboard = () => {
 
         <div className="p-4 md:p-8 max-w-7xl mx-auto relative z-10">
           {/* Header */}
-          <header className="hidden md:flex justify-between items-center mb-10 animate-fade-in-down">
+          <header className="hidden md:flex justify-between items-center mb-10 animate-fade-in-down" data-tour="sidebar">
             <div className="space-y-1">
               <h1 className="text-4xl font-black text-slate-900 tracking-tight">{pageTitle}</h1>
               <p className="text-slate-500 font-medium flex items-center gap-2">
@@ -192,12 +196,12 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <NotificationBell />
+              <NotificationBell data-tour="notifications" />
               <button onClick={refreshAll} className="btn-secondary flex items-center gap-2 p-3" title="Rafraîchir">
                 <RefreshCw size={18} className="text-slate-500" />
               </button>
               {user?.role === 'demandeur' && (
-                <button onClick={() => setIsFormOpen(true)} className="btn-primary flex items-center gap-2 shadow-glow-blue animate-glow-pulse">
+                <button onClick={() => setIsFormOpen(true)} className="btn-primary flex items-center gap-2 shadow-glow-blue animate-glow-pulse" data-tour="new-request">
                   <Plus size={20} />
                   <span>Nouvelle demande</span>
                 </button>
@@ -213,8 +217,9 @@ const Dashboard = () => {
             </p>
             {user?.role === 'demandeur' && (
               <button onClick={() => setIsFormOpen(true)}
-                className="mt-4 w-full btn-primary flex items-center justify-center gap-2 shadow-glow-blue">
-                <Plus size={18} /> Nouvelle demande
+                className="mt-4 w-full btn-primary flex items-center justify-center gap-2 shadow-glow-blue animate-glow-pulse" data-tour="new-request">
+                <Plus size={20} />
+                <span>Nouvelle demande</span>
               </button>
             )}
           </div>
@@ -324,7 +329,16 @@ const Dashboard = () => {
         )}
       </main>
     </div>
-  );
+    {/* Onboarding Tour */}
+    <OnboardingTour
+      steps={user?.role === 'superadmin'
+        ? [...DEFAULT_TOUR_STEPS, ...SUPERADMIN_TOUR_STEPS]
+        : DEFAULT_TOUR_STEPS}
+      userId={user?.id}
+      autoStart={true}
+    />
+  </>
+);
 };
 
 export default Dashboard;

@@ -77,12 +77,35 @@ exports.updateSettings = async (req, res) => {
   }
 };
 
+// Types MIME autorisés pour les logos
+const ALLOWED_LOGO_MIMES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'];
+const MAX_LOGO_SIZE = 5 * 1024 * 1024; // 5 Mo
+
 exports.uploadLogo = async (req, res) => {
   const tenantId = req.user.tenant_id;
 
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'Aucun fichier fourni' });
+    }
+
+    // Validation du type de fichier
+    if (!ALLOWED_LOGO_MIMES.includes(req.file.mimetype)) {
+      // Supprimer le fichier rejeté
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '../../uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return res.status(400).json({ message: 'Type de fichier non autorisé. Formats acceptés : PNG, JPG, GIF, WebP' });
+    }
+
+    // Validation de la taille
+    if (req.file.size > MAX_LOGO_SIZE) {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '../../uploads', req.file.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return res.status(400).json({ message: 'Le fichier est trop volumineux. Taille maximum : 5 Mo' });
     }
 
     const filename = req.file.filename;

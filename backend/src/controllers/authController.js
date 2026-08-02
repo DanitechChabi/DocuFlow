@@ -21,6 +21,11 @@ function normalizeSlug(value) {
 exports.register = async (req, res) => {
   const { username, password, full_name, email, section, tenant_slug } = req.body;
 
+  // Validation de la force du mot de passe
+  if (!password || String(password).length < 6) {
+    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+  }
+
   try {
     // Déterminer le tenant (slug fourni ou défaut)
     let tenantId = 1; // défaut
@@ -190,7 +195,34 @@ exports.registerCompany = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Tenant actif
+    // 1. S'assurer que les tables et contraintes nécessaires existent (migration auto)
+    // Crée la table tenants si elle n'existe pas encore
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tenants (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        email_domain VARCHAR(255),
+        contact_email VARCHAR(255),
+        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    // Assurer que tenant_id existe dans users (pour les bases pré-migration)
+    try {
+      await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1`);
+      await client.query(`ALTER TABLE users ALTER COLUMN tenant_id SET NOT NULL`);
+    } catch (e) { /* colonne déjà présente */ }
+    // Index uniques nécessaires pour ON CONFLICT
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_tenant_name ON sections(tenant_id, name)`);
+    } catch (e) { /* index déjà présent ou table absente */ }
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_tenant_key ON settings(tenant_id, key)`);
+    } catch (e) { /* index déjà présent ou table absente */ }
+
+    // 2. Tenant actif
     let tenant;
     try {
       const tenantResult = await client.query(
@@ -208,7 +240,7 @@ exports.registerCompany = async (req, res) => {
       throw err;
     }
 
-    // 2. Super admin
+    // 3. Super admin
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(admin_password, salt);
     await client.query(
@@ -217,21 +249,49 @@ exports.registerCompany = async (req, res) => {
       [tenant.id, admin_username, hashedPassword, admin_full_name, admin_email]
     );
 
-    // 3. Réglages par défaut
-    await client.query(
-      `INSERT INTO settings (tenant_id, key, value) VALUES
-        ($1, 'site_name', $2),
-        ($1, 'site_description', $3)
-       ON CONFLICT (tenant_id, key) DO NOTHING`,
-      [tenant.id, company_name, 'Plateforme de gestion documentaire']
-    );
-
-    // 4. Sections par défaut
-    for (const sectionName of DEFAULT_SECTIONS) {
+    // 4. Réglages par défaut (ON CONFLICT requiert une contrainte unique sur (tenant_id, key))
+    try {
       await client.query(
-        'INSERT INTO sections (tenant_id, name) VALUES ($1, $2) ON CONFLICT (tenant_id, name) DO NOTHING',
-        [tenant.id, sectionName]
+        `INSERT INTO settings (tenant_id, key, value) VALUES
+          ($1, 'site_name', $2),
+          ($1, 'site_description', $3)
+         ON CONFLICT (tenant_id, key) DO NOTHING`,
+        [tenant.id, company_name, 'Plateforme de gestion documentaire']
       );
+    } catch (settingsErr) {
+      if (settingsErr.code === '42710' || settingsErr.code === '23505') {
+        // Contrainte unique manquante → INSERT simple
+        await client.query(
+          `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'site_name', $2)`,
+          [tenant.id, company_name]
+        );
+        await client.query(
+          `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'site_description', $2)`,
+          [tenant.id, 'Plateforme de gestion documentaire']
+        );
+      } else {
+        throw settingsErr;
+      }
+    }
+
+    // 5. Sections par défaut (ON CONFLICT requiert une contrainte unique sur (tenant_id, name))
+    for (const sectionName of DEFAULT_SECTIONS) {
+      try {
+        await client.query(
+          'INSERT INTO sections (tenant_id, name) VALUES ($1, $2) ON CONFLICT (tenant_id, name) DO NOTHING',
+          [tenant.id, sectionName]
+        );
+      } catch (sectionErr) {
+        if (sectionErr.code === '42710' || sectionErr.code === '23505') {
+          // Contrainte unique manquante → INSERT simple (ignorer les doublons)
+          await client.query(
+            'INSERT INTO sections (tenant_id, name) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM sections WHERE tenant_id = $1 AND name = $2)',
+            [tenant.id, sectionName]
+          );
+        } else {
+          throw sectionErr;
+        }
+      }
     }
 
     await client.query('COMMIT');
@@ -243,7 +303,12 @@ exports.registerCompany = async (req, res) => {
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error(err);
+    console.error('[registerCompany] Erreur détaillée:', {
+      code: err.code,
+      message: err.message,
+      detail: err.detail,
+      constraint: err.constraint,
+    });
     res.status(500).json({ message: "Erreur lors de la création de l'entreprise" });
   } finally {
     client.release();

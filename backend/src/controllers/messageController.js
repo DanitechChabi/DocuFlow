@@ -53,9 +53,9 @@ exports.sendMessage = async (req, res) => {
     if (hasFiles) {
       for (const f of files) {
         const attResult = await db.query(
-          `INSERT INTO message_attachments (message_id, original_name, stored_name, mime_type, file_size)
-           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [message.id, f.original_name, f.stored_name, f.mime_type, f.file_size]
+          `INSERT INTO message_attachments (message_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, secure_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+          [message.id, f.original_name, f.stored_name, f.cloudinary_public_id || null, f.mime_type, f.file_size, f.secure_url || null]
         );
         attachments.push(attResult.rows[0]);
       }

@@ -3,6 +3,7 @@
 -- 1. Attribution des demandes à un archiviste (assignee_id)
 -- 2. Table request_history : étapes horodatées de chaque demande
 --    (source de vérité des transitions de la machine à états → SLA & reporting)
+-- 3. Ajout de tenant_id aux tables de fichiers (multi-tenant)
 -- ============================================================================
 
 -- 1. Attribution
@@ -25,3 +26,13 @@ CREATE TABLE IF NOT EXISTS request_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_request_history_request ON request_history(request_id);
+
+-- 3. Ajouter tenant_id aux tables de fichiers pour le multi-tenant
+ALTER TABLE request_files ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1;
+ALTER TABLE request_files ALTER COLUMN tenant_id SET NOT NULL;
+
+ALTER TABLE message_attachments ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) DEFAULT 1;
+ALTER TABLE message_attachments ALTER COLUMN tenant_id SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_request_files_tenant ON request_files(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_message_attachments_tenant ON message_attachments(tenant_id);
