@@ -23,7 +23,13 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   }
 
   if (user?.role === 'superadmin') {
-    menuItems.push({ id: 'super_admin', label: 'Gestion système', icon: <ShieldCheck size={20} />, tourId: 'super-admin' });
+    // Seul le propriétaire de la plateforme (tenant 1) accède au portail global.
+    // Les superadmins d'entreprise accèdent à l'administration de LEUR entreprise.
+    if (user?.tenant_id === 1) {
+      menuItems.push({ id: 'super_admin', label: 'Gestion système', icon: <ShieldCheck size={20} />, tourId: 'super-admin' });
+    } else {
+      menuItems.push({ id: 'company_admin', label: 'Administration', icon: <ShieldCheck size={20} /> });
+    }
   }
 
   menuItems.push({ id: 'about', label: 'À propos', icon: <Info size={20} /> });
@@ -33,6 +39,8 @@ const Sidebar = ({ activeTab, setActiveTab, isMobileOpen, onToggleMobile }) => {
   const handleNav = (item) => {
     if (item.id === 'super_admin') {
       navigate('/super-admin-portal');
+    } else if (item.id === 'company_admin') {
+      navigate('/admin-portal');
     } else if (item.id === 'about') {
       navigate('/about');
     } else if (item.id === 'documents') {

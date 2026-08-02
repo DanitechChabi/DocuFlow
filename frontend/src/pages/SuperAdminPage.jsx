@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { toast } from '../components/Toast';
+import { authService } from '../services/authService';
 
 const ALL_ROLES = [
   { key: 'demandeur', label: 'Demandeur', color: 'bg-green-100 text-green-600' },
@@ -26,6 +27,17 @@ const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-
 const SuperAdminPage = () => {
   const navigate = useNavigate();
   const settings = useSettings();
+
+  // Sécurité : ce portail est réservé au propriétaire de la plateforme (tenant 1).
+  // Les superadmins des autres entreprises utilisent leur portail scoped /admin-portal.
+  const currentUser = authService.getCurrentUser?.();
+  const [isOwner] = useState(currentUser?.tenant_id === 1);
+
+  useEffect(() => {
+    if (!isOwner) navigate('/admin-portal');
+  }, [isOwner, navigate]);
+
+  if (!isOwner) return null;
 
   // State
   const [loading, setLoading] = useState(true);

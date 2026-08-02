@@ -329,9 +329,11 @@ const Dashboard = () => {
         )}
       </main>
     </div>
-    {/* Onboarding Tour */}
+    {/* Onboarding Tour — l'étape "Gestion système" n'apparaît que pour le
+        propriétaire de la plateforme (tenant 1). Les superadmins d'entreprise
+        ont leur propre portail scoped, pas le tour du portail global. */}
     <OnboardingTour
-      steps={user?.role === 'superadmin'
+      steps={user?.role === 'superadmin' && user?.tenant_id === 1
         ? [...DEFAULT_TOUR_STEPS, ...SUPERADMIN_TOUR_STEPS]
         : DEFAULT_TOUR_STEPS}
       userId={user?.id}

@@ -3,10 +3,14 @@ const router = express.Router();
 const superadminController = require('../controllers/superadminController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
+const platformOwnerMiddleware = require('../middlewares/platformOwnerMiddleware');
 
-// Toutes les routes nécessitent auth + superadmin
+// Toutes les routes nécessitent auth + superadmin + ÊTRE LE PROPRIÉTAIRE DE LA PLATEFORME
+// (tenant 1). Les superadmins des entreprises créées via register-company n'ont
+// PAS accès aux données globales : ils utilisent leurs propres routes scoped.
 router.use(authMiddleware);
 router.use(roleMiddleware(['superadmin']));
+router.use(platformOwnerMiddleware);
 
 // Statistiques globales (avec stats par entreprise)
 router.get('/stats', superadminController.getStats);

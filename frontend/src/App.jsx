@@ -6,6 +6,7 @@ import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import Dashboard from './pages/Dashboard';
 import DocumentsPage from './pages/DocumentsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
+import CompanyAdminPage from './pages/CompanyAdminPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import MessagingFloatingButton from './components/MessagingFloatingButton';
@@ -65,6 +66,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['superadmin']}>
               <SuperAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-portal"
+          element={
+            <ProtectedRoute allowedRoles={['superadmin']}>
+              <CompanyAdminPage />
             </ProtectedRoute>
           }
         />

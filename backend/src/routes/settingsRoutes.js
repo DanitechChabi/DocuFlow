@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const settingsController = require('../controllers/settingsController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const optionalAuthMiddleware = require('../middlewares/optionalAuthMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
 // Config multer
@@ -37,7 +38,9 @@ const upload = multer({
 
 // GET / — route publique : branding (nom, description, logo) utilisé par la
 // page de connexion avant authentification. L'écriture reste réservée au superadmin.
-router.get('/', settingsController.getSettings);
+// Le token optionnel permet à un utilisateur connecté de voir le branding
+// de SON entreprise au lieu du tenant 1 par défaut.
+router.get('/', optionalAuthMiddleware, settingsController.getSettings);
 
 // Routes protégées (superadmin)
 router.put('/', authMiddleware, roleMiddleware(['superadmin']), settingsController.updateSettings);
