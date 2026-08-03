@@ -25,9 +25,7 @@ export const documentService = {
   addFiles: async (id, files) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
-    const response = await api.post(`/documents/${id}/files`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(`/documents/${id}/files`, formData);
     return response.data;
   },
   deleteFile: async (id, fileId) => {
@@ -68,6 +66,12 @@ export const documentService = {
   },
   unlinkDocumentFromRequest: async (requestId) => {
     const response = await api.patch(`/requests/${requestId}/document`, { document_id: null });
+    return response.data;
+  },
+
+  // Partage par email
+  shareDocument: async (id, emails, message) => {
+    const response = await api.post(`/documents/${id}/share`, { emails, message });
     return response.data;
   },
 };

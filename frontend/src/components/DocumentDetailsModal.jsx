@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
-  Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye,
+  Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import DocumentFormModal from './DocumentFormModal';
@@ -31,6 +31,11 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [statusBusy, setStatusBusy] = useState(false);
   const fileInputRef = useRef(null);
   const [deleteFileTarget, setDeleteFileTarget] = useState(null);
+  // Partage
+  const [showShare, setShowShare] = useState(false);
+  const [shareEmails, setShareEmails] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +104,24 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
     }
   };
 
+  const handleShare = async () => {
+    const emails = shareEmails.split(/[,;\s]+/).map(e => e.trim()).filter(e => e.includes('@'));
+    if (!emails.length) return toast.error('Entrez au moins une adresse email valide');
+    setShareBusy(true);
+    try {
+      await documentService.shareDocument(documentId, emails, shareMessage);
+      toast.success(`Document partagé avec ${emails.length} personne(s)`);
+      setShowShare(false);
+      setShareEmails('');
+      setShareMessage('');
+      await logHistory(tenantId, documentId, null, `Partagé par email`, null, null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors du partage');
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
   const isPdf = selectedFile?.mime_type === 'application/pdf';
   const isImage = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'].includes(selectedFile?.mime_type);
 
@@ -112,6 +135,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
             <p className="text-sm text-slate-400 font-medium">{doc?.nom_entreprise || 'Chargement…'}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowShare(true)} className="btn-secondary flex items-center gap-1.5"><Share2 size={15} /> Partager</button>
             {isAdmin && <button onClick={() => setShowEdit(true)} className="btn-secondary flex items-center gap-1.5"><Pencil size={15} /> Modifier</button>}
             <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={18} /></button>
           </div>
@@ -293,6 +317,52 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
         onConfirm={confirmDeleteFile}
         onClose={() => setDeleteFileTarget(null)}
       />
+
+      {/* Modal de partage */}
+      {showShare && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setShowShare(false)}>
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-afgc-secondary/10 rounded-xl"><Share2 size={18} className="text-afgc-secondary" /></div>
+                <h3 className="text-lg font-bold text-slate-800">Partager le document</h3>
+              </div>
+              <button onClick={() => setShowShare(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Adresses email</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={shareEmails}
+                    onChange={e => setShareEmails(e.target.value)}
+                    placeholder="email1@gmail.com, email2@gmail.com"
+                    className="input-premium pl-10"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Séparez plusieurs adresses par une virgule</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Message (optionnel)</label>
+                <textarea
+                  value={shareMessage}
+                  onChange={e => setShareMessage(e.target.value)}
+                  placeholder="Ajoutez un message pour les destinataires..."
+                  className="input-premium min-h-[80px] resize-none"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleShare} disabled={shareBusy} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                  {shareBusy ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Share2 size={16} />}
+                  {shareBusy ? 'Envoi...' : 'Envoyer'}
+                </button>
+                <button onClick={() => setShowShare(false)} className="btn-secondary">Annuler</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

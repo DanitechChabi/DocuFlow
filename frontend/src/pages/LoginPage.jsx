@@ -61,10 +61,10 @@ const LoginPage = () => {
         navigate('/dashboard');
       } else {
         setError(data.message || 'Identifiants invalides');
+        setLoading(false);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Une erreur est survenue lors de la connexion');
-    } finally {
       setLoading(false);
     }
   };

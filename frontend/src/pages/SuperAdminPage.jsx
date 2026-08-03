@@ -13,6 +13,7 @@ import {
   FileText, Archive, ArchiveRestore, Inbox, Calendar, Clock
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ThemeManager from '../components/ThemeManager';
 import { toast } from '../components/Toast';
 import { authService } from '../services/authService';
 
@@ -396,14 +397,11 @@ const SuperAdminPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+    <div className="p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
           <div className="flex items-center gap-3 md:gap-5">
-            <button onClick={() => navigate('/dashboard')} className="p-3 bg-white text-slate-700 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all hover:shadow-md">
-              <LayoutDashboard size={22} />
-            </button>
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 md:p-2.5 bg-gradient-to-br from-red-500 to-red-700 text-white rounded-2xl shadow-lg">
                 <Crown size={22} />
@@ -806,6 +804,11 @@ const SuperAdminPage = () => {
                   <p className="text-white/50 text-xs">{branding.site_description || 'Plateforme'}</p>
                 </div>
               </div>
+            </div>
+
+            {/* Thème & Couleurs */}
+            <div className="glass-card-premium p-6">
+              <ThemeManager />
             </div>
           </div>
         )}

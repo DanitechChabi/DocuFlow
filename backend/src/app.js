@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 require('dotenv').config({ path: './.env' });
 
 const authRoutes = require('./routes/authRoutes');
@@ -29,6 +30,7 @@ const ALLOWED_ORIGINS = isDev
   : [
       process.env.CORS_ORIGIN,
       process.env.APP_URL,
+      'https://docuflow.vercel.app',
       'https://docuflow-afgc.vercel.app',
     ].filter(Boolean).flatMap((o) => o.includes(',') ? o.split(',').map((s) => s.trim()) : [o]);
 
@@ -86,7 +88,22 @@ app.use((err, req, res, _next) => {
     return res.status(400).json({ message: 'JSON invalide dans le corps de la requête' });
   }
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ message: 'Fichier trop volumineux' });
+    return res.status(413).json({ message: 'Fichier trop volumineux (10 Mo max)' });
+  }
+  // Erreurs multer (upload) → message réel au lieu d'un 500 générique
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: 'Trop de fichiers (5 max par demande) ou champ inattendu' });
+    }
+    return res.status(400).json({ message: `Erreur lors de l'upload : ${err.message}` });
+  }
+  // Erreurs busboy (multipart malformé / boundary absent) → 400
+  if (err && err.message && /multipart|boundary/i.test(err.message)) {
+    return res.status(400).json({ message: `Requête multipart invalide : ${err.message}` });
+  }
+  // Rejet du fileFilter (type de fichier non autorisé)
+  if (err.message && err.message.startsWith('Type de fichier non supporté')) {
+    return res.status(400).json({ message: err.message });
   }
   res.status(500).json({ message: 'Erreur interne du serveur' });
 });

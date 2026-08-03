@@ -28,9 +28,9 @@ exports.uploadRequestFiles = async (req, res) => {
       const info = await storage.saveFile(file, { folder: 'request_files' });
 
       const result = await db.query(
-        `INSERT INTO request_files (request_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [requestId, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null]
+        `INSERT INTO request_files (request_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [requestId, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null, tenantId]
       );
       files.push({
         ...result.rows[0],

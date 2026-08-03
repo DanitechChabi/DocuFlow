@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar, Hash,
-  FolderPlus, ChevronLeft, ChevronRight, AlertCircle, ArrowLeft,
+  FolderPlus, ChevronLeft, ChevronRight, AlertCircle,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
@@ -20,8 +20,10 @@ const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé'
 const DocumentsPage = () => {
   const user = authService.getCurrentUser();
   const isAdmin = ['superadmin', 'admin', 'archiviste'].includes(user?.role);
+  const [searchParams] = useSearchParams();
 
-  const [q, setQ] = useState('');
+  // Recherche globale depuis la topbar → pré-remplir ?q=
+  const [q, setQ] = useState(searchParams.get('q') || '');
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ statut: '', type_document: '', annee: '', dossier_id: '' });
   const [folders, setFolders] = useState([]);
@@ -47,6 +49,7 @@ const DocumentsPage = () => {
       if (filters.type_document) params.type_document = filters.type_document;
       if (filters.annee) params.annee = filters.annee;
       if (filters.dossier_id) params.dossier_id = filters.dossier_id;
+      if (filters.tag) params.tag = filters.tag;
       const res = await documentService.getDocuments(params);
       setData(res);
     } catch (err) {
@@ -71,6 +74,13 @@ const DocumentsPage = () => {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Suivre les changements de ?q= (nouvelle recherche depuis la topbar)
+  useEffect(() => {
+    const urlQ = searchParams.get('q');
+    if (urlQ !== null && urlQ !== q) setQ(urlQ);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const handleCreateFolder = async (e) => {
     e.preventDefault();
     if (!folderName.trim()) return;
@@ -94,16 +104,13 @@ const DocumentsPage = () => {
   const totalPages = data?.pagination?.total_pages || 1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 py-8 px-4 sm:px-6">
+    <div className="px-4 sm:px-6 md:px-8 py-6 md:py-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 animate-fade-in-down">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="w-9 h-9 rounded-xl bg-white shadow-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:text-afgc-secondary transition-colors" title="Retour au tableau de bord">
-              <ArrowLeft size={18} />
-            </Link>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                 <FolderOpen className="text-afgc-secondary" size={24} />
                 Documents
               </h1>
@@ -155,6 +162,26 @@ const DocumentsPage = () => {
               <FolderPlus size={16} /> Dossiers
             </button>
           </div>
+
+          {/* Facettes : tags cliquables */}
+          {data?.facets?.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 self-center">Tags :</span>
+              {data.facets.tags.slice(0, 12).map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => { setFilters(f => ({ ...f, tag: f.tag === tag ? '' : tag })); setPage(1); }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                    filters.tag === tag
+                      ? 'bg-afgc-secondary text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
 
           {folderOpen && (
             <form onSubmit={handleCreateFolder} className="flex items-center gap-2 pt-2 border-t border-slate-100">

@@ -14,6 +14,8 @@ const MessagingFloatingButton = () => {
     try {
       const data = await messageService.getUnreadCount();
       setUnreadCount(data.count);
+      // Diffuser le compteur pour la Topbar
+      window.dispatchEvent(new CustomEvent('docuflow:unread-count', { detail: { count: data.count } }));
     } catch (err) {
       // Silent fail
     }
@@ -25,6 +27,13 @@ const MessagingFloatingButton = () => {
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [user, fetchUnreadCount]);
+
+  // Icône messagerie de la topbar → ouvre le même panneau
+  useEffect(() => {
+    const handler = () => setIsPanelOpen((o) => !o);
+    window.addEventListener('docuflow:toggle-messaging', handler);
+    return () => window.removeEventListener('docuflow:toggle-messaging', handler);
+  }, []);
 
   const handleClosePanel = () => {
     setIsPanelOpen(false);

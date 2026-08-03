@@ -19,8 +19,8 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
-    "nodemailer": "^9.0.3",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "resend": "^6.18.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

@@ -6,10 +6,11 @@ import { settingsService } from '../services/settingsService';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import {
-  Users, Layers, Palette, LayoutDashboard, Building2,
+  Users, Layers, Palette, Building2,
   X, Plus, Trash2, Search, UserCog, Upload, Pencil
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ThemeManager from '../components/ThemeManager';
 import { toast } from '../components/Toast';
 
 const roleColor = (role) => ({
@@ -222,14 +223,11 @@ const CompanyAdminPage = () => {
   if (isOwner) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+    <div className="p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
           <div className="flex items-center gap-3 md:gap-5">
-            <button onClick={() => navigate('/dashboard')} className="p-3 bg-white text-slate-700 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all hover:shadow-md">
-              <LayoutDashboard size={22} />
-            </button>
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 md:p-2.5 bg-gradient-to-br from-afgc-primary to-slate-800 text-white rounded-2xl shadow-lg">
                 <Building2 size={22} />
@@ -390,6 +388,7 @@ const CompanyAdminPage = () => {
 
         {/* ============ BRANDING ============ */}
         {activePanel === 'branding' && (
+          <>
           <div className="grid lg:grid-cols-2 gap-5 animate-fade-in-up">
             <div className="glass-card-premium p-6 space-y-5">
               <div className="flex items-center gap-2 mb-2">
@@ -431,6 +430,12 @@ const CompanyAdminPage = () => {
               </div>
             </div>
           </div>
+
+          {/* Thème & Couleurs */}
+          <div className="glass-card-premium p-6 mt-5">
+            <ThemeManager />
+          </div>
+          </>
         )}
 
         {/* ============ MODALS ============ */}

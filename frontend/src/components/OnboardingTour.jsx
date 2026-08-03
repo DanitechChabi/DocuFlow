@@ -8,8 +8,8 @@ export const DEFAULT_TOUR_STEPS = [
     id: 'sidebar',
     selector: '[data-tour="sidebar"]',
     title: 'Navigation principale',
-    content: 'La barre latérale vous donne accès à toutes les sections : Tableau de bord, Mes demandes, Documents, et plus selon votre rôle.',
-    position: 'right',
+    content: 'La barre de navigation vous donne accès à toutes les sections : Tableau de bord, Mes demandes, Documents, et plus selon votre rôle.',
+    position: 'bottom',
   },
   {
     id: 'new_request',

@@ -108,6 +108,18 @@ async function indexRequestToDocuments(tenantId, requestId, userId) {
     const filesRes = await client.query('SELECT * FROM request_files WHERE request_id = $1', [requestId]);
     let filesCount = 0;
     for (const rf of filesRes.rows) {
+      // Fichier stocké sur Cloudinary → réutiliser la référence telle quelle (pas de copie physique)
+      if (rf.cloudinary_public_id) {
+        await client.query(
+          `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [doc.id, 1, rf.original_name, rf.stored_name, rf.cloudinary_public_id, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
+        );
+        filesCount++;
+        continue;
+      }
+
+      // Fichier présent sur le disque local → copier (avec version + upload Cloudinary éventuel)
       const localPath = path.join(FILES_DIR, rf.stored_name);
       if (rf.stored_name && fs.existsSync(localPath)) {
         const fileObj = { path: localPath, filename: rf.stored_name, originalname: rf.original_name, mimetype: rf.mime_type, size: rf.file_size };
@@ -117,9 +129,9 @@ async function indexRequestToDocuments(tenantId, requestId, userId) {
       } else if (rf.stored_name) {
         // Fichier perdu (disque éphémère) → on conserve la référence
         await client.query(
-          `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [doc.id, 1, rf.original_name, rf.stored_name, null, rf.mime_type, rf.file_size, rf.uploaded_by || userId]
+          `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [doc.id, 1, rf.original_name, rf.stored_name, rf.cloudinary_public_id || null, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
         );
         filesCount++;
       }

@@ -1,27 +1,21 @@
 /**
- * Service d'envoi d'e-mails transactionnels (nodemailer).
- * Les variables SMTP sont lues depuis .env. Si SMTP n'est pas configuré,
- * l'envoi est ignoré proprement (logs) — l'application reste fonctionnelle.
+ * Service d'envoi d'e-mails transactionnels (Resend).
+ * Le port SMTP 587 étant bloqué sur Render (free), l'envoi passe par l'API
+ * Resend en HTTPS (port 443). La clé API est lue depuis .env (RESEND_API_KEY).
+ * Si elle est absente, l'envoi est ignoré proprement (logs) — l'application
+ * reste fonctionnelle (notifications internes uniquement).
  */
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config({ path: './.env' });
 
-const isConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
-const transporter = isConfigured
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      // Gmail (587) : STARTTLS obligatoire — nodemailer lève la connexion en TLS
-      requireTLS: true,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-  : null;
+const isConfigured = Boolean(process.env.RESEND_API_KEY);
+const resend = isConfigured ? new Resend(process.env.RESEND_API_KEY) : null;
 
-const FROM = `"${process.env.MAIL_FROM_NAME || 'DocuFlow'}" <${process.env.MAIL_FROM || 'noreply@docuflow.local'}>`;
+// Adresse d'expéditeur : RESEND_FROM si un domaine a été vérifié sur Resend,
+// sinon onboarding@resend.dev (envoi test — uniquement vers l'e-mail du compte Resend).
+const FROM = process.env.RESEND_FROM
+  ? `"${process.env.MAIL_FROM_NAME || 'DocuFlow'}" <${process.env.RESEND_FROM}>`
+  : `"${process.env.MAIL_FROM_NAME || 'DocuFlow'}" <onboarding@resend.dev>`;
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 /* ---- Templates HTML ---- */
@@ -194,8 +188,8 @@ const TEMPLATES = {
  * @param {Object} p - { to, subject, html }
  */
 async function sendMail({ to, subject, html }) {
-  if (!isConfigured || !transporter) {
-    console.log(`[mail] SMTP non configuré — e-mail ignoré pour ${to} : « ${subject} »`);
+  if (!isConfigured || !resend) {
+    console.log(`[mail] Resend non configuré — e-mail ignoré pour ${to} : « ${subject} »`);
     return { sent: false, skipped: true };
   }
 
@@ -206,9 +200,18 @@ async function sendMail({ to, subject, html }) {
   const actualSubject = testTo ? `${subject} [→ ${to}]` : subject;
 
   try {
-    await transporter.sendMail({ from: FROM, to: actualTo, subject: actualSubject, html });
-    console.log(`[mail] E-mail envoyé à ${actualTo}${testTo ? ` (redirigé depuis ${to})` : ''} : « ${subject} »`);
-    return { sent: true };
+    const { data, error } = await resend.emails.send({
+      from: FROM,
+      to: [actualTo],
+      subject: actualSubject,
+      html,
+    });
+    if (error) {
+      console.error(`[mail] Erreur Resend : ${error.message}`);
+      return { sent: false, error: error.message };
+    }
+    console.log(`[mail] E-mail envoyé à ${actualTo}${testTo ? ` (redirigé depuis ${to})` : ''} : « ${subject} » (id ${data?.id})`);
+    return { sent: true, id: data?.id };
   } catch (err) {
     console.error('[mail] Erreur d\'envoi :', err.message);
     return { sent: false, error: err.message };

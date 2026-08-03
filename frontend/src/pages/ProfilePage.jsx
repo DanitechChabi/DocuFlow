@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { userService } from '../services/userService';
 import { sectionService } from '../services/sectionService';
 import { authService } from '../services/authService';
 import {
-  User, Building2, Shield, Calendar, Lock, Save, ArrowLeft,
+  User, Building2, Shield, Calendar, Lock, Save,
   KeyRound, CheckCircle, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
 
 const ProfilePage = () => {
-  const navigate = useNavigate();
 
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +99,7 @@ const ProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
           <p className="text-slate-400 font-medium">Chargement du profil...</p>
@@ -113,18 +111,12 @@ const ProfilePage = () => {
   const initial = profile?.full_name?.charAt(0)?.toUpperCase() || '?';
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 relative">
+    <div className="relative p-4 md:p-8">
       <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-blue-500/[0.03] rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="max-w-3xl mx-auto relative z-10 space-y-6 md:space-y-8">
         {/* Header */}
         <div className="flex items-center gap-3 md:gap-4 animate-fade-in-down">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-2.5 md:p-3 bg-white text-slate-700 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all hover:shadow-md"
-          >
-            <ArrowLeft size={18} />
-          </button>
           <div className="flex items-center gap-3 md:gap-4">
             <div className="relative">
               <div className="w-11 h-11 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-md">

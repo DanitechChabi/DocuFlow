@@ -2,6 +2,7 @@ const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
 const storage = require('../services/storageService');
 const { logHistory, addFileToDocument, setCanonicalReference, indexRequestToDocuments } = require('../services/documentIndexService');
+const { extractText, extractAutoTags } = require('../services/textExtractionService');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -46,9 +47,26 @@ exports.createDocument = async (req, res) => {
     const doc = result.rows[0];
     const reference_mfile = await setCanonicalReference(tenantId, doc.id);
 
+    // Extraction de texte + auto-tagging
+    let allText = '';
     if (req.files && req.files.length) {
       for (const file of req.files) {
         await addFileToDocument(tenantId, doc.id, userId, file);
+        const text = await extractText(file.path, file.mimetype);
+        if (text) allText += ' ' + text;
+      }
+    }
+
+    // Auto-tagging basé sur le contenu extrait
+    if (allText.trim()) {
+      const existingTags = parseTags(tags) || [];
+      const autoTags = extractAutoTags(allText, existingTags);
+      if (autoTags.length > existingTags.length) {
+        await tenantDb.update(
+          tenantId, 'documents',
+          ['tags'], [autoTags],
+          'id', doc.id
+        );
       }
     }
 
@@ -62,7 +80,7 @@ exports.createDocument = async (req, res) => {
 
 exports.listDocuments = async (req, res) => {
   const tenantId = req.user.tenant_id;
-  const { q, type_document, annee, statut, dossier_id, page = 1, page_size = 20 } = req.query;
+  const { q, type_document, annee, statut, dossier_id, tag, auteur, page = 1, page_size = 20 } = req.query;
 
   const conds = ['d.tenant_id = $1'];
   const vals = [tenantId];
@@ -70,12 +88,20 @@ exports.listDocuments = async (req, res) => {
   if (q) {
     vals.push(`%${q}%`);
     const i = vals.length;
-    conds.push(`(d.nom_entreprise ILIKE $${i} OR d.num_dossier ILIKE $${i} OR d.num_acte ILIKE $${i} OR d.reference_mfile ILIKE $${i} OR d.description ILIKE $${i} OR d.type_document ILIKE $${i})`);
+    conds.push(`(d.nom_entreprise ILIKE $${i} OR d.num_dossier ILIKE $${i} OR d.num_acte ILIKE $${i} OR d.reference_mfile ILIKE $${i} OR d.description ILIKE $${i} OR d.type_document ILIKE $${i} OR d.auteur ILIKE $${i} OR EXISTS (SELECT 1 FROM unnest(d.tags) t WHERE t ILIKE $${i}))`);
   }
   if (type_document) { vals.push(type_document); conds.push(`d.type_document = $${vals.length}`); }
   if (annee) { vals.push(Number(annee)); conds.push(`d.annee = $${vals.length}`); }
   if (statut) { vals.push(statut); conds.push(`d.statut = $${vals.length}`); }
   if (dossier_id) { vals.push(Number(dossier_id)); conds.push(`d.dossier_id = $${vals.length}`); }
+  if (tag) {
+    vals.push(tag);
+    conds.push(`$${vals.length} = ANY(d.tags)`);
+  }
+  if (auteur) {
+    vals.push(`%${auteur}%`);
+    conds.push(`d.auteur ILIKE $${vals.length}`);
+  }
 
   const where = conds.join(' AND ');
   const limit = Math.min(Math.max(Number(page_size) || 20, 1), 100);
@@ -96,9 +122,35 @@ exports.listDocuments = async (req, res) => {
       [...vals, limit, offset]
     );
 
+    // Facettes pour les filtres latéraux
+    let facets = {};
+    try {
+      const facRes = await db.query(
+        `SELECT type_document, statut, tags, annee FROM documents d WHERE d.tenant_id = $1`,
+        [tenantId]
+      );
+      const types = new Set();
+      const stats = new Set();
+      const allTags = new Set();
+      const years = new Set();
+      facRes.rows.forEach(r => {
+        if (r.type_document) types.add(r.type_document);
+        if (r.statut) stats.add(r.statut);
+        if (r.tags) r.tags.forEach(t => allTags.add(t));
+        if (r.annee) years.add(r.annee);
+      });
+      facets = {
+        type_document: Array.from(types),
+        statut: Array.from(stats),
+        tags: Array.from(allTags),
+        annees: Array.from(years).sort((a, b) => b - a),
+      };
+    } catch { /* silencieux */ }
+
     res.json({
       documents: listRes.rows,
       pagination: { page: Number(page), page_size: limit, total, total_pages: Math.ceil(total / limit) },
+      facets,
     });
   } catch (err) {
     console.error(err);
@@ -385,5 +437,68 @@ exports.deleteFolder = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression du dossier' });
+  }
+};
+
+/* ===== Partage de document par email ===== */
+
+exports.shareDocument = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const { id } = req.params;
+  const { emails, message } = req.body;
+
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return res.status(400).json({ message: 'Au moins une adresse email est requise' });
+  }
+
+  try {
+    const docRes = await tenantDb.query(
+      tenantId,
+      'SELECT id, reference_mfile, nom_entreprise, num_dossier, num_acte, type_document, annee FROM documents WHERE id = $1',
+      [id]
+    );
+    const doc = docRes.rows[0];
+    if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
+
+    const { sendMail } = require('../services/mailService');
+    const senderName = req.user.full_name || req.user.username;
+
+    for (const email of emails) {
+      if (!email || !email.includes('@')) continue;
+      try {
+        await sendMail({
+          to: email,
+          subject: `📄 ${senderName} vous partage un document — ${doc.reference_mfile}`,
+          html: `
+            <div style="font-family:system-ui,-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;">
+              <div style="text-align:center;margin-bottom:24px;">
+                <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#0f172a,#1e293b);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:18px;">📄</div>
+              </div>
+              <h2 style="color:#0f172a;font-size:18px;font-weight:700;text-align:center;margin:0 0 16px;">Document partagé</h2>
+              <p style="color:#475569;font-size:14px;line-height:1.6;text-align:center;">${senderName} vous a partagé le document suivant :</p>
+              <div style="background:#f8fafc;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #e2e8f0;">
+                <p style="margin:0 0 8px;"><strong style="color:#0f172a;">Référence :</strong> <span style="color:#3b82f6;font-weight:600;">${doc.reference_mfile}</span></p>
+                <p style="margin:0 0 8px;"><strong style="color:#0f172a;">Entreprise :</strong> ${doc.nom_entreprise || '—'}</p>
+                <p style="margin:0 0 8px;"><strong style="color:#0f172a;">Dossier / Acte :</strong> ${doc.num_dossier} / ${doc.num_acte}</p>
+                ${doc.type_document ? `<p style="margin:0 0 8px;"><strong style="color:#0f172a;">Type :</strong> ${doc.type_document}</p>` : ''}
+                <p style="margin:0;"><strong style="color:#0f172a;">Année :</strong> ${doc.annee || '—'}</p>
+              </div>
+              ${message ? `<p style="color:#64748b;font-size:13px;font-style:italic;margin:16px 0;">"${message}"</p>` : ''}
+              <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">Connectez-vous à DocuFlow pour consulter et télécharger ce document.</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+              <p style="color:#cbd5e1;font-size:11px;text-align:center;margin:0;">© ${new Date().getFullYear()} DocuFlow AFGC — Plateforme de gestion documentaire</p>
+            </div>`
+        });
+      } catch (mailErr) {
+        console.error(`[share] Erreur envoi à ${email}:`, mailErr.message);
+      }
+    }
+
+    await logHistory(tenantId, doc.id, req.user.id, `Document partagé avec ${emails.length} personne(s)`, null, null);
+
+    res.json({ message: `Document partagé avec ${emails.length} personne(s)` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors du partage du document' });
   }
 };

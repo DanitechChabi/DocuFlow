@@ -29,4 +29,7 @@ router.post('/:id/files', roleMiddleware(ADMIN_ROLES), uploadMultiple, documentC
 router.delete('/:id/files/:fileId', roleMiddleware(ADMIN_ROLES), documentController.deleteFile);
 router.post('/:id/status', roleMiddleware(ADMIN_ROLES), documentController.setStatus);
 
+// Partage de document par email
+router.post('/:id/share', documentController.shareDocument);
+
 module.exports = router;

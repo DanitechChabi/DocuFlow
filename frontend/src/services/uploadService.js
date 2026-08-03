@@ -5,9 +5,7 @@ export const uploadService = {
   uploadRequestFiles: async (requestId, files) => {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
-    const response = await api.post(`/upload/request/${requestId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    const response = await api.post(`/upload/request/${requestId}`, formData);
     return response.data;
   },
 
@@ -27,9 +25,7 @@ export const uploadService = {
   uploadMessageFile: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/upload/message', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    const response = await api.post('/upload/message', formData);
     return response.data;
   },
 

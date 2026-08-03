@@ -43,7 +43,11 @@ exports.getSettings = async (req, res) => {
 
 exports.updateSettings = async (req, res) => {
   const tenantId = req.user.tenant_id;
-  const allowed = ['site_name', 'site_description'];
+  const allowed = [
+    'site_name', 'site_description',
+    // Thème
+    'primary_color', 'secondary_color', 'accent_color', 'dark_color', 'gold_color',
+  ];
 
   try {
     for (const [key, value] of Object.entries(req.body)) {
