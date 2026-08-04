@@ -35,3 +35,6 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Google OAuth Client ID (accessible dans les composants via import.meta.env)
+// Configuré dans Vercel : VITE_GOOGLE_CLIENT_ID

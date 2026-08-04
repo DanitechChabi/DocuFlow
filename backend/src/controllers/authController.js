@@ -1,7 +1,10 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config({ path: './.env' });
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Sections créées par défaut à la création d'une entreprise
 const DEFAULT_SECTIONS = ['Comptabilité', 'Commercial', 'DAI', 'DRI', 'DGI', 'DNCMP'];
@@ -356,5 +359,108 @@ exports.getCompanyPublic = async (req, res) => {
     }
     console.error(err);
     res.status(500).json({ message: "Erreur lors du chargement de l'entreprise" });
+  }
+};
+
+/* ===== Connexion Google ===== */
+
+exports.googleLogin = async (req, res) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ message: 'Token Google manquant' });
+  }
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Chercher l'utilisateur par email ou google_id
+    let userResult;
+    try {
+      userResult = await db.query(
+        'SELECT id, username, full_name, email, role, tenant_id FROM users WHERE email = $1 OR google_id = $2',
+        [email, googleId]
+      );
+    } catch (err) {
+      // Si la colonne google_id n'existe pas encore
+      if (err.code === '42703') {
+        userResult = await db.query(
+          'SELECT id, username, full_name, email, role, tenant_id FROM users WHERE email = $1',
+          [email]
+        );
+      } else {
+        throw err;
+      }
+    }
+
+    let user;
+    let tenantId;
+
+    if (userResult.rows.length > 0) {
+      // Utilisateur existant → le connecter
+      user = userResult.rows[0];
+      tenantId = user.tenant_id || 1;
+
+      // Mettre à jour google_id si pas encore fait
+      try {
+        await db.query('UPDATE users SET google_id = $1 WHERE id = $2 AND google_id IS NULL', [googleId, user.id]);
+      } catch { /* colonne peut ne pas exister */ }
+    } else {
+      // Nouvel utilisateur → créer dans le tenant par défaut (AFGC)
+      tenantId = 1;
+      const username = email.split('@')[0] + '_' + googleId.slice(0, 6);
+      const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
+
+      try {
+        const newUser = await db.query(
+          `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role, google_id)
+           VALUES ($1, $2, $3, $4, $5, 'demandeur', $6)
+           RETURN id, username, full_name, email, role, tenant_id`,
+          [tenantId, username, randomPassword, name || email.split('@')[0], email, googleId]
+        );
+        user = newUser.rows[0];
+      } catch (err) {
+        if (err.code === '42703') {
+          // Pas de colonne google_id
+          const newUser = await db.query(
+            `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role)
+             VALUES ($1, $2, $3, $4, $5, 'demandeur')
+             RETURN id, username, full_name, email, role, tenant_id`,
+            [tenantId, username, randomPassword, name || email.split('@')[0], email]
+          );
+          user = newUser.rows[0];
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role, tenant_id: tenantId },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        tenant_id: tenantId,
+        picture,
+      },
+    });
+  } catch (err) {
+    console.error('[google-login]', err.message);
+    res.status(401).json({ message: 'Token Google invalide' });
   }
 };
