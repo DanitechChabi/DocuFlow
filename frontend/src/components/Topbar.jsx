@@ -12,8 +12,22 @@ import NotificationBell from './NotificationBell';
 const DEFAULT_LOGO = 'https://th.bing.com/th/id/R.d7f2f165ad7ca819fe72a5f20a08a7c7?rik=cmptSS4F09F1Hw&riu=http%3a%2f%2fapiga.africa%2fimg%2fafgc.jpg&ehk=BW9PLt5Ge5oLmVWHbZvaEzZCStjt7IWIJj4n%2bEJym5M%3d&risl=&pid=ImgRaw&r=0';
 
 /**
+ * Déterminer si une couleur est claire (nécessite du texte sombre).
+ */
+function isLight(hex) {
+  if (!hex) return false;
+  const c = hex.replace('#', '');
+  if (c.length < 6) return false;
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150;
+}
+
+/**
  * Topbar horizontale style GitHub — navigation compacte inline,
  * recherche globale, actions admin dans menu avatar.
+ * S'adapte aux couleurs du thème configuré par l'admin.
  */
 const Topbar = () => {
   const navigate = useNavigate();
@@ -24,6 +38,16 @@ const Topbar = () => {
   const [search, setSearch] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const userMenuRef = useRef(null);
+
+  // Couleurs thème pour la topbar
+  const primaryColor = settings.primary_color || '#0f172a';
+  const secondaryColor = settings.secondary_color || '#3b82f6';
+  const topbarLight = isLight(primaryColor);
+  const tText = topbarLight ? '#1e293b' : '#ffffff';
+  const tMuted = topbarLight ? '#64748b' : 'rgba(255,255,255,0.6)';
+  const tBorder = topbarLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)';
+  const tHover = topbarLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
+  const tActiveBg = topbarLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
 
   const logoSrc = settings.site_logo_url || DEFAULT_LOGO;
   const isStaff = ['archiviste', 'admin', 'superadmin'].includes(user?.role);
@@ -89,11 +113,13 @@ const Topbar = () => {
       onClick={() => setMobileOpen(false)}
       className={({ isActive }) =>
         `flex items-center gap-1.5 px-2 py-1.5 text-sm font-semibold rounded-md transition-colors ${
-          isActive
-            ? 'text-slate-900 bg-slate-100'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          isActive ? '' : ''
         }`
       }
+      style={({ isActive }) => ({
+        color: isActive ? tText : tMuted,
+        backgroundColor: isActive ? tActiveBg : 'transparent',
+      })}
     >
       {item.icon}
       <span className="hidden lg:inline">{item.label}</span>
@@ -120,12 +146,13 @@ const Topbar = () => {
   );
 
   return (
-    <header className="relative z-40 flex-shrink-0 bg-white border-b border-slate-200">
+    <header className="relative z-40 flex-shrink-0" style={{ backgroundColor: primaryColor, borderBottom: `1px solid ${tBorder}` }}>
       <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center gap-3">
         {/* Burger mobile */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden p-2 rounded-md hover:bg-slate-100 text-slate-700 transition-colors"
+          className="lg:hidden p-2 rounded-md transition-colors"
+          style={{ color: tText }}
           aria-label="Menu"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -141,7 +168,7 @@ const Topbar = () => {
           <div className="w-8 h-8 rounded-md bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
             <img src={logoSrc} className="w-full h-full object-cover" alt="Logo" />
           </div>
-          <span className="hidden sm:block font-bold text-slate-900 text-sm">{settings.site_name || 'DocuFlow'}</span>
+          <span className="hidden sm:block font-bold text-sm" style={{ color: tText }}>{settings.site_name || 'DocuFlow'}</span>
         </NavLink>
 
         {/* Spacer gauche — pousse la navigation au centre */}
@@ -159,18 +186,20 @@ const Topbar = () => {
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Recherche globale → GED (desktop uniquement, cachée sur mobile) */}
           <form onSubmit={handleSearch} className="hidden xl:flex items-center relative">
-            <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <Search size={16} className="absolute left-3 pointer-events-none" style={{ color: tMuted }} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un document…"
-              className="w-64 pl-9 pr-3 py-1.5 rounded-md bg-slate-50 border border-slate-200 focus:bg-white focus:border-afgc-secondary focus:outline-none focus:ring-2 focus:ring-afgc-secondary/20 text-sm text-slate-800 transition-all"
+              className="w-64 pl-9 pr-3 py-1.5 rounded-md border focus:outline-none focus:ring-2 text-sm transition-all"
+              style={{ backgroundColor: topbarLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.1)', borderColor: tBorder, color: tText }}
             />
           </form>
 
           <button
             onClick={toggleMessaging}
-            className="relative p-2 rounded-md hover:bg-slate-100 text-slate-600 transition-colors"
+            className="relative p-2 rounded-md transition-colors hover:opacity-80"
+            style={{ color: tText }}
             title="Messagerie"
           >
             <MessageCircle size={20} />
@@ -187,13 +216,13 @@ const Topbar = () => {
           <div className="relative ml-1" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((o) => !o)}
-              className="flex items-center gap-1.5 p-1 rounded-md hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-1.5 p-1 rounded-md transition-colors hover:opacity-80"
               aria-label="Menu utilisateur"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
                 {initial}
               </div>
-              <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+              <ChevronDown size={14} className="hidden sm:block" style={{ color: tMuted }} />
             </button>
 
             {userMenuOpen && (
@@ -249,7 +278,7 @@ const Topbar = () => {
 
       {/* Menu mobile overlay — apparaît sous la topbar */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-slate-100 bg-white/95 backdrop-blur-xl">
+        <div className="lg:hidden border-t backdrop-blur-xl" style={{ borderColor: tBorder, backgroundColor: topbarLight ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.3)' }}>
           {/* Recherche mobile */}
           <form onSubmit={handleSearch} className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
             <Search size={18} className="text-slate-400 flex-shrink-0" />
