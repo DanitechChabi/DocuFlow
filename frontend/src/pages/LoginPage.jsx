@@ -290,9 +290,9 @@ const LoginPage = () => {
           <p className="text-[10px] text-slate-400 font-medium tracking-wider flex items-center justify-center gap-2 flex-wrap">
             <Link to="/about" className="hover:underline transition-colors" style={{ color: settings.secondary_color || '#3b82f6' }}>À propos</Link>
             <span className="text-slate-300">·</span>
-            <Link to="/about" className="hover:underline transition-colors" style={{ color: settings.secondary_color || '#3b82f6' }}>Politique de confidentialité</Link>
+            <Link to="/privacy" className="hover:underline transition-colors" style={{ color: settings.secondary_color || '#3b82f6' }}>Politique de confidentialité</Link>
             <span className="text-slate-300">·</span>
-            <Link to="/about" className="hover:underline transition-colors" style={{ color: settings.secondary_color || '#3b82f6' }}>Politique de cookies</Link>
+            <Link to="/cookies" className="hover:underline transition-colors" style={{ color: settings.secondary_color || '#3b82f6' }}>Politique de cookies</Link>
           </p>
           <p className="text-[10px] text-slate-400">
             © {new Date().getFullYear()} {settings.site_name || 'DocuFlow'} — Tous droits réservés

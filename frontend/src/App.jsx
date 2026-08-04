@@ -9,6 +9,7 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
+import PrivacyPage from './pages/PrivacyPage';
 import AppLayout from './layouts/AppLayout';
 import MessagingFloatingButton from './components/MessagingFloatingButton';
 import ToastContainer from './components/Toast';
@@ -51,6 +52,8 @@ function App() {
           <Route path="/super-admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminPage /></ProtectedRoute>} />
           <Route path="/admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><CompanyAdminPage /></ProtectedRoute>} />
           <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
+        <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/login" replace />} />
