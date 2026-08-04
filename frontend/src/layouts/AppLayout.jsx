@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Topbar from '../components/Topbar';
+import DocumentChatbot from '../components/DocumentChatbot';
 
 /**
  * Layout partagé de l'application :
@@ -14,6 +15,7 @@ const AppLayout = () => {
       <main className="flex-1 overflow-y-auto relative">
         <Outlet />
       </main>
+      <DocumentChatbot />
     </div>
   );
 };

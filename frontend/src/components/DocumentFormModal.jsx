@@ -8,9 +8,11 @@ const emptyForm = () => ({
   num_acte: '',
   annee: new Date().getFullYear(),
   type_document: '',
+  categorie: '',
   description: '',
   auteur: '',
   date_document: '',
+  duree_conservation: '',
   tags: '',
   dossier_id: '',
 });
