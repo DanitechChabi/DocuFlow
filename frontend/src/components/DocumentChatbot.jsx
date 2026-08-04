@@ -152,7 +152,7 @@ const DocumentChatbot = () => {
 
       {/* Chat panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-40 w-[380px] h-[520px] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
+        <div className="fixed bottom-6 left-6 z-40 w-[380px] h-[520px] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
           style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between border-b border-white/10">
