@@ -45,27 +45,42 @@ exports.updateSettings = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const allowed = [
     'site_name', 'site_description',
-    // Thème
     'primary_color', 'secondary_color', 'accent_color', 'dark_color', 'gold_color',
   ];
 
   try {
     for (const [key, value] of Object.entries(req.body)) {
-      if (allowed.includes(key)) {
-        // Fallback: tenter avec tenant_id, puis sans
+      if (!allowed.includes(key)) continue;
+
+      // D'abord essayer de mettre à jour
+      let result;
+      try {
+        result = await db.query(
+          'UPDATE settings SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = $2 AND key = $3',
+          [value, tenantId, key]
+        );
+      } catch (err) {
+        if (err.code === '42703') {
+          result = await db.query(
+            'UPDATE settings SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE key = $2',
+            [value, key]
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      // Si aucune ligne mise à jour, insérer
+      if (result && result.rowCount === 0) {
         try {
           await db.query(
-            `INSERT INTO settings (tenant_id, key, value)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (tenant_id, key) DO UPDATE SET value = $3, updated_at = CURRENT_TIMESTAMP`,
+            'INSERT INTO settings (tenant_id, key, value) VALUES ($1, $2, $3)',
             [tenantId, key, value]
           );
         } catch (err) {
           if (err.code === '42703') {
             await db.query(
-              `INSERT INTO settings (key, value)
-               VALUES ($1, $2)
-               ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
+              'INSERT INTO settings (key, value) VALUES ($1, $2)',
               [key, value]
             );
           } else {
