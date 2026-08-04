@@ -2,6 +2,8 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Topbar from '../components/Topbar';
 import DocumentChatbot from '../components/DocumentChatbot';
+import GlobalSearch from '../components/GlobalSearch';
+import ContextualTooltips from '../components/ContextualTooltips';
 
 /**
  * Layout partagé de l'application :
@@ -16,6 +18,8 @@ const AppLayout = () => {
         <Outlet />
       </main>
       <DocumentChatbot />
+      <GlobalSearch />
+      <ContextualTooltips />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import HistoryTable from '../components/HistoryTable';
 import OnboardingTour from '../components/OnboardingTour';
 import { DEFAULT_TOUR_STEPS, SUPERADMIN_TOUR_STEPS } from '../components/OnboardingTour';
 import RequestDetailsModal from '../components/RequestDetailsModal';
+import DashboardAnalytics from '../components/DashboardAnalytics';
 import { requestService } from '../services/requestService';
 import { requestDetailsService } from '../services/requestDetailsService';
 import { authService } from '../services/authService';
@@ -172,6 +173,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
 
       {/* Dashboard Tab */}
       {tab === 'dashboard' && (
+        <>
         <div className="animate-fade-in-up">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mb-8 md:mb-10">
             {loading ? (
@@ -219,6 +221,10 @@ const Dashboard = ({ tab = 'dashboard' }) => {
             )}
           </div>
         </div>
+
+          {/* Analytics — admin seulement */}
+          {isAdmin && tab === 'dashboard' && <DashboardAnalytics />}
+      </>
       )}
 
           {/* Main content */}
