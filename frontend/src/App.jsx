@@ -39,6 +39,9 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/:slug/register" element={<RegisterPage />} />
         <Route path="/register-company" element={<CompanyRegisterPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
+        <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
 
         {/* Layout partagé : topbar horizontale + contenu */}
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -51,9 +54,6 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/super-admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminPage /></ProtectedRoute>} />
           <Route path="/admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><CompanyAdminPage /></ProtectedRoute>} />
-          <Route path="/about" element={<AboutPage />} />
-        <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
-        <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/login" replace />} />
