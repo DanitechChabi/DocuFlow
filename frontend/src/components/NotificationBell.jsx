@@ -86,7 +86,7 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
         data-tour={dataTour}
         {...rest}
         className={`p-2.5 relative transition-all duration-200 rounded-xl ${
-          isOpen ? 'bg-slate-100 text-afgc-primary' : 'text-slate-400 hover:text-afgc-primary hover:bg-slate-100'
+          isOpen ? 'bg-slate-100 text-docuflow-primary' : 'text-slate-400 hover:text-docuflow-primary hover:bg-slate-100'
         }`}
         title="Notifications"
       >
@@ -117,7 +117,7 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
               {hasUnread && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="text-xs font-bold text-afgc-secondary hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50"
+                  className="text-xs font-bold text-docuflow-secondary hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50"
                 >
                   Tout marquer lu
                 </button>
@@ -140,7 +140,7 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                   <div
                     key={n.id}
                     className={`px-5 py-4 border-b border-slate-50 last:border-b-0 transition-colors ${
-                      !n.is_read ? 'bg-blue-50/30 border-l-2 border-l-afgc-secondary' : 'hover:bg-slate-50'
+                      !n.is_read ? 'bg-blue-50/30 border-l-2 border-l-docuflow-secondary' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex justify-between items-start gap-3">
@@ -156,7 +156,7 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                       {!n.is_read && (
                         <button
                           onClick={() => handleMarkAsRead(n.id)}
-                          className="p-1.5 text-afgc-secondary hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
+                          className="p-1.5 text-docuflow-secondary hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
                           title="Marquer comme lu"
                         >
                           <Check size={14} />

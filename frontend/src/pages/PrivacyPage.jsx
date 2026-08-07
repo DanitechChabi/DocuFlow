@@ -6,7 +6,7 @@ import { useSettings } from '../contexts/SettingsContext';
 const Section = ({ icon: Icon, title, children }) => (
   <div className="glass-card-premium p-6">
     <div className="flex items-center gap-3 mb-4">
-      <div className="p-2 rounded-xl bg-afgc-secondary/10"><Icon size={18} className="text-afgc-secondary" /></div>
+      <div className="p-2 rounded-xl bg-docuflow-secondary/10"><Icon size={18} className="text-docuflow-secondary" /></div>
       <h3 className="text-lg font-bold text-slate-800">{title}</h3>
     </div>
     <div className="text-sm text-slate-600 leading-relaxed space-y-3">{children}</div>

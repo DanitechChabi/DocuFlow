@@ -163,10 +163,21 @@ const Dashboard = ({ tab = 'dashboard' }) => {
             <RefreshCw size={18} className="text-slate-500" />
           </button>
           {user?.role === 'demandeur' && (
-            <button onClick={() => setIsFormOpen(true)} className="btn-primary flex items-center gap-2 shadow-glow-blue animate-glow-pulse" data-tour="new-request">
-              <Plus size={20} />
-              <span>Nouvelle demande</span>
-            </button>
+            <div className="relative">
+              {/* Halo pulsant derrière le bouton — le bouton reste net */}
+              <div
+                className="absolute -inset-2 bg-gradient-to-r from-docuflow-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse pointer-events-none"
+                aria-hidden="true"
+              ></div>
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="relative btn-primary flex items-center gap-2 shadow-glow-blue"
+                data-tour="new-request"
+              >
+                <Plus size={20} />
+                <span>Nouvelle demande</span>
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -233,10 +244,10 @@ const Dashboard = ({ tab = 'dashboard' }) => {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2 md:gap-3">
                   {tab === 'my_tasks'
-                    ? <><ClipboardList size={20} className="text-afgc-secondary" /> <span>Mes tâches</span></>
+                    ? <><ClipboardList size={20} className="text-docuflow-secondary" /> <span>Mes tâches</span></>
                     : isAdmin
-                      ? <><Package size={20} className="text-afgc-secondary" /> <span>File d'attente</span></>
-                      : <><FileText size={20} className="text-afgc-primary" /> <span>Mes requêtes</span></>
+                      ? <><Package size={20} className="text-docuflow-secondary" /> <span>File d'attente</span></>
+                      : <><FileText size={20} className="text-docuflow-primary" /> <span>Mes requêtes</span></>
                   }
                 </h2>
                 {loading && (

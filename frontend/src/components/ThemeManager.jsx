@@ -64,7 +64,7 @@ const ColorInput = ({ color, onChange, label }) => (
       type="text"
       value={color}
       onChange={onChange}
-      className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-afgc-secondary/30"
+      className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-docuflow-secondary/30"
       maxLength={7}
     />
   </div>
@@ -96,11 +96,11 @@ const ThemeManager = ({ compact = false }) => {
     }
     el.textContent = `
       :root {
-        --color-afgc-primary: ${colors.primary_color} !important;
-        --color-afgc-secondary: ${colors.secondary_color} !important;
-        --color-afgc-accent: ${colors.accent_color} !important;
-        --color-afgc-dark: ${colors.dark_color} !important;
-        --color-afgc-gold: ${colors.gold_color} !important;
+        --color-docuflow-primary: ${colors.primary_color} !important;
+        --color-docuflow-secondary: ${colors.secondary_color} !important;
+        --color-docuflow-accent: ${colors.accent_color} !important;
+        --color-docuflow-dark: ${colors.dark_color} !important;
+        --color-docuflow-gold: ${colors.gold_color} !important;
       }
     `;
   }, [colors]);
@@ -171,7 +171,7 @@ const ThemeManager = ({ compact = false }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-br from-afgc-secondary to-purple-600 text-white rounded-2xl shadow-lg">
+        <div className="p-2 bg-gradient-to-br from-docuflow-secondary to-purple-600 text-white rounded-2xl shadow-lg">
           <Palette size={20} />
         </div>
         <div>
@@ -192,8 +192,8 @@ const ThemeManager = ({ compact = false }) => {
                 onClick={() => applyPreset(preset)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-afgc-secondary text-white shadow-md'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:border-afgc-secondary/50'
+                    ? 'bg-docuflow-secondary text-white shadow-md'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:border-docuflow-secondary/50'
                 }`}
               >
                 <div className="flex -space-x-1">
@@ -234,7 +234,7 @@ const ThemeManager = ({ compact = false }) => {
                 type="text"
                 value={colors[key]}
                 onChange={(e) => handleChange(key, e.target.value)}
-                className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-afgc-secondary/30"
+                className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-docuflow-secondary/30"
                 maxLength={7}
               />
             </div>

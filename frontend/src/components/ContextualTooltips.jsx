@@ -111,10 +111,10 @@ const ContextualTooltips = ({ enabled = true }) => {
         style={{ top: Math.max(16, pos.top), left: Math.max(16, Math.min(pos.left, window.innerWidth - 340)) }}
       >
         {/* Header */}
-        <div className="px-5 pt-4 pb-3 bg-gradient-to-r from-afgc-secondary/5 to-blue-500/5 flex items-center justify-between">
+        <div className="px-5 pt-4 pb-3 bg-gradient-to-r from-docuflow-secondary/5 to-blue-500/5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-afgc-secondary/10">
-              <Lightbulb size={14} className="text-afgc-secondary" />
+            <div className="p-1.5 rounded-lg bg-docuflow-secondary/10">
+              <Lightbulb size={14} className="text-docuflow-secondary" />
             </div>
             <h4 className="text-sm font-bold text-slate-800">{tooltip.title}</h4>
           </div>

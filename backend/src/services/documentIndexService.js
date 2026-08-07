@@ -7,7 +7,7 @@ const storage = require('../services/storageService');
 const path = require('path');
 const fs = require('fs');
 
-const FILES_DIR = path.join(__dirname, '../../uploads/files');
+const { FILES_DIR } = require('../config/paths');
 
 // Insère une ligne d'historique du cycle de vie documentaire.
 // client : optionnel — si fourni (transaction), les requêtes s'exécutent dessus.

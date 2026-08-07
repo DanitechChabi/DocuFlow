@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
 import {
-  Info, HelpCircle, Scale, Mail,
+  Info, HelpCircle, Scale, Mail, ArrowLeft,
   Globe, Code, ChevronDown,
   FileText, MessageCircle, Building2, ShieldCheck, HardDrive,
   FolderOpen, Sparkles, Users, Zap, Heart
@@ -34,7 +35,7 @@ const faqItems = [
   },
   {
     q: "Comment fonctionne l'onboarding à la première connexion ?",
-    a: "Un guide interactif (spotlight + flèches) vous accompagne pas à pas : navigation dans la barre latérale, création de demande, notifications, documents, profil. Pour les superadmins, un assistant dédié aide à créer les utilisateurs, sections et configurer l'entreprise."
+    a: "Un guide interactif (spotlight) vous accompagne pas à pas : navigation, création de demande, notifications, documents, profil. Pour les superadmins, un assistant dédié aide à créer les utilisateurs, sections et configurer l'entreprise."
   },
   {
     q: "Qui contacter en cas de problème ?",
@@ -51,8 +52,15 @@ const licensePoints = [
 ];
 
 const AboutPage = () => {
+  const navigate = useNavigate();
   const settings = useSettings();
   const [openFaq, setOpenFaq] = useState(0);
+
+  // Retour à la page précédente, ou au tableau de bord si entrée directe
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/dashboard');
+  };
 
   const features = [
     { icon: <FileText size={20} />, title: 'Demandes documentaires', desc: 'Créez, suivez et gérez vos demandes de documents avec une machine à états complète' },
@@ -78,6 +86,14 @@ const AboutPage = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
           <div className="flex items-center gap-3 md:gap-5">
+            <button
+              onClick={handleBack}
+              className="p-2 rounded-xl bg-white shadow-sm border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors flex-shrink-0"
+              aria-label="Retour"
+              title="Retour"
+            >
+              <ArrowLeft size={18} className="text-slate-500" />
+            </button>
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <div className="p-2.5 md:p-3 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-2xl shadow-lg">
@@ -96,7 +112,7 @@ const AboutPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up">
           {stats.map((s, i) => (
             <div key={s.label} className="glass-card-premium p-4 md:p-5 text-center" style={{ animationDelay: `${100 + i * 80}ms` }}>
-              <div className="flex items-center justify-center gap-2 text-afgc-secondary mb-2">
+              <div className="flex items-center justify-center gap-2 text-docuflow-secondary mb-2">
                 {s.icon}
               </div>
               <div className="text-2xl md:text-3xl font-black text-slate-900">{s.value}</div>
@@ -130,7 +146,7 @@ const AboutPage = () => {
           </p>
           <p className="text-sm text-slate-600 leading-relaxed mb-4">
             L'expérience utilisateur est enrichie par un <strong>onboarding interactif</strong> à la première
-            connexion (spotlight + flèches) et un <strong>assistant dédié pour les superadministrateurs</strong>
+            connexion (spotlight) et un <strong>assistant dédié pour les superadministrateurs</strong>
             qui guide la création des utilisateurs, sections, branding et configuration de l'entreprise.
           </p>
         </div>

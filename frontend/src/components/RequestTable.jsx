@@ -56,7 +56,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
                 onClick={() => setFilter(f.key)}
                 className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 ${
                   isActive
-                    ? 'bg-afgc-primary text-white shadow-md shadow-slate-200'
+                    ? 'bg-docuflow-primary text-white shadow-md shadow-slate-200'
                     : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300 hover:text-slate-700 hover:shadow-sm'
                 }`}
               >
@@ -137,7 +137,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-afgc-secondary opacity-0 group-hover:opacity-100 transition-all duration-200">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-docuflow-secondary opacity-0 group-hover:opacity-100 transition-all duration-200">
                       Détails <ChevronRight size={14} />
                     </span>
                   </td>

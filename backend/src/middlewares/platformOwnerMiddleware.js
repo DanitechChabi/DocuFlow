@@ -1,7 +1,7 @@
 /**
  * platformOwnerMiddleware — Restreint une route au SEUL propriétaire de la plateforme.
  *
- * Le propriétaire de la plateforme est le superadmin du tenant 1 (AFGC).
+ * Le propriétaire de la plateforme est le superadmin du tenant 1 (DocuFlow).
  * Les superadmins des autres entreprises (créées via register-company)
  * ne doivent JAMAIS avoir accès aux routes globales /api/superadmin/*.
  */

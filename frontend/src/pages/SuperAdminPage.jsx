@@ -421,7 +421,7 @@ const SuperAdminPage = () => {
               key={id}
               onClick={() => setActivePanel(id)}
               className={`px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
-                activePanel === id ? 'bg-afgc-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                activePanel === id ? 'bg-docuflow-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Icon size={15} />
@@ -483,7 +483,7 @@ const SuperAdminPage = () => {
                     <div key={t.tenant_id} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-lg transition-all duration-300 animate-fade-in-up" style={{ animationDelay: `${i * 60}ms` }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="p-2 rounded-xl bg-gradient-to-br from-afgc-primary to-slate-800 text-white flex-shrink-0">
+                          <div className="p-2 rounded-xl bg-gradient-to-br from-docuflow-primary to-slate-800 text-white flex-shrink-0">
                             <Building2 size={16} />
                           </div>
                           <div className="min-w-0">
@@ -528,7 +528,7 @@ const SuperAdminPage = () => {
                   { key: 'archived', label: 'Archivées', icon: Archive },
                   { key: 'all', label: 'Toutes', icon: Inbox },
                 ].map((f) => (
-                  <button key={f.key} onClick={() => setRequestFilter(f.key)} className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${requestFilter === f.key ? 'bg-afgc-primary text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <button key={f.key} onClick={() => setRequestFilter(f.key)} className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${requestFilter === f.key ? 'bg-docuflow-primary text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>
                     <f.icon size={13} /> {f.label}
                   </button>
                 ))}
@@ -651,7 +651,7 @@ const SuperAdminPage = () => {
                 {filteredUsers.map((u, idx) => (
                   <div key={u.id} className="bg-white rounded-2xl p-5 border border-slate-100 hover:shadow-lg hover:border-blue-200/50 transition-all duration-300 group animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
                     <div className="flex items-start gap-4 mb-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0 ${u.role === 'superadmin' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-afgc-secondary to-blue-600'}`}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0 ${u.role === 'superadmin' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-docuflow-secondary to-blue-600'}`}>
                         {u.role === 'superadmin' ? <Crown size={20} /> : (u.full_name?.charAt(0)?.toUpperCase() || '?')}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -795,7 +795,7 @@ const SuperAdminPage = () => {
             </div>
             <div className="glass-card-premium p-6">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Aperçu</h3>
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-afgc-primary to-slate-900 rounded-2xl">
+              <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-docuflow-primary to-slate-900 rounded-2xl">
                 <div className="w-12 h-12 rounded-full bg-white/10 overflow-hidden flex-shrink-0 border-2 border-white/20">
                   {logoPreview ? <img src={logoPreview} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/50 font-bold">?</div>}
                 </div>
@@ -861,7 +861,7 @@ const SuperAdminPage = () => {
                     <button key={r.key} type="button"
                       onClick={() => editUser ? setEditUser({ ...editUser, role: r.key }) : setUserForm({ ...userForm, role: r.key })}
                       className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${
-                        (editUser ? editUser.role : userForm.role) === r.key ? 'bg-afgc-primary text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        (editUser ? editUser.role : userForm.role) === r.key ? 'bg-docuflow-primary text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}>
                       {r.label}
                     </button>
@@ -954,7 +954,7 @@ const SuperAdminPage = () => {
             </div>
             <form onSubmit={handleCreateTenant} className="p-8 space-y-4">
               <input className="input-premium" value={tenantForm.name} onChange={(e) => setTenantForm({...tenantForm, name: e.target.value})} required placeholder="Nom de l'entreprise" />
-              <input className="input-premium" value={tenantForm.slug} onChange={(e) => setTenantForm({...tenantForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} required placeholder="Slug (ex: afgc)" />
+              <input className="input-premium" value={tenantForm.slug} onChange={(e) => setTenantForm({...tenantForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} required placeholder="Slug (ex: docuflow)" />
               <input className="input-premium" value={tenantForm.email_domain} onChange={(e) => setTenantForm({...tenantForm, email_domain: e.target.value})} placeholder="Domaine email (optionnel)" />
               <input className="input-premium" type="email" value={tenantForm.contact_email} onChange={(e) => setTenantForm({...tenantForm, contact_email: e.target.value})} placeholder="Email de contact (optionnel)" />
               <div className="flex gap-3">

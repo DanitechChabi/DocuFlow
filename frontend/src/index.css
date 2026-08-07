@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-afgc-primary: #0f172a;
-  --color-afgc-secondary: #3b82f6;
-  --color-afgc-accent: #f8fafc;
-  --color-afgc-dark: #1e293b;
-  --color-afgc-gold: #d4af37;
+  --color-docuflow-primary: #0f172a;
+  --color-docuflow-secondary: #3b82f6;
+  --color-docuflow-accent: #f8fafc;
+  --color-docuflow-dark: #1e293b;
+  --color-docuflow-gold: #d4af37;
 
   --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.08);
@@ -82,6 +82,10 @@
 @keyframes spinner {
   to { transform: rotate(360deg); }
 }
+@keyframes docuflow-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 0 20px 4px rgba(59, 130, 246, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.4), 0 0 34px 8px rgba(59, 130, 246, 0.65); }
+}
 
 /* =========== UTILITY CLASSES =========== */
 
@@ -116,6 +120,12 @@
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+/* Anneau du tour d'onboarding — désigne l'élément mis en avant (spotlight sans flèche) */
+.docuflow-ring {
+  border: 3px solid #3b82f6;
+  animation: docuflow-ring-pulse 1.6s ease-in-out infinite;
 }
 
 .delay-100 { animation-delay: 100ms; }
@@ -154,7 +164,7 @@
 }
 
 .btn-primary {
-  background-color: var(--color-afgc-primary);
+  background-color: var(--color-docuflow-primary);
   color: white;
   border-radius: 0.75rem;
   font-weight: 700;
@@ -162,7 +172,7 @@
   transition: all 0.2s;
 }
 .btn-primary:hover {
-  background-color: var(--color-afgc-dark);
+  background-color: var(--color-docuflow-dark);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   transform: translateY(-1px);
 }
@@ -234,7 +244,7 @@
     color: var(--color-slate-300);
   }
   .input-premium:focus {
-    border-color: var(--color-afgc-secondary);
+    border-color: var(--color-docuflow-secondary);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
   }
 
@@ -383,7 +393,7 @@ select.input-premium {
 
 /* Table row hover indicator — subtle left border on hover */
 tr.hover-indicator:hover td:first-child {
-  box-shadow: inset 3px 0 0 0 var(--color-afgc-secondary);
+  box-shadow: inset 3px 0 0 0 var(--color-docuflow-secondary);
 }
 
 /* Accessible hidden text */

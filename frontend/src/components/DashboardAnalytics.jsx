@@ -37,7 +37,7 @@ const DashboardAnalytics = () => {
     return (
       <div className="glass-card-premium p-6 animate-fade-in-up">
         <div className="flex items-center gap-3 mb-4">
-          <BarChart3 size={20} className="text-afgc-secondary" />
+          <BarChart3 size={20} className="text-docuflow-secondary" />
           <h3 className="text-lg font-bold text-slate-800">Analyses</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -108,7 +108,7 @@ const DashboardAnalytics = () => {
   return (
     <div className="glass-card-premium p-6 animate-fade-in-up">
       <div className="flex items-center gap-3 mb-6">
-        <BarChart3 size={20} className="text-afgc-secondary" />
+        <BarChart3 size={20} className="text-docuflow-secondary" />
         <h3 className="text-lg font-bold text-slate-800">Analyses</h3>
         <span className="text-xs text-slate-400 font-medium">{total} actions enregistrées</span>
       </div>

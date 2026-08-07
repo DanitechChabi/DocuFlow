@@ -33,7 +33,7 @@ const ConfirmDialog = ({ isOpen, title, message, confirmLabel = 'Confirmer', typ
       icon: AlertTriangle,
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-500',
-      btnBg: 'bg-afgc-secondary hover:bg-blue-700',
+      btnBg: 'bg-docuflow-secondary hover:bg-blue-700',
     },
   };
 

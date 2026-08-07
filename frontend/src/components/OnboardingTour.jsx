@@ -38,6 +38,8 @@ export const DEFAULT_TOUR_STEPS = [
     title: 'Votre profil',
     content: 'Modifiez vos informations, changez votre mot de passe, gérez vos préférences.',
     position: 'left',
+    // La cible vit dans le menu avatar (fermé au départ) → le tour l'ouvre
+    inMenu: true,
   },
 ];
 
@@ -49,6 +51,7 @@ export const SUPERADMIN_TOUR_STEPS = [
     title: 'Gestion système',
     content: 'Accès au portail superadmin : gestion des utilisateurs, sections, branding, entreprises.',
     position: 'bottom',
+    inMenu: true,
   },
 ];
 
@@ -144,28 +147,53 @@ const OnboardingTour = ({
     return { top, left };
   }, []);
 
+  const isElementVisible = useCallback((element) => {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0 && element.getClientRects().length > 0;
+  }, []);
+
+  const positionOnElement = useCallback((stepIndex, element) => {
+    const step = steps[stepIndex];
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      const newRect = element.getBoundingClientRect();
+      setTargetRect(newRect);
+      const pos = computeTooltipPosition(element, step.position);
+      setTooltipPosition(pos);
+      setCurrentStep(stepIndex);
+    }, 300);
+  }, [steps, computeTooltipPosition]);
+
   const goToStep = useCallback((stepIndex) => {
     if (stepIndex < 0 || stepIndex >= steps.length) return;
 
     const step = steps[stepIndex];
+
+    // Certaines cibles vivent dans le menu utilisateur (fermé au départ) :
+    // on ouvre le menu via un événement puis on positionne la cible.
+    if (step.inMenu) {
+      window.dispatchEvent(new CustomEvent('docuflow:set-user-menu', { detail: true }));
+      setTimeout(() => {
+        const el = findTargetElement(step.selector);
+        if (el && isElementVisible(el)) positionOnElement(stepIndex, el);
+        else goToStep(stepIndex + 1);
+      }, 350);
+      return;
+    }
+
     const element = findTargetElement(step.selector);
 
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        const newRect = element.getBoundingClientRect();
-        setTargetRect(newRect);
-        const pos = computeTooltipPosition(element, step.position);
-        setTooltipPosition(pos);
-        setCurrentStep(stepIndex);
-      }, 300);
+    if (element && isElementVisible(element)) {
+      positionOnElement(stepIndex, element);
     } else {
       // Élément non trouvé, passer au suivant
       goToStep(stepIndex + 1);
     }
-  }, [steps, findTargetElement, computeTooltipPosition]);
+  }, [steps, findTargetElement, isElementVisible, positionOnElement]);
 
   const finishTour = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('docuflow:set-user-menu', { detail: false }));
     markTourDone();
     setIsOpen(false);
     setTargetRect(null);
@@ -187,6 +215,7 @@ const OnboardingTour = ({
   }, [currentStep, goToStep]);
 
   const skipTour = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('docuflow:set-user-menu', { detail: false }));
     markTourDone();
     setIsOpen(false);
     setTargetRect(null);
@@ -263,20 +292,26 @@ const OnboardingTour = ({
     };
   }
 
-  // Flèche du tooltip
-  const getArrowPosition = (position) => {
-    switch (position) {
-      case 'right': return { top: '50%', left: '-8px', transform: 'translateY(-50%) rotate(90deg)' };
-      case 'left': return { top: '50%', right: '-8px', transform: 'translateY(-50%) rotate(-90deg)' };
-      case 'bottom': return { top: '-8px', left: '50%', transform: 'translateX(-50%) rotate(180deg)' };
-      default: return { bottom: '-8px', left: '50%', transform: 'translateX(-50%)' };
-    }
-  };
-
   return createPortal(
     <>
-      {/* Spotlight overlay */}
-      {spotlightStyle && <div style={spotlightStyle} aria-hidden="true" />}
+      {/* Spotlight overlay : masque + « trou » sur l'élément cible */}
+      {spotlightStyle && (
+        <>
+          <div style={spotlightStyle} aria-hidden="true" />
+          {/* Anneau lumineux — désigne l'élément mis en avant (remplace la flèche) */}
+          <div
+            className="docuflow-ring pointer-events-none fixed rounded-xl"
+            style={{
+              top: targetRect.top - 8,
+              left: targetRect.left - 8,
+              width: targetRect.width + 16,
+              height: targetRect.height + 16,
+              zIndex: 9998,
+            }}
+            aria-hidden="true"
+          />
+        </>
+      )}
 
       {/* Tooltip */}
       <div
@@ -290,15 +325,6 @@ const OnboardingTour = ({
         aria-modal="true"
         aria-labelledby="tour-title"
       >
-        {/* Flèche */}
-        <div
-          className="absolute w-3 h-3 bg-white rotate-45 shadow-lg"
-          style={{
-            ...getArrowPosition(step.position),
-            boxShadow: '4px 4px 8px rgba(0,0,0,0.1)',
-          }}
-        />
-
         {/* Carte tooltip */}
         <div className="bg-white rounded-2xl shadow-elevated border border-slate-100 overflow-hidden">
           {/* Header */}
@@ -326,7 +352,7 @@ const OnboardingTour = ({
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-afgc-secondary to-blue-500 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-docuflow-secondary to-blue-500 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -341,7 +367,7 @@ const OnboardingTour = ({
                   disabled={i === currentStep}
                   className={`w-2 h-2 rounded-full transition-all ${
                     i === currentStep
-                      ? 'bg-afgc-secondary w-6'
+                      ? 'bg-docuflow-secondary w-6'
                       : i < currentStep
                       ? 'bg-emerald-500'
                       : 'bg-slate-300 hover:bg-slate-400'

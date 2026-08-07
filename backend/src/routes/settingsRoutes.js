@@ -2,17 +2,13 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const settingsController = require('../controllers/settingsController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const optionalAuthMiddleware = require('../middlewares/optionalAuthMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
-// Config multer
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Config multer — dossier des uploads (surchargeable via UPLOADS_DIR)
+const { UPLOADS_DIR: uploadDir } = require('../config/paths');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),

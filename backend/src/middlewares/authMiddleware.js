@@ -13,7 +13,7 @@ module.exports = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = {
       ...decoded,
-      tenant_id: decoded.tenant_id || 1, // Fallback AFGC si pas encore migré
+      tenant_id: decoded.tenant_id || 1, // Fallback DocuFlow si pas encore migré
     };
     next();
   } catch (err) {

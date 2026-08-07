@@ -18,7 +18,7 @@ const HistoryTable = ({ logs, onRequestClick }) => {
             <tr key={log.id} className="hover:bg-slate-50/80 transition-all duration-150 animate-fade-in-up group" style={{ animationDelay: `${idx * 30}ms` }}>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
                     {log.user_name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <span className="font-medium text-slate-700 text-sm">{log.user_name}</span>
@@ -30,7 +30,7 @@ const HistoryTable = ({ logs, onRequestClick }) => {
                   {log.request_id && (
                     <button
                       onClick={() => onRequestClick(log.request_id)}
-                      className="p-1.5 bg-afgc-primary/5 text-afgc-primary rounded-lg hover:bg-afgc-primary/10 transition-all opacity-0 group-hover:opacity-100"
+                      className="p-1.5 bg-docuflow-primary/5 text-docuflow-primary rounded-lg hover:bg-docuflow-primary/10 transition-all opacity-0 group-hover:opacity-100"
                       title="Voir la demande"
                     >
                       <ExternalLink size={12} />

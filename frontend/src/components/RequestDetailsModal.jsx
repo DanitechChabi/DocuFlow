@@ -270,7 +270,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
         <div className={`px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-100 ${statusColor[request.statut] || 'border-l-transparent'} border-l-4 sticky top-0 bg-white z-10`}>
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="p-2.5 sm:p-3 bg-gradient-to-br from-afgc-primary to-slate-800 text-afgc-secondary rounded-xl sm:rounded-2xl shadow-md flex-shrink-0">
+              <div className="p-2.5 sm:p-3 bg-gradient-to-br from-docuflow-primary to-slate-800 text-docuflow-secondary rounded-xl sm:rounded-2xl shadow-md flex-shrink-0">
                 <FileText size={22} />
               </div>
               <div className="min-w-0">
@@ -303,7 +303,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                   {stateHistory.map((h, idx) => (
                     <div key={h.id} className="flex gap-4 animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
                       <div className="flex flex-col items-center">
-                        <div className={`w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-afgc-secondary border-afgc-secondary' : 'bg-white border-slate-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-docuflow-secondary border-docuflow-secondary' : 'bg-white border-slate-300'}`}></div>
                         {idx < stateHistory.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 mt-1"></div>}
                       </div>
                       <div className="pb-6">
@@ -335,7 +335,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                   {history.map((h, idx) => (
                     <div key={h.id} className="flex gap-4 animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
                       <div className="flex flex-col items-center">
-                        <div className={`w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-afgc-secondary border-afgc-secondary' : 'bg-white border-slate-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full border-2 ${idx === 0 ? 'bg-docuflow-secondary border-docuflow-secondary' : 'bg-white border-slate-300'}`}></div>
                         {idx < history.length - 1 && <div className="w-0.5 flex-1 bg-slate-200 mt-1"></div>}
                       </div>
                       <div className="pb-6">
@@ -404,7 +404,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                           onClick={() => setStatus(s)}
                           className={`px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all uppercase tracking-wider ${
                             status === s
-                              ? 'bg-afgc-primary text-white shadow-sm'
+                              ? 'bg-docuflow-primary text-white shadow-sm'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                           }`}
                         >
@@ -486,7 +486,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                     <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50">
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-afgc-secondary">{gedDoc.reference_mfile}</p>
+                          <p className="text-sm font-bold text-docuflow-secondary">{gedDoc.reference_mfile}</p>
                           <p className="text-xs text-slate-500 truncate">{gedDoc.nom_entreprise} · {gedDoc.num_dossier}/{gedDoc.num_acte} · {gedDoc.statut}</p>
                         </div>
                         <button onClick={handleUnlinkDocument} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 flex-shrink-0" title="Retirer le lien">
@@ -515,7 +515,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                             <div className="absolute z-10 mt-1 w-full bg-white rounded-xl border border-slate-200 shadow-elevated max-h-56 overflow-y-auto">
                               {linkResults.map((d) => (
                                 <button key={d.id} onClick={() => handlePickDocument(d)} className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm">
-                                  <span className="font-bold text-afgc-secondary">{d.reference_mfile}</span>
+                                  <span className="font-bold text-docuflow-secondary">{d.reference_mfile}</span>
                                   <span className="text-slate-500"> · {d.nom_entreprise} · {d.num_dossier}/{d.num_acte}</span>
                                 </button>
                               ))}
@@ -599,7 +599,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                     return (
                       <div key={f.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl group hover:bg-slate-100 transition-colors">
                         <div className="p-1.5 bg-white rounded-lg shadow-sm">
-                          <Icon size={14} className="text-afgc-secondary" />
+                          <Icon size={14} className="text-docuflow-secondary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-slate-700 truncate">{f.original_name}</p>
@@ -607,7 +607,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <a href={f.url} target="_blank" rel="noopener noreferrer"
-                            className="p-1.5 hover:bg-afgc-secondary/10 rounded-lg text-slate-400 hover:text-afgc-secondary transition-colors"
+                            className="p-1.5 hover:bg-docuflow-secondary/10 rounded-lg text-slate-400 hover:text-docuflow-secondary transition-colors"
                             title="Télécharger">
                             <Download size={14} />
                           </a>

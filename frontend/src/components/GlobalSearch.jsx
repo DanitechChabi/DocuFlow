@@ -117,7 +117,7 @@ const GlobalSearch = () => {
         <div className="max-h-80 overflow-y-auto">
           {searching && (
             <div className="px-5 py-8 text-center text-sm text-slate-400">
-              <div className="w-5 h-5 border-2 border-slate-200 border-t-afgc-secondary rounded-full animate-spin mx-auto mb-2"></div>
+              <div className="w-5 h-5 border-2 border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto mb-2"></div>
               Recherche…
             </div>
           )}
@@ -140,7 +140,7 @@ const GlobalSearch = () => {
                     key={i}
                     onClick={item.action}
                     className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-colors ${
-                      i === selectedIndex ? 'bg-afgc-secondary/5' : 'hover:bg-slate-50'
+                      i === selectedIndex ? 'bg-docuflow-secondary/5' : 'hover:bg-slate-50'
                     }`}
                   >
                     <Icon size={16} className="text-slate-400 flex-shrink-0" />

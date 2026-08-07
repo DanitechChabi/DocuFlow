@@ -1,0 +1,54 @@
+{
+  "name": "docuflow-desktop",
+  "productName": "DocuFlow",
+  "version": "1.0.0",
+  "description": "DocuFlow — Plateforme de gestion documentaire (application bureau)",
+  "main": "main.js",
+  "author": "CHABI BOUKO Daniel",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "build:frontend": "cd ../frontend && npm run build -- --mode desktop",
+    "icon": "node scripts/make-icon.js",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.0"
+  },
+  "build": {
+    "appId": "com.docuflow.app",
+    "productName": "DocuFlow",
+    "asar": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      { "from": "../backend/src", "to": "backend/src" },
+      { "from": "../backend/node_modules", "to": "backend/node_modules", "filter": ["**/*", "!nodemon/**", "!**/.bin/**"] },
+      { "from": "../frontend/dist", "to": "frontend/dist" },
+      { "from": "../docs", "to": "docs", "filter": ["**/*.sql"] }
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DocuFlow",
+      "artifactName": "DocuFlow-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "DocuFlow-Portable-${version}.exe"
+    }
+  }
+}

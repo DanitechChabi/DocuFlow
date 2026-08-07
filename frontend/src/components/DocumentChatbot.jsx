@@ -109,7 +109,7 @@ const DocumentChatbot = () => {
   const formatDoc = (doc) => (
     <div key={doc.id} className="bg-white/10 rounded-xl p-3 border border-white/5 hover:bg-white/15 transition-colors">
       <div className="flex items-start gap-2">
-        <FileText size={14} className="text-afgc-secondary mt-0.5 flex-shrink-0" />
+        <FileText size={14} className="text-docuflow-secondary mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <p className="text-sm font-bold text-white truncate">{doc.reference_mfile}</p>
           <p className="text-xs text-white/50 truncate">{doc.nom_entreprise} — {doc.type_document || 'N/A'}</p>
@@ -130,9 +130,9 @@ const DocumentChatbot = () => {
         >
           <div className="relative">
             {/* Halo animé */}
-            <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-afgc-secondary to-blue-500 opacity-30 blur-lg group-hover:opacity-50 transition-opacity animate-pulse"></div>
+            <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-docuflow-secondary to-blue-500 opacity-30 blur-lg group-hover:opacity-50 transition-opacity animate-pulse"></div>
             {/* Robot icon */}
-            <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-afgc-secondary to-blue-600 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+            <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="11" width="18" height="10" rx="2"/>
                 <circle cx="9" cy="16" r="1"/>
@@ -157,8 +157,8 @@ const DocumentChatbot = () => {
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-afgc-secondary/20 flex items-center justify-center">
-                <Bot size={18} className="text-afgc-secondary" />
+              <div className="w-9 h-9 rounded-xl bg-docuflow-secondary/20 flex items-center justify-center">
+                <Bot size={18} className="text-docuflow-secondary" />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">DocuBot</p>
@@ -176,7 +176,7 @@ const DocumentChatbot = () => {
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   msg.role === 'user'
-                    ? 'bg-afgc-secondary text-white rounded-br-md'
+                    ? 'bg-docuflow-secondary text-white rounded-br-md'
                     : 'bg-white/5 text-white/90 rounded-bl-md'
                 }`}>
                   <p className="text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
@@ -192,7 +192,7 @@ const DocumentChatbot = () => {
               <div className="flex justify-start">
                 <div className="bg-white/5 rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <Search size={14} className="text-afgc-secondary animate-pulse" />
+                    <Search size={14} className="text-docuflow-secondary animate-pulse" />
                     <span className="text-sm text-white/50">Recherche…</span>
                   </div>
                 </div>
@@ -210,12 +210,12 @@ const DocumentChatbot = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Posez votre question…"
-                className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-white/30 focus:outline-none focus:border-afgc-secondary/50 focus:bg-white/10 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-white/30 focus:outline-none focus:border-docuflow-secondary/50 focus:bg-white/10 transition-colors"
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || searching}
-                className="p-2.5 rounded-xl bg-afgc-secondary text-white hover:bg-afgc-secondary/80 disabled:opacity-30 transition-all"
+                className="p-2.5 rounded-xl bg-docuflow-secondary text-white hover:bg-docuflow-secondary/80 disabled:opacity-30 transition-all"
               >
                 <Send size={18} />
               </button>

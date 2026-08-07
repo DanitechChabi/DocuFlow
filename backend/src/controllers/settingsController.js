@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
+const { UPLOADS_DIR } = require('../config/paths');
 
 exports.getSettings = async (req, res) => {
   const tenantId = req.user?.tenant_id || 1;
@@ -113,7 +114,7 @@ exports.uploadLogo = async (req, res) => {
       // Supprimer le fichier rejeté
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '../../uploads', req.file.filename);
+      const filePath = path.join(UPLOADS_DIR, req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       return res.status(400).json({ message: 'Type de fichier non autorisé. Formats acceptés : PNG, JPG, GIF, WebP' });
     }
@@ -122,7 +123,7 @@ exports.uploadLogo = async (req, res) => {
     if (req.file.size > MAX_LOGO_SIZE) {
       const fs = require('fs');
       const path = require('path');
-      const filePath = path.join(__dirname, '../../uploads', req.file.filename);
+      const filePath = path.join(UPLOADS_DIR, req.file.filename);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       return res.status(400).json({ message: 'Le fichier est trop volumineux. Taille maximum : 5 Mo' });
     }
@@ -136,7 +137,7 @@ exports.uploadLogo = async (req, res) => {
         [tenantId]
       );
       if (old.rows.length > 0 && old.rows[0].value && old.rows[0].value !== filename) {
-        const oldPath = path.join(__dirname, '../../uploads', old.rows[0].value);
+        const oldPath = path.join(UPLOADS_DIR, old.rows[0].value);
         if (fs.existsSync(oldPath)) {
           fs.unlinkSync(oldPath);
         }

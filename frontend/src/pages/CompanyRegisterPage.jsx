@@ -96,7 +96,7 @@ const CompanyRegisterPage = () => {
           <h2 className="text-2xl font-black text-slate-800 mb-2">Entreprise créée !</h2>
           <p className="text-slate-500">
             Votre compte administrateur est prêt. Redirection vers votre espace{' '}
-            <span className="font-bold text-afgc-secondary">{createdSlug}</span>…
+            <span className="font-bold text-docuflow-secondary">{createdSlug}</span>…
           </p>
         </div>
       </div>
@@ -113,8 +113,8 @@ const CompanyRegisterPage = () => {
       <div className="max-w-lg w-full animate-fade-in-up relative z-10">
         <div className="text-center mb-8">
           <div className="relative inline-flex mb-4">
-            <div className="absolute -inset-2 bg-gradient-to-r from-afgc-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse"></div>
-            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 shadow-lg flex items-center justify-center">
+            <div className="absolute -inset-2 bg-gradient-to-r from-docuflow-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse"></div>
+            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 shadow-lg flex items-center justify-center">
               <Building2 size={28} className="text-white" />
             </div>
           </div>
@@ -138,7 +138,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom de l'entreprise</label>
               <div className="relative group">
-                <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
                   name="company_name"
@@ -146,7 +146,7 @@ const CompanyRegisterPage = () => {
                   value={formData.company_name}
                   onChange={handleCompanyName}
                   required
-                  placeholder="Ex. Compagnie AFGC"
+                  placeholder="Ex. Compagnie DocuFlow"
                 />
               </div>
             </div>
@@ -154,7 +154,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Code entreprise</label>
               <div className="relative group">
-                <KeyRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <KeyRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
                   name="slug"
@@ -164,7 +164,7 @@ const CompanyRegisterPage = () => {
                   required
                   pattern="[a-z0-9-]+"
                   title="Lettres minuscules, chiffres et tirets uniquement"
-                  placeholder="ex. compagnie-afgc"
+                  placeholder="ex. compagnie-docuflow"
                 />
               </div>
               <p className="text-[11px] text-slate-400 ml-1">
@@ -179,7 +179,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom complet</label>
               <div className="relative group">
-                <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
                   name="admin_full_name"
@@ -195,7 +195,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-1 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
               <div className="relative group">
-                <UserPlus size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <UserPlus size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
                   name="admin_username"
@@ -211,7 +211,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-1 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe</label>
               <div className="relative group">
-                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="password"
                   name="admin_password"
@@ -228,7 +228,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email administrateur</label>
               <div className="relative group">
-                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="email"
                   name="admin_email"
@@ -244,7 +244,7 @@ const CompanyRegisterPage = () => {
             <div className="col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email de contact (optionnel)</label>
               <div className="relative group">
-                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="email"
                   name="contact_email"
@@ -280,7 +280,7 @@ const CompanyRegisterPage = () => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
               Déjà inscrit ?{' '}
-              <Link to="/login" className="text-afgc-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
+              <Link to="/login" className="text-docuflow-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
                 Se connecter
               </Link>
             </p>

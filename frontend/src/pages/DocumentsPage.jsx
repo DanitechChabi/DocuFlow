@@ -111,7 +111,7 @@ const DocumentsPage = () => {
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <FolderOpen className="text-afgc-secondary" size={24} />
+                <FolderOpen className="text-docuflow-secondary" size={24} />
                 Documents
               </h1>
               <p className="text-sm text-slate-400 font-medium">Référentiel documentaire — recherche, classement et versions</p>
@@ -173,7 +173,7 @@ const DocumentsPage = () => {
                   onClick={() => { setFilters(f => ({ ...f, tag: f.tag === tag ? '' : tag })); setPage(1); }}
                   className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
                     filters.tag === tag
-                      ? 'bg-afgc-secondary text-white shadow-sm'
+                      ? 'bg-docuflow-secondary text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -225,7 +225,7 @@ const DocumentsPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {!loading && data?.documents?.map((d) => (
                   <tr key={d.id} onClick={() => setDetailDoc(d.id)} className="hover:bg-blue-50/40 cursor-pointer transition-colors">
-                    <td className="px-4 py-3 font-bold text-afgc-secondary">{d.reference_mfile}</td>
+                    <td className="px-4 py-3 font-bold text-docuflow-secondary">{d.reference_mfile}</td>
                     <td className="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><Building2 size={14} className="text-slate-400" /> {d.nom_entreprise}</td>
                     <td className="px-4 py-3 text-slate-600">{d.num_dossier} / {d.num_acte}</td>
                     <td className="px-4 py-3">{d.type_document || '—'}</td>

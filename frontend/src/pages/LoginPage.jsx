@@ -77,7 +77,7 @@ const LoginPage = () => {
     return () => { mounted = false; };
   }, [slug]);
 
-  const defaultLogoSrc = 'https://th.bing.com/th/id/R.d7f2f165ad7ca819fe72a5f20a08a7c7?rik=cmptSS4F09F1Hw&riu=http%3a%2f%2fapiga.africa%2fimg%2fafgc.jpg&ehk=BW9PLt5Ge5oLmVWHbZvaEzZCStjt7IWIJj4n%2bEJym5M%3d&risl=&pid=ImgRaw&r=0';
+  const defaultLogoSrc = '/favicon.svg';
   // Branding : priorité à l'entreprise de l'URL, sinon aux réglages globaux
   const displayName = company?.settings?.site_name || company?.name || settings.site_name || 'DocuFlow';
   const displayDesc = company?.settings?.site_description || settings.site_description || 'Plateforme de gestion documentaire';
@@ -109,7 +109,7 @@ const LoginPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
         <div className="flex flex-col items-center gap-3 text-slate-400">
-          <Loader2 size={28} className="animate-spin text-afgc-secondary" />
+          <Loader2 size={28} className="animate-spin text-docuflow-secondary" />
           <span className="text-sm font-medium">Chargement de l'espace entreprise…</span>
         </div>
       </div>
@@ -130,7 +130,7 @@ const LoginPage = () => {
             Créer mon espace entreprise
           </Link>
           <p className="mt-4">
-            <Link to="/login" className="text-sm text-afgc-secondary font-bold hover:underline">
+            <Link to="/login" className="text-sm text-docuflow-secondary font-bold hover:underline">
               ← Revenir à la connexion
             </Link>
           </p>
@@ -214,7 +214,7 @@ const LoginPage = () => {
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
               <div className="relative group">
-                <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type="text"
                   className="input-premium pl-12"
@@ -231,7 +231,7 @@ const LoginPage = () => {
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe</label>
               <div className="relative group">
-                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+                <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
                 <input
                   type={showPwd ? 'text' : 'password'}
                   className="input-premium pl-12 pr-12"

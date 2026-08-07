@@ -148,7 +148,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
             </div>
           )}
 
-          {loading && <div className="py-20 text-center text-slate-400"><div className="w-8 h-8 border-2 border-slate-300 border-t-afgc-secondary rounded-full animate-spin mx-auto mb-3"></div>Chargement du document…</div>}
+          {loading && <div className="py-20 text-center text-slate-400"><div className="w-8 h-8 border-2 border-slate-300 border-t-docuflow-secondary rounded-full animate-spin mx-auto mb-3"></div>Chargement du document…</div>}
           {!loading && doc && (
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               {/* Colonne gauche : métadonnées */}
@@ -169,7 +169,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   {Array.isArray(doc.tags) && doc.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {doc.tags.map((t, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded-full bg-blue-50 text-afgc-secondary text-[11px] font-bold"><Tag size={10} className="inline mr-1" />{t}</span>
+                        <span key={i} className="px-2 py-0.5 rounded-full bg-blue-50 text-docuflow-secondary text-[11px] font-bold"><Tag size={10} className="inline mr-1" />{t}</span>
                       ))}
                     </div>
                   )}
@@ -235,11 +235,11 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                         key={f.id}
                         onClick={() => setSelectedFile(f)}
                         className={`flex items-center justify-between px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
-                          selectedFile?.id === f.id ? 'border-afgc-secondary bg-blue-50/50' : 'border-slate-100 hover:bg-slate-50'
+                          selectedFile?.id === f.id ? 'border-docuflow-secondary bg-blue-50/50' : 'border-slate-100 hover:bg-slate-50'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center text-white flex-shrink-0">
+                          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white flex-shrink-0">
                             <File size={16} />
                           </div>
                           <div className="min-w-0">
@@ -277,7 +277,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   <div className="space-y-3">
                     {doc.history?.map((h) => (
                       <div key={h.id} className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-afgc-secondary flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-docuflow-secondary flex-shrink-0">
                           <CheckCircle size={15} />
                         </div>
                         <div>
@@ -324,7 +324,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-afgc-secondary/10 rounded-xl"><Share2 size={18} className="text-afgc-secondary" /></div>
+                <div className="p-2 bg-docuflow-secondary/10 rounded-xl"><Share2 size={18} className="text-docuflow-secondary" /></div>
                 <h3 className="text-lg font-bold text-slate-800">Partager le document</h3>
               </div>
               <button onClick={() => setShowShare(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={18} /></button>

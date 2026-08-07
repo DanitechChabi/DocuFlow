@@ -32,7 +32,7 @@ const applyLogo = (url) => {
 
 /**
  * Applique les couleurs thème comme variables CSS sur :root.
- * Les composants qui utilisent var(--color-afgc-*) seront mis à jour automatiquement.
+ * Les composants qui utilisent var(--color-docuflow-*) seront mis à jour automatiquement.
  */
 const applyThemeColors = (themeData) => {
   const root = document.documentElement;
@@ -52,11 +52,11 @@ const applyThemeColors = (themeData) => {
 
   styleEl.textContent = `
     :root {
-      --color-afgc-primary: ${primary} !important;
-      --color-afgc-secondary: ${secondary} !important;
-      --color-afgc-accent: ${accent} !important;
-      --color-afgc-dark: ${dark} !important;
-      --color-afgc-gold: ${gold} !important;
+      --color-docuflow-primary: ${primary} !important;
+      --color-docuflow-secondary: ${secondary} !important;
+      --color-docuflow-accent: ${accent} !important;
+      --color-docuflow-dark: ${dark} !important;
+      --color-docuflow-gold: ${gold} !important;
       --color-primary-color: ${primary} !important;
       --color-secondary-color: ${secondary} !important;
       --color-accent-color: ${accent} !important;

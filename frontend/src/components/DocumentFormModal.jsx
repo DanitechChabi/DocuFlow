@@ -112,7 +112,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-2 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Entreprise</label>
             <div className="relative group">
-              <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="text" name="nom_entreprise" className="input-premium pl-12" value={formData.nom_entreprise} onChange={handleChange} required placeholder="Nom de l'entreprise" />
             </div>
           </div>
@@ -120,14 +120,14 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° dossier</label>
             <div className="relative group">
-              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="text" name="num_dossier" className="input-premium pl-12" value={formData.num_dossier} onChange={handleChange} required placeholder="D-2026-001" />
             </div>
           </div>
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° acte</label>
             <div className="relative group">
-              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="text" name="num_acte" className="input-premium pl-12" value={formData.num_acte} onChange={handleChange} required placeholder="A-001" />
             </div>
           </div>
@@ -135,7 +135,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Année</label>
             <div className="relative group">
-              <Calendar size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <Calendar size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="number" name="annee" className="input-premium pl-12" value={formData.annee} onChange={handleChange} required />
             </div>
           </div>
@@ -150,7 +150,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Auteur</label>
             <div className="relative group">
-              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="text" name="auteur" className="input-premium pl-12" value={formData.auteur} onChange={handleChange} placeholder="Rédacteur / service" />
             </div>
           </div>
@@ -162,7 +162,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Dossier de classement</label>
             <div className="relative group">
-              <FolderOpen size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <FolderOpen size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <select name="dossier_id" className="input-premium pl-12" value={formData.dossier_id} onChange={handleChange}>
                 <option value="">Aucun dossier</option>
                 {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -172,7 +172,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Tags</label>
             <div className="relative group">
-              <Tag size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-afgc-secondary transition-colors pointer-events-none" />
+              <Tag size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <input type="text" name="tags" className="input-premium pl-12" value={formData.tags} onChange={handleChange} placeholder="séparés par des virgules" />
             </div>
           </div>
@@ -195,10 +195,10 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
                 const dropped = Array.from(e.dataTransfer.files || []);
                 setFiles((prev) => [...prev, ...dropped].slice(0, 5));
               }}
-              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-afgc-secondary/50 hover:bg-blue-50/30 transition-colors"
+              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-docuflow-secondary/50 hover:bg-blue-50/30 transition-colors"
             >
               <Upload size={24} className="mx-auto mb-2 text-slate-400" />
-              <p className="text-sm text-slate-500 font-medium">Glissez vos fichiers ici ou <span className="text-afgc-secondary font-bold">cliquez</span></p>
+              <p className="text-sm text-slate-500 font-medium">Glissez vos fichiers ici ou <span className="text-docuflow-secondary font-bold">cliquez</span></p>
               <p className="text-[11px] text-slate-400 mt-1">PDF, images, Word, Excel… (5 max)</p>
               <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
             </div>
@@ -206,7 +206,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
               <div className="mt-3 space-y-2">
                 {files.map((f, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
-                    <span className="flex items-center gap-2 text-sm text-slate-600 font-medium"><File size={14} className="text-afgc-secondary" /> {f.name}</span>
+                    <span className="flex items-center gap-2 text-sm text-slate-600 font-medium"><File size={14} className="text-docuflow-secondary" /> {f.name}</span>
                     <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 text-xs font-bold">Retirer</button>
                   </div>
                 ))}

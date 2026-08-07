@@ -86,8 +86,8 @@ const RegisterPage = () => {
       <div className="max-w-lg w-full animate-fade-in-up relative z-10">
         <div className="text-center mb-8">
           <div className="relative inline-flex mb-4">
-            <div className="absolute -inset-2 bg-gradient-to-r from-afgc-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse"></div>
-            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 shadow-lg flex items-center justify-center">
+            <div className="absolute -inset-2 bg-gradient-to-r from-docuflow-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse"></div>
+            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 shadow-lg flex items-center justify-center">
               <UserPlus size={28} className="text-white" />
             </div>
           </div>
@@ -212,7 +212,7 @@ const RegisterPage = () => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
               Déjà un compte ?{' '}
-              <Link to={slug ? `/${slug}/login` : '/login'} className="text-afgc-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
+              <Link to={slug ? `/${slug}/login` : '/login'} className="text-docuflow-secondary font-bold hover:text-blue-700 transition-colors underline-offset-4 hover:underline">
                 Se connecter
               </Link>
             </p>

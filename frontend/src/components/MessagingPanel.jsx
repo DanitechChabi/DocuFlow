@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 import { uploadService } from '../services/uploadService';
 
 const userColors = [
-  'from-afgc-secondary to-blue-600',
+  'from-docuflow-secondary to-blue-600',
   'from-emerald-500 to-teal-600',
   'from-violet-500 to-purple-600',
   'from-rose-500 to-pink-600',
@@ -218,7 +218,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                 <ArrowLeft size={20} />
               </button>
             )}
-            <div className="p-2 bg-gradient-to-br from-afgc-secondary to-blue-600 text-white rounded-xl shadow-sm">
+            <div className="p-2 bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-xl shadow-sm">
               <MessageCircle size={20} />
             </div>
             <div>
@@ -260,7 +260,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                     <button
                       key={conv.id}
                       onClick={() => openConversation(conv)}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-100 hover:border-afgc-secondary/30 hover:shadow-md transition-all text-left group"
+                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-100 hover:border-docuflow-secondary/30 hover:shadow-md transition-all text-left group"
                     >
                       <div className="relative flex-shrink-0">
                         <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getInitialsColor(conv.id)} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
@@ -286,12 +286,12 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                           {conv.last_message || 'Commencez une conversation'}
                         </p>
                       </div>
-                      <ChevronRight size={16} className="text-slate-300 group-hover:text-afgc-secondary transition-colors flex-shrink-0" />
+                      <ChevronRight size={16} className="text-slate-300 group-hover:text-docuflow-secondary transition-colors flex-shrink-0" />
                     </button>
                   ))}
                   <div className="pt-3">
                     <button onClick={startNewMessage}
-                      className="w-full py-3 text-center text-sm font-bold text-afgc-secondary hover:bg-blue-50 rounded-xl transition-colors border-2 border-dashed border-slate-200 hover:border-afgc-secondary/50">
+                      className="w-full py-3 text-center text-sm font-bold text-docuflow-secondary hover:bg-blue-50 rounded-xl transition-colors border-2 border-dashed border-slate-200 hover:border-docuflow-secondary/50">
                       + Nouvelle conversation
                     </button>
                   </div>
@@ -310,7 +310,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
               ) : (
                 users.map((u) => (
                   <button key={u.id} onClick={() => selectNewUser(u)}
-                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-100 hover:border-afgc-secondary/30 hover:shadow-md transition-all text-left group">
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-100 hover:border-docuflow-secondary/30 hover:shadow-md transition-all text-left group">
                     <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getInitialsColor(u.id)} flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0`}>
                       {u.full_name?.charAt(0).toUpperCase() || '?'}
                     </div>
@@ -318,7 +318,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                       <p className="text-sm font-bold text-slate-800">{u.full_name}</p>
                       <p className="text-xs text-slate-400 capitalize">{u.role}</p>
                     </div>
-                    <ChevronRight size={16} className="text-slate-300 group-hover:text-afgc-secondary transition-colors flex-shrink-0" />
+                    <ChevronRight size={16} className="text-slate-300 group-hover:text-docuflow-secondary transition-colors flex-shrink-0" />
                   </button>
                 ))
               )}
@@ -345,7 +345,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                     <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
                       <div className={`max-w-[80%] p-3.5 rounded-2xl ${
                         isMine
-                          ? 'bg-gradient-to-br from-afgc-secondary to-blue-600 text-white rounded-br-md shadow-md'
+                          ? 'bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-br-md shadow-md'
                           : 'bg-white border border-slate-100 text-slate-800 rounded-bl-md shadow-sm'
                       }`}>
                         {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
@@ -420,7 +420,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                   <button onClick={() => fileInputRef.current?.click()} disabled={sending || filesUploading}
                     className={`p-3 rounded-xl transition-all flex-shrink-0 ${
                       pendingFiles.length > 0
-                        ? 'bg-afgc-secondary/10 text-afgc-secondary'
+                        ? 'bg-docuflow-secondary/10 text-docuflow-secondary'
                         : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
                     } disabled:opacity-40`}>
                     <Paperclip size={20} />
@@ -439,7 +439,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                   <button
                     onClick={handleSend}
                     disabled={(!textInput.trim() && pendingFiles.length === 0) || sending || filesUploading}
-                    className="p-3.5 bg-gradient-to-br from-afgc-secondary to-blue-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0"
+                    className="p-3.5 bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0"
                   >
                     <Send size={20} />
                   </button>

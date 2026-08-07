@@ -229,7 +229,7 @@ const CompanyAdminPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
           <div className="flex items-center gap-3 md:gap-5">
             <div className="flex items-center gap-3 mb-1">
-              <div className="p-2 md:p-2.5 bg-gradient-to-br from-afgc-primary to-slate-800 text-white rounded-2xl shadow-lg">
+              <div className="p-2 md:p-2.5 bg-gradient-to-br from-docuflow-primary to-slate-800 text-white rounded-2xl shadow-lg">
                 <Building2 size={22} />
               </div>
               <div>
@@ -247,7 +247,7 @@ const CompanyAdminPage = () => {
               key={id}
               onClick={() => setActivePanel(id)}
               className={`px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
-                activePanel === id ? 'bg-afgc-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
+                activePanel === id ? 'bg-docuflow-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Icon size={15} />
@@ -308,7 +308,7 @@ const CompanyAdminPage = () => {
                         <tr key={u.id} className="border-t border-slate-50 hover:bg-blue-50/30 transition-colors">
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-afgc-primary to-afgc-secondary text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-docuflow-primary to-docuflow-secondary text-white flex items-center justify-center text-xs font-black flex-shrink-0">
                                 {(u.full_name || '?').charAt(0).toUpperCase()}
                               </div>
                               <div>
@@ -363,7 +363,7 @@ const CompanyAdminPage = () => {
               {sections.map((s) => (
                 <div key={s.id} className="glass-card-premium p-4 flex items-center justify-between border border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-blue-50 text-afgc-secondary">
+                    <div className="p-2.5 rounded-xl bg-blue-50 text-docuflow-secondary">
                       <Layers size={18} />
                     </div>
                     <div>
@@ -392,7 +392,7 @@ const CompanyAdminPage = () => {
           <div className="grid lg:grid-cols-2 gap-5 animate-fade-in-up">
             <div className="glass-card-premium p-6 space-y-5">
               <div className="flex items-center gap-2 mb-2">
-                <Palette size={18} className="text-afgc-secondary" />
+                <Palette size={18} className="text-docuflow-secondary" />
                 <h3 className="font-black text-slate-800">Identité de votre entreprise</h3>
               </div>
               <div>
@@ -419,7 +419,7 @@ const CompanyAdminPage = () => {
 
             <div className="glass-card-premium p-6">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Aperçu</h3>
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-afgc-primary to-slate-900 rounded-2xl">
+              <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-docuflow-primary to-slate-900 rounded-2xl">
                 <div className="w-12 h-12 rounded-full bg-white/10 overflow-hidden flex-shrink-0 border-2 border-white/20">
                   {logoPreview ? <img src={logoPreview} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/50 font-bold">?</div>}
                 </div>
@@ -445,7 +445,7 @@ const CompanyAdminPage = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setIsCreateOpen(false)}>
             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 pb-3">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2"><Users size={20} className="text-afgc-secondary" /> Nouvel utilisateur</h3>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2"><Users size={20} className="text-docuflow-secondary" /> Nouvel utilisateur</h3>
                 <button onClick={() => setIsCreateOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400" /></button>
               </div>
               <form onSubmit={handleCreateUser} className="p-6 pt-3 space-y-3">
@@ -476,7 +476,7 @@ const CompanyAdminPage = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setEditUser(null)}>
             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 pb-3">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2"><UserCog size={20} className="text-afgc-secondary" /> Modifier {editUser.full_name}</h3>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2"><UserCog size={20} className="text-docuflow-secondary" /> Modifier {editUser.full_name}</h3>
                 <button onClick={() => setEditUser(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400" /></button>
               </div>
               <div className="p-6 pt-3 space-y-4">

@@ -26,14 +26,8 @@ if (USE_CLOUDINARY) {
   console.warn('[storage] Cloudinary non configuré → stockage sur disque local (éphémère sur Render free)');
 }
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-const FILES_DIR = path.join(UPLOADS_DIR, 'files');
-
-// Créer les dossiers au démarrage (mode sync car au chargement du module)
-const fsSync = require('fs');
-if (!fsSync.existsSync(FILES_DIR)) {
-  fsSync.mkdirSync(FILES_DIR, { recursive: true });
-}
+// Dossier des uploads (surchargeable via UPLOADS_DIR — bureau Electron)
+const { UPLOADS_DIR, FILES_DIR } = require('../config/paths');
 
 /**
  * Ressource Cloudinary correspondant à un type MIME.

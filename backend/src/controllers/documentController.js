@@ -486,7 +486,7 @@ exports.shareDocument = async (req, res) => {
               ${message ? `<p style="color:#64748b;font-size:13px;font-style:italic;margin:16px 0;">"${message}"</p>` : ''}
               <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">Connectez-vous à DocuFlow pour consulter et télécharger ce document.</p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
-              <p style="color:#cbd5e1;font-size:11px;text-align:center;margin:0;">© ${new Date().getFullYear()} DocuFlow AFGC — Plateforme de gestion documentaire</p>
+              <p style="color:#cbd5e1;font-size:11px;text-align:center;margin:0;">© ${new Date().getFullYear()} DocuFlow — Plateforme de gestion documentaire</p>
             </div>`
         });
       } catch (mailErr) {

@@ -9,7 +9,7 @@ import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import NotificationBell from './NotificationBell';
 
-const DEFAULT_LOGO = 'https://th.bing.com/th/id/R.d7f2f165ad7ca819fe72a5f20a08a7c7?rik=cmptSS4F09F1Hw&riu=http%3a%2f%2fapiga.africa%2fimg%2fafgc.jpg&ehk=BW9PLt5Ge5oLmVWHbZvaEzZCStjt7IWIJj4n%2bEJym5M%3d&risl=&pid=ImgRaw&r=0';
+const DEFAULT_LOGO = '/favicon.svg';
 
 /**
  * Déterminer si une couleur est claire (nécessite du texte sombre).
@@ -85,6 +85,14 @@ const Topbar = () => {
     return () => window.removeEventListener('docuflow:unread-count', handler);
   }, []);
 
+  // Le tour d'onboarding peut ouvrir/fermer le menu utilisateur
+  // (les étapes « profil » et « Gestion système » pointent vers des items de ce menu)
+  useEffect(() => {
+    const handler = (e) => setUserMenuOpen(!!e.detail);
+    window.addEventListener('docuflow:set-user-menu', handler);
+    return () => window.removeEventListener('docuflow:set-user-menu', handler);
+  }, []);
+
   const handleSearch = (e) => {
     e.preventDefault();
     const q = search.trim();
@@ -136,7 +144,7 @@ const Topbar = () => {
       onClick={() => setMobileOpen(false)}
       className={({ isActive }) =>
         `flex items-center gap-2 px-3 py-2.5 text-sm font-semibold rounded-xl transition-colors ${
-          isActive ? 'bg-slate-100 text-afgc-primary' : 'text-slate-600 hover:bg-slate-50'
+          isActive ? 'bg-slate-100 text-docuflow-primary' : 'text-slate-600 hover:bg-slate-50'
         }`
       }
     >
@@ -165,7 +173,7 @@ const Topbar = () => {
           onClick={() => setMobileOpen(false)}
           className="flex items-center gap-2 flex-shrink-0"
         >
-          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
             <img src={logoSrc} className="w-full h-full object-cover" alt="Logo" />
           </div>
           <span className="hidden sm:block font-bold text-sm" style={{ color: tText }}>{settings.site_name || 'DocuFlow'}</span>
@@ -219,7 +227,7 @@ const Topbar = () => {
               className="flex items-center gap-1.5 p-1 rounded-md transition-colors hover:opacity-80"
               aria-label="Menu utilisateur"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
                 {initial}
               </div>
               <ChevronDown size={14} className="hidden sm:block" style={{ color: tMuted }} />
@@ -239,6 +247,7 @@ const Topbar = () => {
                   <button
                     onClick={() => { navigate('/profile'); setUserMenuOpen(false); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    data-tour="profile"
                   >
                     <UserIcon size={16} /> Mon profil
                   </button>

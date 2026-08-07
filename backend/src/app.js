@@ -18,6 +18,9 @@ const superadminRoutes = require('./routes/superadminRoutes');
 
 const path = require('path');
 
+// Dossier des uploads (surchargeable via UPLOADS_DIR — bureau Electron)
+const { UPLOADS_DIR, FILES_DIR } = require('./config/paths');
+
 const app = express();
 
 // Derrière un proxy (Render…) : req.protocol reflète le X-Forwarded-Proto (https)
@@ -51,7 +54,7 @@ app.use(cors(
 app.use(express.json({ limit: '10mb' }));
 
 // Dossier uploads en statique (logo)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Diagnostic Middleware: Logs every single request attempt
 app.use((req, res, next) => {
@@ -74,11 +77,28 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/superadmin', superadminRoutes);
 
 // Dossier des fichiers uploadés
-app.use('/uploads/files', express.static(path.join(__dirname, '../uploads/files')));
+app.use('/uploads/files', express.static(FILES_DIR));
+
+// --- Mode bureau (Electron) : sert le frontend compilé, même-origine ---
+// Opt-in via SERVE_FRONTEND=true (défini par desktop/main.js).
+// Sans impact sur Render/Vercel (variable absente) : routes /api, /uploads
+// et health check conservent leur comportement actuel.
+const fs = require('fs');
+const frontendDist = path.join(__dirname, '../../frontend/dist');
+if (process.env.SERVE_FRONTEND === 'true' && fs.existsSync(frontendDist)) {
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+      return express.static(frontendDist)(req, res, () => {
+        res.sendFile(path.join(frontendDist, 'index.html')); // SPA fallback (React Router)
+      });
+    }
+    next();
+  });
+}
 
 // Basic health check
 app.get('/', (req, res) => {
-  res.send('DocuFlow-AFGC API is running...');
+  res.send('DocuFlow API is running...');
 });
 
 // Global error handler — prevents unhandled errors from crashing the process
@@ -109,13 +129,19 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-// 0.0.0.0 : indispensable en déploiement cloud (Render, Railway…) pour écouter sur toutes les interfaces
-const HOST = '0.0.0.0';
+// 0.0.0.0 : indispensable en déploiement cloud (Render, Railway…) pour écouter sur toutes les interfaces.
+// Mode bureau (Electron) : desktop/main.js pose HOST=127.0.0.1 (loopback uniquement) et PORT=0
+// (port libre attribué par l'OS — lu via server.address().port).
+const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`-------------------------------------------------`);
   console.log(`🚀 Server is running!`);
   console.log(`📍 Local: http://127.0.0.1:${PORT}`);
   console.log(`-------------------------------------------------`);
 });
+
+// Exporté pour l'app de bureau (Electron) : desktop/main.js lit server.address().port
+// quand PORT=0 et garde la main sur le cycle de vie du serveur.
+module.exports = { app, server };
 

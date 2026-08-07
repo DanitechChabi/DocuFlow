@@ -119,7 +119,7 @@ const ProfilePage = () => {
         <div className="flex items-center gap-3 md:gap-4 animate-fade-in-down">
           <div className="flex items-center gap-3 md:gap-4">
             <div className="relative">
-              <div className="w-11 h-11 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-afgc-secondary to-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-md">
+              <div className="w-11 h-11 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-md">
                 {initial}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 md:w-4 md:h-4 bg-green-500 rounded-full border-2 border-white"></div>

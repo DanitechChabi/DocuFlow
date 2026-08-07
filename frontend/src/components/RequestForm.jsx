@@ -74,7 +74,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
       <div className="bg-white w-full max-w-2xl max-h-screen overflow-y-auto rounded-2xl sm:rounded-3xl shadow-2xl animate-scale-in m-0 sm:m-4" onClick={e => e.stopPropagation()}>
         <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-afgc-primary text-afgc-secondary rounded-xl">
+            <div className="p-2 sm:p-2.5 bg-docuflow-primary text-docuflow-secondary rounded-xl">
               <FileText size={20} />
             </div>
             <div>
@@ -190,7 +190,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-afgc-secondary/50 hover:bg-afgc-secondary/5 transition-all"
+              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-docuflow-secondary/50 hover:bg-docuflow-secondary/5 transition-all"
             >
               <Upload size={28} className="mx-auto text-slate-300 mb-2" />
               <p className="text-sm font-medium text-slate-500">Cliquez pour ajouter des fichiers</p>
@@ -203,7 +203,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
               <div className="space-y-2 mt-2">
                 {files.map((file, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <File size={16} className="text-afgc-secondary flex-shrink-0" />
+                    <File size={16} className="text-docuflow-secondary flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
                       <p className="text-xs text-slate-400">{formatSize(file.size)}</p>

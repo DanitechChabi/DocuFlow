@@ -55,7 +55,6 @@ function layout(body) {
           <tr>
             <td style="background:${COLORS.primary};padding:24px 32px;">
               <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:.5px;">${process.env.MAIL_FROM_NAME || 'DocuFlow'}</span>
-              <span style="color:${COLORS.secondary};font-size:20px;font-weight:800;">AFGC</span>
             </td>
           </tr>
           <tr>

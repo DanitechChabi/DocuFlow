@@ -153,7 +153,7 @@ exports.login = async (req, res) => {
     }
 
     // Génération du Token JWT incluant tenant_id
-    // Fallback à 1 (AFGC) si la colonne n'existe pas encore (pré-migration)
+    // Fallback à 1 (DocuFlow) si la colonne n'existe pas encore (pré-migration)
     const tenantId = user.tenant_id || 1;
     const token = jwt.sign(
       { id: user.id, role: user.role, tenant_id: tenantId },
@@ -412,7 +412,7 @@ exports.googleLogin = async (req, res) => {
         await db.query('UPDATE users SET google_id = $1 WHERE id = $2 AND google_id IS NULL', [googleId, user.id]);
       } catch { /* colonne peut ne pas exister */ }
     } else {
-      // Nouvel utilisateur → créer dans le tenant par défaut (AFGC)
+      // Nouvel utilisateur → créer dans le tenant par défaut (DocuFlow)
       tenantId = 1;
       const username = email.split('@')[0] + '_' + googleId.slice(0, 6);
       const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);

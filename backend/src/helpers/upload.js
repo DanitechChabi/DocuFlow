@@ -5,18 +5,10 @@
  */
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-const FILES_DIR = path.join(UPLOADS_DIR, 'files');
-
-// Créer les dossiers s'ils n'existent pas
-[UPLOADS_DIR, FILES_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+// Dossier des uploads (surchargeable via UPLOADS_DIR — bureau Electron)
+const { UPLOADS_DIR, FILES_DIR } = require('../config/paths');
 
 // Types MIME autorisés
 const ALLOWED_MIMES = {

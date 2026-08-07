@@ -4,7 +4,7 @@ const storage = require('../services/storageService');
 const path = require('path');
 const fs = require('fs');
 
-const FILES_DIR = path.join(__dirname, '../../uploads/files');
+const { FILES_DIR } = require('../config/paths');
 
 exports.uploadRequestFiles = async (req, res) => {
   const { requestId } = req.params;
