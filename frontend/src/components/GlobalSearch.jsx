@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, FileText, FolderOpen, User, Command, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, FileText, FolderOpen, User, Command, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { documentService } from '../services/documentService';
 
@@ -58,14 +58,16 @@ const GlobalSearch = () => {
           action: () => { navigate('/documents?q=' + encodeURIComponent(query)); setIsOpen(false); },
         }));
         setResults(docs);
-      } catch (err) {
+      } catch {
+        // Recherche en échec (réseau, session expirée) : liste vide plutôt qu'un
+        // modal cassé — l'utilisateur peut relancer sa saisie.
         setResults([]);
       } finally {
         setSearching(false);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, navigate]);
 
   // Pages de navigation rapides
   const quickPages = [

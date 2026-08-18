@@ -13,7 +13,7 @@ import { authService } from '../services/authService';
 import { toast } from '../components/Toast';
 import {
   Plus, FileText, Package, Clock,
-  AlertCircle, ArrowUpRight, RefreshCw, Search, ClipboardList
+  AlertCircle, ArrowUpRight, RefreshCw, Search, ClipboardList, CheckCircle2
 } from 'lucide-react';
 
 const SkeletonCard = ({ delay = 0 }) => (
@@ -27,6 +27,11 @@ const SkeletonCard = ({ delay = 0 }) => (
     </div>
   </div>
 );
+
+// Onglets réservés au staff (archiviste, admin, superadmin). Hors du composant :
+// une constante recréée à chaque rendu déclencherait l'effet de redirection en
+// boucle si elle figurait dans ses dépendances.
+const STAFF_TABS = ['my_tasks', 'history', 'all_requests'];
 
 const Dashboard = ({ tab = 'dashboard' }) => {
   const navigate = useNavigate();
@@ -44,9 +49,8 @@ const Dashboard = ({ tab = 'dashboard' }) => {
   const isAdmin = user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin';
 
   // Onglets réservés au staff : rediriger les demandeurs
-  const staffTabs = ['my_tasks', 'history', 'all_requests'];
   useEffect(() => {
-    if (!isAdmin && staffTabs.includes(tab)) {
+    if (!isAdmin && STAFF_TABS.includes(tab)) {
       navigate('/dashboard', { replace: true });
     }
   }, [isAdmin, tab, navigate]);
@@ -126,13 +130,21 @@ const Dashboard = ({ tab = 'dashboard' }) => {
     orange: { bg: 'bg-orange-50', text: 'text-orange-600' },
     purple: { bg: 'bg-purple-50', text: 'text-purple-600' },
     green: { bg: 'bg-green-50', text: 'text-green-600' },
+    blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
     red: { bg: 'bg-red-50', text: 'text-red-600' },
   };
 
+  // Les clés reprennent au caractère près celles de la machine à états du
+  // backend (requestStateMachine.js) — accents compris : `getStats` indexe son
+  // objet sur la valeur brute de la colonne `statut`, donc `livre` sans accent
+  // ne correspondrait à rien et la carte resterait figée à zéro.
+  // « Livré » manquait : l'état final normal d'une demande n'était pas affiché,
+  // si bien qu'une demande aboutie disparaissait des compteurs.
   const statCards = [
     { key: 'en attente', label: 'En attente', icon: Clock, color: 'orange' },
     { key: 'a traiter', label: 'À traiter', icon: AlertCircle, color: 'purple' },
     { key: 'transmis', label: 'Transmis', icon: ArrowUpRight, color: 'green' },
+    { key: 'livré', label: 'Livré', icon: CheckCircle2, color: 'blue' },
     { key: 'rejete', label: 'Rejeté', icon: AlertCircle, color: 'red' },
   ];
 

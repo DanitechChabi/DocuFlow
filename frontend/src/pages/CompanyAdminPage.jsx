@@ -3,14 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { userService } from '../services/userService';
 import { sectionService } from '../services/sectionService';
 import { settingsService } from '../services/settingsService';
+
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import {
   Users, Layers, Palette, Building2,
-  X, Plus, Trash2, Search, UserCog, Upload, Pencil
+  X, Plus, Trash2, Search, UserCog, Upload, Pencil,
+  Users2, Database, SlidersHorizontal, FolderTree
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ThemeManager from '../components/ThemeManager';
+import GroupManager from '../components/admin/GroupManager';
+import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
+import ConfigurationConsole from '../components/admin/ConfigurationConsole';
+import FolderManager from '../components/admin/FolderManager';
 import { toast } from '../components/Toast';
 
 const roleColor = (role) => ({
@@ -65,7 +71,9 @@ const CompanyAdminPage = () => {
 
   const isOwner = user?.tenant_id === 1;
 
-  // --- FETCH (tout est scoped par tenant) ---
+  // Le schéma de métadonnées est chargé et enregistré par MetadataSchemaPanel,
+  // qui sert aussi la console superadministrateur : un seul endroit à corriger.
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -81,6 +89,7 @@ const CompanyAdminPage = () => {
       setLoading(false);
     }
   }, []);
+
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -211,7 +220,11 @@ const CompanyAdminPage = () => {
   const tabs = [
     { id: 'users', label: 'Utilisateurs', icon: Users, badge: users.length },
     { id: 'sections', label: 'Sections', icon: Layers, badge: sections.length },
+    { id: 'groups', label: 'Groupes', icon: Users2 },
+    { id: 'metadata', label: 'Métadonnées', icon: Database },
+    { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'branding', label: 'Branding', icon: Palette },
+    { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
   ];
 
   // Sécurité : un superadmin d'une autre entreprise ne doit JAMAIS voir le portail global.
@@ -343,6 +356,36 @@ const CompanyAdminPage = () => {
           </div>
         )}
 
+        {/* ============ GROUPES ============ */}
+        {activePanel === 'groups' && (
+          <div className="animate-fade-in-up">
+            <GroupManager />
+          </div>
+        )}
+
+        {/* ============ MÉTADONNÉES ============ */}
+        {activePanel === 'metadata' && (
+          <div className="animate-fade-in-up">
+            <MetadataSchemaPanel />
+          </div>
+        )}
+
+        {/* ============ DOSSIERS ============ */}
+        {activePanel === 'folders' && (
+          <div className="animate-fade-in-up">
+            <FolderManager />
+          </div>
+        )}
+
+        {/* ============ CONFIGURATION ============ */}
+        {/* Console générée depuis le catalogue backend : tout paramètre ajouté à
+            config/settingsCatalog.js y apparaît sans modifier cette page. */}
+        {activePanel === 'configuration' && (
+          <div className="animate-fade-in-up">
+            <ConfigurationConsole />
+          </div>
+        )}
+
         {/* ============ SECTIONS ============ */}
         {activePanel === 'sections' && (
           <div className="space-y-4 animate-fade-in-up">
@@ -358,7 +401,6 @@ const CompanyAdminPage = () => {
                 <Plus size={18} /> Ajouter
               </button>
             </form>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sections.map((s) => (
                 <div key={s.id} className="glass-card-premium p-4 flex items-center justify-between border border-slate-100">

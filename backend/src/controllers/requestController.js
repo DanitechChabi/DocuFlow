@@ -4,6 +4,7 @@ const requestStateMachine = require('../services/requestStateMachine');
 const mailService = require('../services/mailService');
 const storage = require('../services/storageService');
 const { indexRequestToDocuments } = require('../services/documentIndexService');
+const auditService = require('../services/auditService');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
@@ -265,9 +266,13 @@ exports.getAuditLogs = async (req, res) => {
     // Tentative avec tenant_id ; fallback si colonne absente
     let result;
     try {
-      let query = `SELECT al.*, u.full_name as user_name
+      // LEFT JOIN et non JOIN : un INNER JOIN écartait toutes les entrées sans
+      // auteur identifié (actions système, comptes supprimés), qui disparaissaient
+      // alors de l'historique sans laisser de trace — inacceptable pour un
+      // journal d'audit qui se veut exhaustif.
+      let query = `SELECT al.*, COALESCE(u.full_name, al.user_name) as user_name
                    FROM audit_logs al
-                   JOIN users u ON al.id_user = u.id
+                   LEFT JOIN users u ON al.id_user = u.id
                    WHERE al.tenant_id = $1`;
       const params = [tenantId];
 
@@ -276,14 +281,14 @@ exports.getAuditLogs = async (req, res) => {
         params.push(userId);
       }
 
-      query += ` ORDER BY al.timestamp DESC`;
+      query += ` ORDER BY al.id DESC`;
       result = await db.query(query, params);
     } catch (err) {
       if (err.code === '42703') {
         // Fallback : pas de tenant_id
-        let query = `SELECT al.*, u.full_name as user_name
+        let query = `SELECT al.*, COALESCE(u.full_name, al.user_name) as user_name
                      FROM audit_logs al
-                     JOIN users u ON al.id_user = u.id`;
+                     LEFT JOIN users u ON al.id_user = u.id`;
         const params = [];
 
         if (role !== 'admin' && role !== 'superadmin') {
@@ -291,14 +296,16 @@ exports.getAuditLogs = async (req, res) => {
           params.push(userId);
         }
 
-        query += ` ORDER BY al.timestamp DESC`;
+        query += ` ORDER BY al.id DESC`;
         result = await db.query(query, params);
       } else {
         throw err;
       }
     }
 
-    res.json(result.rows);
+    // Contrat unique pour les deux vues du journal (historique des flux et
+    // journal d'audit) : voir auditService.normalizeLog.
+    res.json(result.rows.map(auditService.normalizeLog));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la récupération de l'historique" });

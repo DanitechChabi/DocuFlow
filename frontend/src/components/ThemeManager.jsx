@@ -42,34 +42,6 @@ const PRESETS = [
   },
 ];
 
-const ColorInput = ({ color, onChange, label }) => (
-  <div className="flex items-center gap-3">
-    <label className="relative cursor-pointer">
-      <input
-        type="color"
-        value={color}
-        onChange={onChange}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-      <div
-        className="w-12 h-12 rounded-xl border-2 border-white shadow-md hover:scale-110 transition-transform"
-        style={{ backgroundColor: color }}
-      />
-    </label>
-    <div className="flex-1">
-      <p className="text-sm font-semibold text-slate-800">{label}</p>
-      <p className="text-xs text-slate-400 font-mono uppercase">{color}</p>
-    </div>
-    <input
-      type="text"
-      value={color}
-      onChange={onChange}
-      className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-docuflow-secondary/30"
-      maxLength={7}
-    />
-  </div>
-);
-
 const ThemeManager = ({ compact = false }) => {
   const settings = useSettings();
   const [colors, setColors] = useState(DEFAULT_VALUES);
@@ -85,7 +57,10 @@ const ThemeManager = ({ compact = false }) => {
     });
   }, [settings.primary_color, settings.secondary_color, settings.accent_color, settings.dark_color, settings.gold_color]);
 
-  // Aperçu live — injecte un <style> avec !important pour overrider Tailwind
+  // Aperçu live — injecte un <style> avec !important pour overrider Tailwind.
+  // Le nettoyage au démontage est indispensable : sans lui, des couleurs
+  // essayées puis non enregistrées resteraient appliquées à toute l'application
+  // après avoir quitté la page.
   useEffect(() => {
     const styleId = 'theme-manager-preview';
     let el = document.getElementById(styleId);
@@ -103,6 +78,7 @@ const ThemeManager = ({ compact = false }) => {
         --color-docuflow-gold: ${colors.gold_color} !important;
       }
     `;
+    return () => el.remove();
   }, [colors]);
 
   const handleChange = (key, value) => {
@@ -123,7 +99,8 @@ const ThemeManager = ({ compact = false }) => {
       await settings.update(colors);
       toast.success('Thème sauvegardé !');
     } catch (err) {
-      toast.error('Erreur lors de la sauvegarde');
+      // Le backend valide le format hexadécimal : on remonte son message.
+      toast.error(err?.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
     }

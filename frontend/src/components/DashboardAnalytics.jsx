@@ -52,17 +52,27 @@ const DashboardAnalytics = () => {
   if (!stats) return null;
 
   // 1. Données pour le graphique Doughnut (répartition par statut)
+  //
+  // Les clés sont celles de la machine à états du backend (requestStateMachine.js) :
+  // elles portent leurs accents (`livré`, `annulé`) et doivent correspondre au
+  // caractère près, `getStats` renvoyant un objet indexé par la valeur brute de
+  // la colonne `statut`. Le graphique lisait `stats['livre']` sans accent : le
+  // segment « Livré » restait donc à zéro même avec des demandes livrées, et
+  // « Annulé » n'était pas représenté du tout — deux statuts sur six perdus.
+  const STATUS_SLICES = [
+    { key: 'en attente', label: 'En attente', color: '#f59e0b' },
+    { key: 'a traiter', label: 'À traiter', color: '#8b5cf6' },
+    { key: 'transmis', label: 'Transmis', color: '#10b981' },
+    { key: 'livré', label: 'Livré', color: '#3b82f6' },
+    { key: 'rejete', label: 'Rejeté', color: '#ef4444' },
+    { key: 'annulé', label: 'Annulé', color: '#94a3b8' },
+  ];
+
   const statusData = {
-    labels: ['En attente', 'À traiter', 'Transmis', 'Livré', 'Rejeté'],
+    labels: STATUS_SLICES.map((s) => s.label),
     datasets: [{
-      data: [
-        stats['en attente'] || 0,
-        stats['a traiter'] || 0,
-        stats['transmis'] || 0,
-        stats['livre'] || 0,
-        stats['rejete'] || 0,
-      ],
-      backgroundColor: ['#f59e0b', '#8b5cf6', '#10b981', '#3b82f6', '#ef4444'],
+      data: STATUS_SLICES.map((s) => stats[s.key] || 0),
+      backgroundColor: STATUS_SLICES.map((s) => s.color),
       borderWidth: 0,
       hoverOffset: 8,
     }],
@@ -102,7 +112,10 @@ const DashboardAnalytics = () => {
     }],
   };
 
-  // 3. Données pour le Doughnut des demandes par statut global
+  // 3. Total des demandes toutes catégories.
+  // `stats` vient de getStats, qui agrège la table `requests` : ce total compte
+  // donc des DEMANDES, pas des actions du journal. L'intitulé disait « actions
+  // enregistrées », ce qui laissait lire le nombre d'écritures d'audit.
   const total = Object.values(stats).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
 
   return (
@@ -110,7 +123,9 @@ const DashboardAnalytics = () => {
       <div className="flex items-center gap-3 mb-6">
         <BarChart3 size={20} className="text-docuflow-secondary" />
         <h3 className="text-lg font-bold text-slate-800">Analyses</h3>
-        <span className="text-xs text-slate-400 font-medium">{total} actions enregistrées</span>
+        <span className="text-xs text-slate-400 font-medium">
+          {total} demande{total > 1 ? 's' : ''}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -143,19 +158,27 @@ const DashboardAnalytics = () => {
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
             <TrendingUp size={14} /> Activité (7 jours)
           </p>
-          <div className="h-52">
-            <Line
-              data={activityData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.04)' } },
-                  x: { ticks: { font: { size: 11 } }, grid: { display: false } },
-                },
-              }}
-            />
+          <div className="h-52 flex items-center justify-center">
+            {/* Une organisation neuve n'a aucune écriture d'audit : la courbe
+                serait alors plate à zéro, ce qui se lit comme une panne du
+                graphique plutôt que comme une absence de données. Le camembert
+                voisin gère déjà ce cas — on aligne les deux. */}
+            {logs.length > 0 ? (
+              <Line
+                data={activityData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.04)' } },
+                    x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+                  },
+                }}
+              />
+            ) : (
+              <p className="text-sm text-slate-400">Aucune activité sur les 7 derniers jours</p>
+            )}
           </div>
         </div>
       </div>

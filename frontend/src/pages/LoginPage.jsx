@@ -77,7 +77,9 @@ const LoginPage = () => {
     return () => { mounted = false; };
   }, [slug]);
 
-  const defaultLogoSrc = '/favicon.svg';
+  // Le cartouche de connexion est un carré à fond dégradé sombre : monogramme à
+  // encre claire, et non le wordmark, dont le ratio 3,3:1 y serait écrasé.
+  const defaultLogoSrc = '/brand/docuflow-mark-light.png';
   // Branding : priorité à l'entreprise de l'URL, sinon aux réglages globaux
   const displayName = company?.settings?.site_name || company?.name || settings.site_name || 'DocuFlow';
   const displayDesc = company?.settings?.site_description || settings.site_description || 'Plateforme de gestion documentaire';

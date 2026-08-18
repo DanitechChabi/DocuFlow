@@ -9,7 +9,10 @@ import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import NotificationBell from './NotificationBell';
 
-const DEFAULT_LOGO = '/favicon.svg';
+// Monogramme officiel, deux encres : la topbar prend la couleur primaire du
+// tenant, qui peut être claire comme sombre. Généré par make-brand.js.
+const DEFAULT_MARK_DARK = '/brand/docuflow-mark.png';
+const DEFAULT_MARK_LIGHT = '/brand/docuflow-mark-light.png';
 
 /**
  * Déterminer si une couleur est claire (nécessite du texte sombre).
@@ -49,7 +52,10 @@ const Topbar = () => {
   const tHover = topbarLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
   const tActiveBg = topbarLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
 
-  const logoSrc = settings.site_logo_url || DEFAULT_LOGO;
+  // À défaut de logo du tenant, on choisit l'encre du monogramme selon la
+  // luminosité de la topbar : l'encre noire disparaîtrait sur un fond sombre.
+  const logoSrc = settings.site_logo_url || (topbarLight ? DEFAULT_MARK_DARK : DEFAULT_MARK_LIGHT);
+  const hasCustomLogo = Boolean(settings.site_logo_url);
   const isStaff = ['archiviste', 'admin', 'superadmin'].includes(user?.role);
   const isSuperadmin = user?.role === 'superadmin';
   const isOwner = isSuperadmin && user?.tenant_id === 1;
@@ -173,8 +179,22 @@ const Topbar = () => {
           onClick={() => setMobileOpen(false)}
           className="flex items-center gap-2 flex-shrink-0"
         >
-          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-            <img src={logoSrc} className="w-full h-full object-cover" alt="Logo" />
+          {/* Le monogramme officiel se pose à même la topbar : le cartouche
+              dégradé et `object-cover` ne servent qu'au logo d'un tenant, de
+              cadrage inconnu. Appliqués au monogramme, ils masqueraient le
+              tracé et le rogneraient. */}
+          <div
+            className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${
+              hasCustomLogo
+                ? 'rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 overflow-hidden'
+                : ''
+            }`}
+          >
+            <img
+              src={logoSrc}
+              className={hasCustomLogo ? 'w-full h-full object-cover' : 'w-full h-full object-contain'}
+              alt="Logo"
+            />
           </div>
           <span className="hidden sm:block font-bold text-sm" style={{ color: tText }}>{settings.site_name || 'DocuFlow'}</span>
         </NavLink>
@@ -259,6 +279,17 @@ const Topbar = () => {
                       data-tour="super-admin"
                     >
                       <ShieldCheck size={16} /> {isOwner ? 'Gestion système' : 'Administration'}
+                    </button>
+                  )}
+
+                  {/* Le journal d'audit est réservé aux administrateurs : la route
+                      /admin/audit-logs applique le même filtre de rôle. */}
+                  {['admin', 'superadmin'].includes(user?.role) && (
+                    <button
+                      onClick={() => { navigate('/admin/audit-logs'); setUserMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <ClipboardList size={16} /> Journal d'audit
                     </button>
                   )}
 

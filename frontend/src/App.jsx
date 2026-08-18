@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import DocumentsPage from './pages/DocumentsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
+import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import PrivacyPage from './pages/PrivacyPage';
@@ -54,6 +55,7 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/super-admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminPage /></ProtectedRoute>} />
           <Route path="/admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><CompanyAdminPage /></ProtectedRoute>} />
+          <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminAuditLogsPage /></ProtectedRoute>} />
         </Route>
 
         <Route path="/" element={<Navigate to="/login" replace />} />

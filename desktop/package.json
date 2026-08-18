@@ -10,6 +10,7 @@
     "start": "electron .",
     "build:frontend": "cd ../frontend && npm run build -- --mode desktop",
     "icon": "node scripts/make-icon.js",
+    "brand": "node scripts/make-brand.js",
     "dist": "electron-builder --win"
   },
   "devDependencies": {

@@ -14,7 +14,10 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const metadataRoutes = require('./routes/metadataRoutes');
 const superadminRoutes = require('./routes/superadminRoutes');
+const groupRoutes = require('./routes/groupRoutes');
+const auditRoutes = require('./routes/auditRoutes');
 
 const path = require('path');
 
@@ -62,6 +65,9 @@ app.use((req, res, next) => {
   next();
 });
 
+const auditMiddleware = require('./middlewares/auditMiddleware');
+app.use(auditMiddleware);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
@@ -74,10 +80,14 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/metadata', metadataRoutes);
 app.use('/api/superadmin', superadminRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/audit', auditRoutes);
 
-// Dossier des fichiers uploadés
+// Dossier des fichiers uploadés (local + sous-dossier documents)
 app.use('/uploads/files', express.static(FILES_DIR));
+app.use('/uploads/files/documents', express.static(FILES_DIR));
 
 // --- Mode bureau (Electron) : sert le frontend compilé, même-origine ---
 // Opt-in via SERVE_FRONTEND=true (défini par desktop/main.js).
@@ -108,7 +118,12 @@ app.use((err, req, res, _next) => {
     return res.status(400).json({ message: 'JSON invalide dans le corps de la requête' });
   }
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ message: 'Fichier trop volumineux (10 Mo max)' });
+    // Plafond absolu du serveur. La limite propre à chaque organisation est
+    // appliquée en amont par uploadPolicyMiddleware, avec son propre message.
+    const { MAX_UPLOAD_BYTES } = require('./helpers/upload');
+    return res.status(413).json({
+      message: `Fichier trop volumineux (${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} Mo max)`,
+    });
   }
   // Erreurs multer (upload) → message réel au lieu d'un 500 générique
   if (err instanceof multer.MulterError) {
@@ -139,6 +154,18 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 Server is running!`);
   console.log(`📍 Local: http://127.0.0.1:${PORT}`);
   console.log(`-------------------------------------------------`);
+
+  // Synchronise le catalogue de configuration (config/settingsCatalog.js) vers
+  // `setting_definitions`. La base reflète ainsi toujours le code : la console
+  // de configuration et la fonction SQL provision_tenant_defaults() disposent du
+  // même référentiel. Échec sans conséquence : le catalogue reste servi depuis
+  // le code, seule la copie en base est différée.
+  const tenantProvisioningService = require('./services/tenantProvisioningService');
+  tenantProvisioningService.syncSettingDefinitions()
+    .then((result) => {
+      if (result.synced) console.log(`[config] ${result.synced} définitions de paramètres synchronisées`);
+    })
+    .catch((err) => console.warn('[config] Synchronisation du catalogue différée :', err.message));
 });
 
 // Exporté pour l'app de bureau (Electron) : desktop/main.js lit server.address().port

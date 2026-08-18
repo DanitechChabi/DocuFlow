@@ -99,8 +99,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
             <div className="relative">
               <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input className="input-premium pl-12" value={formData.nom_entreprise}
-                onChange={(e) => setFormData({...formData, nom_entreprise: e.target.value})} required
-                placeholder="Entrez la raison sociale" />
+                onChange={(e) => setFormData({...formData, nom_entreprise: e.target.value})}                 placeholder="Entrez la raison sociale" required />
             </div>
           </div>
 
@@ -109,8 +108,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
             <div className="relative">
               <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input className="input-premium pl-12" value={formData.num_dossier}
-                onChange={(e) => setFormData({...formData, num_dossier: e.target.value})} required
-                placeholder="Entrez le n° de dossier (ex: DOS-2024-001)" />
+                onChange={(e) => setFormData({...formData, num_dossier: e.target.value})}                 placeholder="Entrez le n° de dossier (ex: DOS-2024-001)" required />
             </div>
           </div>
 
@@ -119,8 +117,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
             <div className="relative">
               <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input className="input-premium pl-12" value={formData.num_acte}
-                onChange={(e) => setFormData({...formData, num_acte: e.target.value})} required
-                placeholder="Entrez le n° d'acte (ex: ACT-2024-045)" />
+                onChange={(e) => setFormData({...formData, num_acte: e.target.value})}                 placeholder="Entrez le n° d'acte (ex: ACT-2024-045)" required />
             </div>
           </div>
 

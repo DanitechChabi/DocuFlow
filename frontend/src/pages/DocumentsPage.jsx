@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search, Plus, FolderOpen, FileText, Building2, Calendar, Hash,
-  FolderPlus, ChevronLeft, ChevronRight, AlertCircle,
+  Search, Plus, FolderOpen, FileText, Building2, Calendar,
+  FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
+import { toast } from '../components/Toast';
 import DocumentFormModal from '../components/DocumentFormModal';
 import DocumentDetailsModal from '../components/DocumentDetailsModal';
+import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
+import DynamicViewBuilder from '../components/DynamicViewBuilder';
+import DraggableDocumentGroup from '../components/DraggableDocumentGroup';
 
 const STATUS_CLASSES = {
   'disponible': 'status-badge-delivered',
@@ -16,6 +21,15 @@ const STATUS_CLASSES = {
 };
 
 const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé': 'Archivé' };
+
+// Étiquette produite par le COALESCE de getDynamicViewData pour les documents
+// sans valeur. Ce n'est pas une valeur stockable : elle doit rester identique de
+// part et d'autre, le backend la retraduisant en NULL à l'écriture.
+const UNCLASSIFIED_GROUP = 'Non classé';
+
+// Seul le statut a un domaine fermé côté backend (setStatus). Un dépôt vers
+// « Non classé » y est donc impossible : on ne peut pas vider un statut.
+const STATUS_VALUES = ['disponible', 'prêt', 'archivé'];
 
 const DocumentsPage = () => {
   const user = authService.getCurrentUser();
@@ -34,6 +48,106 @@ const DocumentsPage = () => {
   const [pageSize] = useState(15);
 
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'dynamic'
+  const [groupByField, setGroupByField] = useState('type_document');
+  const [dynamicGroups, setDynamicGroups] = useState([]);
+  const [dynamicLoading, setDynamicLoading] = useState(false);
+  const [dynamicError, setDynamicError] = useState('');
+  const [showAssembly, setShowAssembly] = useState(false);
+  const [showViewBuilder, setShowViewBuilder] = useState(false);
+  const [savedViews, setSavedViews] = useState([]);
+  // Vue enregistrée en cours de lecture (null = regroupement ad hoc). En mode
+  // vue enregistrée, c'est le backend qui décide du champ de regroupement.
+  const [activeViewId, setActiveViewId] = useState(null);
+  const [activeGroupField, setActiveGroupField] = useState('type_document');
+  const [pendingDropGroup, setPendingDropGroup] = useState(null);
+
+  // 6 px avant de considérer qu'il s'agit d'un glissement : sans cette
+  // contrainte, le clic d'ouverture d'une fiche document déclenchait un drag et
+  // le détail ne s'ouvrait plus.
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const loadDynamicView = useCallback(async () => {
+    setDynamicLoading(true);
+    setDynamicError('');
+    try {
+      const res = await documentService.getDynamicViewData(groupByField, activeViewId);
+      setDynamicGroups(res.groups);
+      // Le champ réellement appliqué vient de la réponse : pour une vue
+      // enregistrée, il est porté par la vue et non par l'état local.
+      setActiveGroupField(res.group_by_field);
+    } catch (err) {
+      // Une erreur avalée ici produisait exactement le symptôme signalé : la vue
+      // dynamique n'affichait rien, sans le moindre message.
+      setDynamicGroups([]);
+      setDynamicError(err?.response?.data?.message || 'Impossible de calculer la vue dynamique.');
+    } finally {
+      setDynamicLoading(false);
+    }
+  }, [groupByField, activeViewId]);
+
+  const loadSavedViews = useCallback(async () => {
+    try {
+      setSavedViews(await documentService.getDynamicViews());
+    } catch { /* silencieux : une vue enregistrée absente ne bloque pas la page */ }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === 'dynamic') { loadDynamicView(); loadSavedViews(); }
+  }, [viewMode, loadDynamicView, loadSavedViews]);
+
+  /**
+   * Dépôt d'un document dans un autre groupe : écrit la métadonnée de
+   * regroupement. Deux chemins d'écriture selon le champ, car `updateDocument`
+   * n'accepte pas `statut` (liste `allowed` de documentController) — un PATCH y
+   * serait accepté puis silencieusement ignoré, ou refusé faute de champ à
+   * modifier. Le statut passe donc par `setStatus`, qui journalise en plus le
+   * changement dans l'historique du document.
+   */
+  const handleDocumentDrop = async ({ active, over }) => {
+    if (!over) return; // relâché en dehors d'un groupe
+
+    const targetGroup = over.data?.current?.groupName;
+    const doc = active.data?.current?.document;
+    if (!targetGroup || !doc) return;
+
+    const currentValue = doc[activeGroupField] ?? null;
+    const currentGroup = currentValue === null || currentValue === '' ? UNCLASSIFIED_GROUP : String(currentValue);
+    if (currentGroup === targetGroup) return; // déjà dans ce groupe
+
+    if (activeGroupField === 'statut') {
+      if (!STATUS_VALUES.includes(targetGroup)) {
+        toast.error(`« ${targetGroup} » n'est pas un statut valide`);
+        return;
+      }
+    } else if (activeGroupField === 'annee' && targetGroup !== UNCLASSIFIED_GROUP && !Number.isFinite(Number(targetGroup))) {
+      // `annee` est une colonne numérique : un groupe non numérique ne peut pas y être écrit.
+      toast.error('Année invalide');
+      return;
+    }
+
+    setPendingDropGroup(targetGroup);
+    try {
+      if (activeGroupField === 'statut') {
+        await documentService.setStatus(doc.id, targetGroup, 'Reclassement par glisser-déposer');
+      } else {
+        // « Non classé » est retraduit en NULL par le backend : on l'envoie tel
+        // quel plutôt que de dupliquer ici la règle de vidage.
+        await documentService.updateDocument(doc.id, { [activeGroupField]: targetGroup });
+      }
+      // Rechargement plutôt que déplacement optimiste : les compteurs, l'ordre
+      // des groupes (ORDER BY count DESC) et l'apparition/disparition d'un groupe
+      // sont calculés par le backend. Les recalculer côté client dupliquerait
+      // cette logique et divergerait au premier écart.
+      await loadDynamicView();
+      toast.success(`Document déplacé vers « ${targetGroup} »`);
+    } catch (err) {
+      const data = err.response?.data;
+      toast.error(data?.message || data?.error || 'Le déplacement a échoué');
+    } finally {
+      setPendingDropGroup(null);
+    }
+  };
   const [editingDoc, setEditingDoc] = useState(null);
   const [detailDoc, setDetailDoc] = useState(null);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -117,11 +231,32 @@ const DocumentsPage = () => {
               <p className="text-sm text-slate-400 font-medium">Référentiel documentaire — recherche, classement et versions</p>
             </div>
           </div>
-          {isAdmin && (
-            <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn-primary flex items-center gap-2">
-              <Plus size={18} /> Nouveau document
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-docuflow-secondary shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                Liste standard
+              </button>
+              <button
+                onClick={() => setViewMode('dynamic')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'dynamic' ? 'bg-white text-docuflow-secondary shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                📊 Vues Dynamiques (M-Files)
+              </button>
+            </div>
+            {isAdmin && (
+              <>
+                <button onClick={() => setShowAssembly(true)} className="btn-secondary flex items-center gap-1.5 text-xs">
+                  🪄 Assemblage M-Files
+                </button>
+                <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn-primary flex items-center gap-2">
+                  <Plus size={18} /> Nouveau document
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Toolbar */}
@@ -206,7 +341,112 @@ const DocumentsPage = () => {
           </div>
         )}
 
-        {/* Table */}
+        {/* Vues Dynamiques M-Files */}
+        {viewMode === 'dynamic' && (
+          <div className="space-y-4">
+            <div className="glass-card-premium p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Regrouper dynamiquement par :</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { key: 'type_document', label: 'Type de document' },
+                    { key: 'statut', label: 'Statut' },
+                    { key: 'annee', label: 'Année' },
+                    { key: 'nom_entreprise', label: 'Entreprise' },
+                    { key: 'auteur', label: 'Auteur' }
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      // Choisir un regroupement ad hoc quitte la vue enregistrée :
+                      // sinon le libellé afficherait une vue dont les filtres ne
+                      // s'appliquent plus au résultat montré.
+                      onClick={() => { setGroupByField(opt.key); setActiveViewId(null); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!activeViewId && groupByField === opt.key ? 'bg-docuflow-secondary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vues enregistrées : regroupement ET filtres rejoués par le backend */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Vues enregistrées :</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {savedViews.length === 0 && (
+                    <span className="text-xs text-slate-400 italic">Aucune vue enregistrée</span>
+                  )}
+                  {savedViews.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setActiveViewId((prev) => (prev === v.id ? null : v.id))}
+                      title={v.description || v.name}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeViewId === v.id ? 'bg-docuflow-secondary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {v.name}
+                    </button>
+                  ))}
+                  {isAdmin && (
+                    <button onClick={() => setShowViewBuilder(true)} className="btn-secondary flex items-center gap-1.5 text-xs">
+                      <Layers size={14} /> Composer une vue
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {dynamicLoading && <div className="py-12 text-center text-slate-400">Calcul de la vue dynamique…</div>}
+
+            {!dynamicLoading && dynamicError && (
+              <div className="glass-card-premium p-8 text-center space-y-3">
+                <p className="text-sm font-semibold text-red-500">{dynamicError}</p>
+                <button onClick={loadDynamicView} className="btn-secondary text-sm py-2">Réessayer</button>
+              </div>
+            )}
+
+            {!dynamicLoading && !dynamicError && dynamicGroups.length === 0 && (
+              <div className="glass-card-premium p-10 text-center text-slate-400 space-y-2">
+                <FolderOpen size={28} className="mx-auto opacity-40" />
+                <p className="text-sm font-semibold text-slate-500">Aucun document à regrouper</p>
+                <p className="text-xs">
+                  Indexez des documents, ou choisissez un autre critère de regroupement.
+                </p>
+              </div>
+            )}
+
+            {!dynamicLoading && !dynamicError && dynamicGroups.length > 0 && (
+              <>
+                {isAdmin && (
+                  <p className="text-xs text-slate-400 font-medium">
+                    Faites glisser une fiche par sa poignée pour la reclasser :
+                    la métadonnée « {activeGroupField} » du document est mise à jour.
+                  </p>
+                )}
+                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDocumentDrop}>
+                  {dynamicGroups.map((grp) => (
+                    <div key={grp.group_name} className="mb-4">
+                      <DraggableDocumentGroup
+                        groupName={grp.group_name}
+                        count={grp.count}
+                        documents={grp.documents || []}
+                        canDrag={isAdmin}
+                        // Un statut ne peut pas être vidé (domaine fermé côté
+                        // backend) : le groupe « Non classé » n'accepte donc
+                        // aucun dépôt quand le regroupement porte sur le statut.
+                        acceptsDrop={isAdmin && !(activeGroupField === 'statut' && grp.group_name === UNCLASSIFIED_GROUP)}
+                        isPending={pendingDropGroup === grp.group_name}
+                        onOpenDocument={setDetailDoc}
+                      />
+                    </div>
+                  ))}
+                </DndContext>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Table standard */}
+        {viewMode === 'list' && (
         <div className="glass-card-premium overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -269,6 +509,7 @@ const DocumentsPage = () => {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {showForm && (
@@ -277,6 +518,23 @@ const DocumentsPage = () => {
           folders={folders}
           onClose={() => setShowForm(false)}
           onSuccess={() => { setShowForm(false); load(); loadFolders(); }}
+        />
+      )}
+      {showAssembly && (
+        <DocumentAssemblyModal
+          onClose={() => setShowAssembly(false)}
+          onSuccess={() => { setShowAssembly(false); load(); }}
+        />
+      )}
+      {showViewBuilder && (
+        <DynamicViewBuilder
+          onClose={() => setShowViewBuilder(false)}
+          onCreated={(view) => {
+            loadSavedViews();
+            // On bascule directement sur la vue qui vient d'être composée :
+            // l'auteur voit immédiatement le résultat de ses filtres.
+            if (view?.id) setActiveViewId(view.id);
+          }}
         />
       )}
       {detailDoc && (

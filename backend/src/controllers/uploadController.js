@@ -11,6 +11,23 @@ exports.uploadRequestFiles = async (req, res) => {
   const userId = req.user.id;
   const tenantId = req.user.tenant_id;
 
+  // ---------- VALIDATION SÉCURITÉ (AVANT TOUTE SAUVEGARDE) ----------
+  const MAX_SIZE_MB = 10; // 10 Mo par fichier
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/msword', // .doc
+    'application/vnd.ms-excel', // .xls
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'application/json',
+    'text/plain',
+    'application/vnd.ms-outlook'
+  ];
+
   try {
     // Vérifier que la demande existe et appartient au tenant
     const request = await tenantDb.query(tenantId, 'SELECT id FROM requests WHERE id = $1', [requestId]);
@@ -22,23 +39,54 @@ exports.uploadRequestFiles = async (req, res) => {
       return res.status(400).json({ message: 'Aucun fichier fourni' });
     }
 
-    const files = [];
+    // Valider TOUS les fichiers AVANT de sauvegarder un seul
     for (const file of req.files) {
-      // Utiliser le storage service (Cloudinary ou local)
-      const info = await storage.saveFile(file, { folder: 'request_files' });
+      // --- Validation taille ---
+      const sizeInMb = file.size / (1024 * 1024);
+      if (sizeInMb > MAX_SIZE_MB) {
+        return res.status(400).json({
+          message: `Fichier trop volumineux (max ${MAX_SIZE_MB} Mo) : ${file.originalname}`
+        });
+      }
 
-      const result = await db.query(
-        `INSERT INTO request_files (request_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url, tenant_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [requestId, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null, tenantId]
-      );
-      files.push({
-        ...result.rows[0],
-        url: storage.fileUrl(req, { ...result.rows[0], stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: file.mimetype, secure_url: info.secureUrl })
-      });
+      // --- Validation type MIME ---
+      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        return res.status(400).json({
+          message: `Type de fichier non autorisé : ${file.mimetype} (${file.originalname})`
+        });
+      }
     }
 
-    res.status(201).json({ files });
+    // Tous les fichiers valides → procéder à la sauvegarde (dans une transaction)
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const files = [];
+      for (const file of req.files) {
+        // Utiliser le storage service (Cloudinary ou local)
+        const info = await storage.saveFile(file, { folder: 'request_files' });
+
+        const result = await client.query(
+          `INSERT INTO request_files (request_id, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url, tenant_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+          [requestId, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null, tenantId]
+        );
+        files.push({
+          ...result.rows[0],
+          url: storage.fileUrl(req, { ...result.rows[0], stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: file.mimetype, secure_url: info.secureUrl })
+        });
+      }
+
+      await client.query('COMMIT');
+      res.status(201).json({ files });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[upload] Erreur transaction:', err.message);
+      res.status(500).json({ message: "Erreur lors de l'upload des fichiers" });
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de l'upload des fichiers" });
@@ -117,6 +165,7 @@ exports.uploadMessageFile = async (req, res) => {
       return res.status(400).json({ message: 'Aucun fichier fourni' });
     }
 
+    const tenantId = req.user.tenant_id;
     const info = await storage.saveFile(req.file, { folder: 'message_attachments' });
 
     res.status(201).json({
@@ -127,6 +176,7 @@ exports.uploadMessageFile = async (req, res) => {
       mime_type: req.file.mimetype,
       file_size: req.file.size,
       secure_url: info.secureUrl,
+      tenant_id: tenantId,
       url: storage.fileUrl(req, { stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: req.file.mimetype, secure_url: info.secureUrl })
     });
   } catch (err) {

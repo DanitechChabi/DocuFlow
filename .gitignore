@@ -44,3 +44,15 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Exploration de la base et scripts de diagnostic jetables
+# (requêtes ad hoc écrites pour inspecter Neon — non référencées par le code)
+check_*.sql
+fix_docs.sql
+backend/check_tables.js
+backend/list_dbs.js
+backend/setup_db_runner.js
+.tmp-dryrun/
+
+# Notes de revue de code internes
+suivi.md

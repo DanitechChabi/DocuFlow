@@ -2,12 +2,16 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const settingsService = require('../services/settingsService');
+const tenantProvisioningService = require('../services/tenantProvisioningService');
 require('dotenv').config({ path: './.env' });
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Sections créées par défaut à la création d'une entreprise
-const DEFAULT_SECTIONS = ['Comptabilité', 'Commercial', 'DAI', 'DRI', 'DGI', 'DNCMP'];
+// Sections créées par défaut à la création d'une entreprise.
+// Source unique : tenantProvisioningService, qui provisionne l'organisation
+// entière (réglages, schéma de métadonnées, dossiers, vues, rétention…).
+const DEFAULT_SECTIONS = tenantProvisioningService.DEFAULT_SECTIONS;
 
 // Normalise un code entreprise : minuscules, sans accents, espaces → tirets
 function normalizeSlug(value) {
@@ -24,9 +28,8 @@ function normalizeSlug(value) {
 exports.register = async (req, res) => {
   const { username, password, full_name, email, section, tenant_slug } = req.body;
 
-  // Validation de la force du mot de passe
-  if (!password || String(password).length < 6) {
-    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+  if (!password) {
+    return res.status(400).json({ message: 'Le mot de passe est obligatoire' });
   }
 
   try {
@@ -47,6 +50,15 @@ exports.register = async (req, res) => {
           throw err;
         }
       }
+    }
+
+    // Politique de mot de passe de l'organisation (réglages password_min_length
+    // et password_require_symbols). Contrôlée après résolution du tenant, car
+    // chaque organisation fixe ses propres exigences.
+    const passwordPolicy = await settingsService.getPasswordPolicy(tenantId);
+    const passwordError = passwordPolicy.validate(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
     }
 
     // Vérifier si l'utilisateur existe déjà (avec fallback si tenant_id absent)
@@ -155,10 +167,11 @@ exports.login = async (req, res) => {
     // Génération du Token JWT incluant tenant_id
     // Fallback à 1 (DocuFlow) si la colonne n'existe pas encore (pré-migration)
     const tenantId = user.tenant_id || 1;
+    // Durée configurable par le superadministrateur (réglage session_duration_days)
     const token = jwt.sign(
       { id: user.id, role: user.role, tenant_id: tenantId },
       process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: await settingsService.getSessionDuration(tenantId) }
     );
 
     res.json({
@@ -243,58 +256,35 @@ exports.registerCompany = async (req, res) => {
       throw err;
     }
 
-    // 3. Super admin
+    // 3. Super admin — son id sert d'auteur aux objets provisionnés ci-dessous
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(admin_password, salt);
-    await client.query(
+    const superadminResult = await client.query(
       `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role)
-       VALUES ($1, $2, $3, $4, $5, 'superadmin')`,
+       VALUES ($1, $2, $3, $4, $5, 'superadmin')
+       RETURNING id`,
       [tenant.id, admin_username, hashedPassword, admin_full_name, admin_email]
     );
+    const superadmin = superadminResult.rows[0];
 
-    // 4. Réglages par défaut (ON CONFLICT requiert une contrainte unique sur (tenant_id, key))
-    try {
-      await client.query(
-        `INSERT INTO settings (tenant_id, key, value) VALUES
-          ($1, 'site_name', $2),
-          ($1, 'site_description', $3)
-         ON CONFLICT (tenant_id, key) DO NOTHING`,
-        [tenant.id, company_name, 'Plateforme de gestion documentaire']
-      );
-    } catch (settingsErr) {
-      if (settingsErr.code === '42710' || settingsErr.code === '23505') {
-        // Contrainte unique manquante → INSERT simple
-        await client.query(
-          `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'site_name', $2)`,
-          [tenant.id, company_name]
-        );
-        await client.query(
-          `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'site_description', $2)`,
-          [tenant.id, 'Plateforme de gestion documentaire']
-        );
-      } else {
-        throw settingsErr;
-      }
-    }
-
-    // 5. Sections par défaut (ON CONFLICT requiert une contrainte unique sur (tenant_id, name))
-    for (const sectionName of DEFAULT_SECTIONS) {
-      try {
-        await client.query(
-          'INSERT INTO sections (tenant_id, name) VALUES ($1, $2) ON CONFLICT (tenant_id, name) DO NOTHING',
-          [tenant.id, sectionName]
-        );
-      } catch (sectionErr) {
-        if (sectionErr.code === '42710' || sectionErr.code === '23505') {
-          // Contrainte unique manquante → INSERT simple (ignorer les doublons)
-          await client.query(
-            'INSERT INTO sections (tenant_id, name) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM sections WHERE tenant_id = $1 AND name = $2)',
-            [tenant.id, sectionName]
-          );
-        } else {
-          throw sectionErr;
-        }
-      }
+    // 4. Installation complète de l'organisation : réglages typés (catalogue
+    //    complet), schéma de métadonnées + champs, dossiers, vues dynamiques,
+    //    politique de rétention, zone de stockage, groupes et sections.
+    //    Le superadministrateur trouve ainsi une application entièrement
+    //    configurable dès sa première connexion. Chaque étape est protégée par
+    //    un SAVEPOINT : une table non encore migrée est signalée sans faire
+    //    échouer l'inscription.
+    const provisioning = await tenantProvisioningService.provisionTenant(tenant.id, {
+      client,
+      companyName: company_name,
+      ownerId: superadmin.id,
+    });
+    if (provisioning.skipped.length || provisioning.failed.length) {
+      console.warn('[registerCompany] Provisionnement partiel', {
+        tenant: tenant.slug,
+        skipped: provisioning.skipped,
+        failed: provisioning.failed,
+      });
     }
 
     await client.query('COMMIT');
@@ -303,6 +293,7 @@ exports.registerCompany = async (req, res) => {
       message: 'Entreprise créée avec succès. Votre compte administrateur est prêt.',
       slug: tenant.slug,
       name: tenant.name,
+      provisioned: provisioning.done,
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -421,7 +412,7 @@ exports.googleLogin = async (req, res) => {
         const newUser = await db.query(
           `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role, google_id)
            VALUES ($1, $2, $3, $4, $5, 'demandeur', $6)
-           RETURN id, username, full_name, email, role, tenant_id`,
+           RETURNING id, username, full_name, email, role, tenant_id`,
           [tenantId, username, randomPassword, name || email.split('@')[0], email, googleId]
         );
         user = newUser.rows[0];
@@ -431,7 +422,7 @@ exports.googleLogin = async (req, res) => {
           const newUser = await db.query(
             `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role)
              VALUES ($1, $2, $3, $4, $5, 'demandeur')
-             RETURN id, username, full_name, email, role, tenant_id`,
+             RETURNING id, username, full_name, email, role, tenant_id`,
             [tenantId, username, randomPassword, name || email.split('@')[0], email]
           );
           user = newUser.rows[0];
@@ -444,7 +435,7 @@ exports.googleLogin = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, role: user.role, tenant_id: tenantId },
       process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: await settingsService.getSessionDuration(tenantId) }
     );
 
     res.json({

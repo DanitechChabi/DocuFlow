@@ -31,11 +31,12 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [statusBusy, setStatusBusy] = useState(false);
   const fileInputRef = useRef(null);
   const [deleteFileTarget, setDeleteFileTarget] = useState(null);
-  // Partage
+  // Partage & Relations
   const [showShare, setShowShare] = useState(false);
   const [shareEmails, setShareEmails] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
+  const [relations, setRelations] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +46,10 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
       setDoc(data);
       setSelectedFile(data.files?.[0] || null);
       setNewStatus(data.statut || '');
+      try {
+        const rels = await documentService.getRelations(documentId);
+        setRelations(rels);
+      } catch { /* silencieux */ }
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors du chargement du document');
     } finally {
@@ -114,11 +119,32 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
       setShowShare(false);
       setShareEmails('');
       setShareMessage('');
-      await logHistory(tenantId, documentId, null, `Partagé par email`, null, null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Erreur lors du partage');
     } finally {
       setShareBusy(false);
+    }
+  };
+
+  const handleCheckout = async () => {
+    try {
+      const res = await documentService.checkoutDocument(documentId);
+      toast.success(res.message || 'Check-out effectué');
+      await load();
+      if (onChanged) onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors du verrouillage');
+    }
+  };
+
+  const handleCheckin = async () => {
+    try {
+      const res = await documentService.checkinDocument(documentId);
+      toast.success(res.message || 'Check-in effectué');
+      await load();
+      if (onChanged) onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors du déverrouillage');
     }
   };
 
@@ -156,7 +182,14 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                 <div className="glass-card-premium p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className={`status-badge ${STATUS_CLASSES[doc.statut] || ''}`}>{STATUS_LABELS[doc.statut] || doc.statut}</span>
-                    <span className="text-xs text-slate-400 font-medium">v{doc.version}</span>
+                    <div className="flex items-center gap-1.5">
+                      {doc.is_checked_out ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold flex items-center gap-1">🔒 Verrouillé</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-bold">🔓 Libre</span>
+                      )}
+                      <span className="text-xs text-slate-400 font-medium">v{doc.version}</span>
+                    </div>
                   </div>
                   <Meta icon={Building2} label="Entreprise" value={doc.nom_entreprise} />
                   <Meta icon={FileText} label="N° dossier / acte" value={`${doc.num_dossier} / ${doc.num_acte}`} />
@@ -175,6 +208,26 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   )}
                   {doc.description && <p className="text-sm text-slate-600 leading-relaxed">{doc.description}</p>}
                 </div>
+
+                {/* M-Files Relations & Dépendances */}
+                {relations.length > 0 && (
+                  <div className="glass-card-premium p-5 space-y-3">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                      <span>🔗 Documents liés ({relations.length})</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {relations.map(rel => (
+                        <div key={rel.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-bold text-docuflow-secondary">{rel.reference_mfile}</span>
+                            <p className="text-slate-600 truncate max-w-[180px]">{rel.nom_entreprise}</p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-blue-50 text-docuflow-secondary font-bold capitalize">{rel.relation_type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {isAdmin && (
                   <div className="glass-card-premium p-5 space-y-3">
@@ -249,7 +302,24 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <a href={f.url} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500" title="Télécharger"><Download size={15} /></a>
-                          {isAdmin && (
+                {/* Verrouillage M-Files (Check-in / Check-out) */}
+                <div className="glass-card-premium p-5 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
+                    <span>Verrouillage M-Files</span>
+                    {doc.is_checked_out ? <span className="text-amber-600 font-bold">🔒 Verrouillé</span> : <span className="text-emerald-600 font-bold">🔓 Disponible</span>}
+                  </h3>
+                  {doc.is_checked_out ? (
+                    <button onClick={handleCheckin} className="btn-primary w-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2">
+                      🔓 Effectuer le Check-in (Libérer)
+                    </button>
+                  ) : (
+                    <button onClick={handleCheckout} className="btn-secondary w-full border-amber-300 text-amber-800 hover:bg-amber-50 flex items-center justify-center gap-2">
+                      🔒 Effectuer le Check-out (Verrouiller)
+                    </button>
+                  )}
+                </div>
+
+                {isAdmin && (
                             <button onClick={() => handleDeleteFile(f.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600" title="Supprimer"><Trash2 size={15} /></button>
                           )}
                         </div>

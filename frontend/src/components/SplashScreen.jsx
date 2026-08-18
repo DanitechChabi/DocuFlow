@@ -56,7 +56,7 @@ const playTaDum = () => {
 
 /**
  * Splash screen style Netflix — s'affiche après connexion réussie.
- * Animation du logo DocuFlow avec fond flou et couleurs fidèles au site.
+ * Animation du wordmark officiel DocuFlow avec fond flou et couleurs du site.
  *
  * @param {Function} onComplete - Callback appelé après l'animation (redirection dashboard)
  */
@@ -121,21 +121,19 @@ const SplashScreen = ({ onComplete }) => {
             }}
           />
 
-          {/* Texte DocuFlow */}
+          {/* Wordmark officiel — le fond du splash est sombre, d'où l'encre
+              claire. Le nom était auparavant composé en police système, ce qui
+              ne restituait pas la marque cursive. */}
           <div className="relative text-center">
-            <h1
-              className="font-black tracking-tighter"
+            <img
+              src="/brand/docuflow-wordmark-light.png"
+              alt="DocuFlow"
+              className="mx-auto w-auto"
               style={{
-                fontSize: 'clamp(4rem, 15vw, 12rem)',
-                color: '#ffffff',
-                textShadow: '0 0 60px rgba(59, 130, 246, 0.6), 0 0 100px rgba(59, 130, 246, 0.4), 0 4px 20px rgba(0, 0, 0, 0.3)',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                letterSpacing: '-0.05em',
-                fontWeight: 900,
+                height: 'clamp(4rem, 13vw, 10rem)',
+                filter: 'drop-shadow(0 0 60px rgba(59, 130, 246, 0.6)) drop-shadow(0 4px 20px rgba(0, 0, 0, 0.3))',
               }}
-            >
-              DocuFlow
-            </h1>
+            />
 
             {/* Ligne dorée subtile */}
             <div

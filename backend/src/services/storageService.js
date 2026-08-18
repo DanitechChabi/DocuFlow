@@ -114,10 +114,21 @@ async function deleteFile({ storedName, cloudinaryPublicId, resourceType }) {
  * fallback sur reconstruction pour les anciens fichiers sans secure_url.
  */
 function fileUrl(req, fileRow) {
-  if (USE_CLOUDINARY && fileRow.cloudinary_public_id) {
-    return fileRow.secure_url || cloudinary.url(fileRow.cloudinary_public_id, { secure: true, resource_type: resourceTypeFromMime(fileRow.mime_type) });
+  if (fileRow.secure_url) {
+    return fileRow.secure_url;
   }
-  return `${req.protocol}://${req.get('host')}/uploads/files/${fileRow.stored_name}`;
+  if (fileRow.cloudinary_public_id) {
+    if (fileRow.cloudinary_public_id.startsWith('http://') || fileRow.cloudinary_public_id.startsWith('https://')) {
+      return fileRow.cloudinary_public_id;
+    }
+    // Fallback URL Cloudinary générique si secure_url non renseigné
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'docuflow';
+    const resType = resourceTypeFromMime(fileRow.mime_type);
+    return `https://res.cloudinary.com/${cloudName}/${resType}/upload/${fileRow.cloudinary_public_id}`;
+  }
+  // Mode local : utiliser le chemin relatif stocké pour supporter les sous-dossiers
+  const relativePath = fileRow.stored_name || '';
+  return `${req.protocol}://${req.get('host')}/uploads/files/${relativePath}`;
 }
 
 module.exports = { saveFile, deleteFile, fileUrl, USE_CLOUDINARY, resourceTypeFromMime };

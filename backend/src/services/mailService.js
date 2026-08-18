@@ -6,6 +6,7 @@
  * reste fonctionnelle (notifications internes uniquement).
  */
 const { Resend } = require('resend');
+const { escapeHtml, escapeOr, sanitizeHeader } = require('../helpers/htmlEscape');
 require('dotenv').config({ path: './.env' });
 
 const isConfigured = Boolean(process.env.RESEND_API_KEY);
@@ -54,7 +55,7 @@ function layout(body) {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid ${COLORS.border};overflow:hidden;">
           <tr>
             <td style="background:${COLORS.primary};padding:24px 32px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:.5px;">${process.env.MAIL_FROM_NAME || 'DocuFlow'}</span>
+              <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:.5px;">${escapeHtml(process.env.MAIL_FROM_NAME || 'DocuFlow')}</span>
             </td>
           </tr>
           <tr>
@@ -75,26 +76,31 @@ function layout(body) {
 </html>`;
 }
 
+// Les champs de demande viennent de `req.body` (createRequest) et sont stockés
+// bruts : ils sont échappés ici, au point de rendu, et non à l'enregistrement —
+// la base garde la valeur saisie, seul le HTML est neutralisé.
 function requestBlock(r) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${COLORS.border};border-radius:12px;margin:16px 0;">
     <tr>
       <td style="padding:16px 20px;font-size:14px;color:${COLORS.slate};">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${COLORS.slate};margin-bottom:4px;">Entreprise</div>
-        <div style="font-weight:700;color:${COLORS.primary};font-size:16px;">${r.nom_entreprise || '—'}</div>
+        <div style="font-weight:700;color:${COLORS.primary};font-size:16px;">${escapeOr(r.nom_entreprise)}</div>
       </td>
     </tr>
     <tr>
       <td style="padding:0 20px 16px;font-size:13px;color:${COLORS.slate};line-height:1.6;">
-        Dossier <b>${r.num_dossier || '—'}</b> · Acte <b>${r.num_acte || '—'}</b> · ${r.annee || '—'}<br />
-        Type : <b>${r.type_document || '—'}</b> · Priorité : <b>${r.priorite || '—'}</b>
+        Dossier <b>${escapeOr(r.num_dossier)}</b> · Acte <b>${escapeOr(r.num_acte)}</b> · ${escapeOr(r.annee)}<br />
+        Type : <b>${escapeOr(r.type_document)}</b> · Priorité : <b>${escapeOr(r.priorite)}</b>
       </td>
     </tr>
   </table>`;
 }
 
+// `statusColor` et `STATUS_LABELS` sont des tables fermées, mais un statut absent
+// de STATUS_LABELS retombe sur `status` lui-même : on l'échappe donc aussi.
 function statusPill(status) {
   const color = statusColor(status);
-  return `<div style="display:inline-block;padding:6px 14px;border-radius:999px;background:${color}1a;color:${color};border:1px solid ${color}44;font-weight:700;font-size:13px;">${STATUS_LABELS[status] || status}</div>`;
+  return `<div style="display:inline-block;padding:6px 14px;border-radius:999px;background:${color}1a;color:${color};border:1px solid ${color}44;font-weight:700;font-size:13px;">${escapeHtml(STATUS_LABELS[status] || status)}</div>`;
 }
 
 const STATUS_LABELS = {
@@ -120,7 +126,7 @@ function ctaButton(label, url) {
 
 const TEMPLATES = {
   request_created: (r) => ({
-    subject: `Accusé de réception — demande ${r.nom_entreprise}`,
+    subject: `Accusé de réception — demande ${sanitizeHeader(r.nom_entreprise)}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Demande bien reçue ✅</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -137,7 +143,7 @@ const TEMPLATES = {
   }),
 
   status_update: (r) => ({
-    subject: `Mise à jour de votre demande — ${r.nom_entreprise}`,
+    subject: `Mise à jour de votre demande — ${sanitizeHeader(r.nom_entreprise)}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Mise à jour de votre demande</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -151,7 +157,7 @@ const TEMPLATES = {
   }),
 
   delivered: (r) => ({
-    subject: `Votre document est disponible — ${r.nom_entreprise}`,
+    subject: `Votre document est disponible — ${sanitizeHeader(r.nom_entreprise)}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Votre document a été livré 🎉</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -168,11 +174,11 @@ const TEMPLATES = {
   }),
 
   assigned: (r, assigneeName) => ({
-    subject: `Nouvelle demande assignée — ${r.nom_entreprise}`,
+    subject: `Nouvelle demande assignée — ${sanitizeHeader(r.nom_entreprise)}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Une demande vous a été assignée</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
-        Bonjour${assigneeName ? ` ${assigneeName}` : ''},<br />
+        Bonjour${assigneeName ? ` ${escapeHtml(assigneeName)}` : ''},<br />
         Une demande vous a été confiée pour traitement.
       </p>
       ${requestBlock(r)}
@@ -196,7 +202,7 @@ async function sendMail({ to, subject, html }) {
   // MAIL_TEST_TO défini dans .env → le vrai destinataire est noté dans le sujet.
   const testTo = process.env.MAIL_TEST_TO;
   const actualTo = testTo || to;
-  const actualSubject = testTo ? `${subject} [→ ${to}]` : subject;
+  const actualSubject = sanitizeHeader(testTo ? `${subject} [→ ${to}]` : subject);
 
   try {
     const { data, error } = await resend.emails.send({

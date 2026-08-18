@@ -10,10 +10,14 @@ import {
   X, Plus, Trash2, Search, CheckCircle, AlertCircle, Save, Upload,
   Globe, ToggleLeft, ToggleRight, Crown, UserCog, KeyRound,
   TrendingUp, Activity, Mail, Lock, Eye, EyeOff, Pencil, Image,
-  FileText, Archive, ArchiveRestore, Inbox, Calendar, Clock
+  FileText, Archive, ArchiveRestore, Inbox, Calendar, Clock, SlidersHorizontal,
+  Database, FolderTree
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ThemeManager from '../components/ThemeManager';
+import ConfigurationConsole from '../components/admin/ConfigurationConsole';
+import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
+import FolderManager from '../components/admin/FolderManager';
 import { toast } from '../components/Toast';
 import { authService } from '../services/authService';
 
@@ -38,7 +42,10 @@ const SuperAdminPage = () => {
     if (!isOwner) navigate('/admin-portal');
   }, [isOwner, navigate]);
 
-  if (!isOwner) return null;
+  // Le rendu conditionnel se fait en toute fin de composant (juste avant le
+  // `return` principal) : sortir ici court-circuiterait les hooks déclarés plus
+  // bas, et React lèverait « Rendered fewer hooks than expected » au rendu
+  // suivant, faisant écran blanc sur tout le portail.
 
   // State
   const [loading, setLoading] = useState(true);
@@ -392,9 +399,16 @@ const SuperAdminPage = () => {
     { id: 'users', label: 'Utilisateurs', icon: Users, badge: stats.totalUsers },
     { id: 'superadmins', label: 'Super Admins', icon: Crown, badge: stats.totalSuperAdmins },
     { id: 'sections', label: 'Sections', icon: Layers },
+    { id: 'metadata', label: 'Métadonnées', icon: Database },
+    { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'tenants', label: 'Entreprises', icon: Building2, badge: stats.totalTenants },
     { id: 'branding', label: 'Branding', icon: Palette },
+    { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
   ];
+
+  // Non-propriétaire : la redirection est déjà programmée par l'effet ci-dessus,
+  // on n'affiche rien en attendant. Placé APRÈS tous les hooks (voir plus haut).
+  if (!isOwner) return null;
 
   return (
     <div className="p-4 md:p-8">
@@ -755,6 +769,31 @@ const SuperAdminPage = () => {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* ============ MÉTADONNÉES ============ */}
+        {/* Schéma de classification du tenant propriétaire de la plateforme.
+            Même écran que la console d'entreprise (composant partagé). */}
+        {activePanel === 'metadata' && (
+          <div className="animate-fade-in-up">
+            <MetadataSchemaPanel />
+          </div>
+        )}
+
+        {/* ============ DOSSIERS ============ */}
+        {activePanel === 'folders' && (
+          <div className="animate-fade-in-up">
+            <FolderManager />
+          </div>
+        )}
+
+        {/* ============ CONFIGURATION ============ */}
+        {/* Console générée depuis le catalogue backend (settingsCatalog.js) :
+            l'intégralité des paramètres de la plateforme, typés et validés. */}
+        {activePanel === 'configuration' && (
+          <div className="animate-fade-in-up">
+            <ConfigurationConsole />
           </div>
         )}
 

@@ -35,9 +35,16 @@ const storage = multer.diskStorage({
   }
 });
 
+// Plafond absolu du serveur. La limite réellement appliquée est celle du
+// réglage « Taille maximale par fichier » de l'organisation, vérifiée par
+// middlewares/uploadPolicyMiddleware.js : multer fixe ses limites à la
+// construction et ne peut pas dépendre du tenant de la requête. Ce plafond
+// correspond au maximum autorisé par le catalogue (max_upload_size_mb).
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 Mo
+
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo max
+  limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter: (req, file, cb) => {
     if (ALLOWED_MIMES[file.mimetype]) {
       cb(null, true);
@@ -57,4 +64,4 @@ const uploadMultiple = upload.array('files', 5);
  */
 const uploadSingle = upload.single('file');
 
-module.exports = { upload, uploadMultiple, uploadSingle, ALLOWED_MIMES };
+module.exports = { upload, uploadMultiple, uploadSingle, ALLOWED_MIMES, MAX_UPLOAD_BYTES };

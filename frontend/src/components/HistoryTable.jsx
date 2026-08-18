@@ -14,14 +14,21 @@ const HistoryTable = ({ logs, onRequestClick }) => {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
-          {logs.map((log, idx) => (
-            <tr key={log.id} className="hover:bg-slate-50/80 transition-all duration-150 animate-fade-in-up group" style={{ animationDelay: `${idx * 30}ms` }}>
+          {logs.map((log, idx) => {
+            // `actor_name` / `occurred_at` sont les champs canoniques renvoyés par
+            // le backend (voir auditService.normalizeLog) ; les colonnes
+            // historiques restent lues en secours. Une action système sans auteur
+            // s'affiche « Système » plutôt qu'une cellule vide.
+            const actor = log.actor_name || log.user_name || 'Système';
+            const occurredAt = log.occurred_at || log.timestamp;
+            return (
+            <tr key={log.id ?? idx} className="hover:bg-slate-50/80 transition-all duration-150 animate-fade-in-up group" style={{ animationDelay: `${idx * 30}ms` }}>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                    {log.user_name?.charAt(0)?.toUpperCase() || '?'}
+                    {actor.charAt(0).toUpperCase()}
                   </div>
-                  <span className="font-medium text-slate-700 text-sm">{log.user_name}</span>
+                  <span className="font-medium text-slate-700 text-sm">{actor}</span>
                 </div>
               </td>
               <td className="px-6 py-4">
@@ -41,7 +48,7 @@ const HistoryTable = ({ logs, onRequestClick }) => {
               <td className="px-6 py-4">
                 <div className="flex items-center gap-1.5 text-sm text-slate-500">
                   <Clock size={14} className="text-slate-400" />
-                  {log.timestamp ? new Date(log.timestamp).toLocaleString('fr-FR') : 'N/A'}
+                  {occurredAt ? new Date(occurredAt).toLocaleString('fr-FR') : 'N/A'}
                 </div>
               </td>
               <td className="px-6 py-4 text-right">
@@ -54,7 +61,8 @@ const HistoryTable = ({ logs, onRequestClick }) => {
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
           {logs.length === 0 && (
             <tr>
               <td colSpan={4} className="p-12 text-center">

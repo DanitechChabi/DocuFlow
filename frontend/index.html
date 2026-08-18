@@ -2,11 +2,18 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" href="/icons.svg" />
-    <link rel="apple-touch-icon" href="/icons.svg" />
+    <!-- Déclinaisons générées depuis assets/brand/docuflow-logo.png par
+         desktop/scripts/make-brand.js. Le monogramme « D » remplace le wordmark
+         dans ces cadres carrés, où celui-ci (ratio 3,3:1) serait illisible. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/brand/favicon-192.png" />
+    <!-- iOS ignore les SVG et aplatit l'alpha sur du noir : cette icône est
+         pré-composée sur le bleu nuit de la marque. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="application-name" content="DocuFlow" />
+    <meta name="theme-color" content="#0f172a" />
     <title>DocuFlow — Plateforme de gestion documentaire</title>
   </head>
   <body>

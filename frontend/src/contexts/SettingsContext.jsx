@@ -6,7 +6,16 @@ const SettingsContext = createContext({ site_name: 'DocuFlow', site_description:
 export const useSettings = () => useContext(SettingsContext);
 
 const DEFAULT_TITLE = 'DocuFlow';
-const DEFAULT_FAVICON = '/favicon.svg';
+
+// Déclinaisons officielles générées par desktop/scripts/make-brand.js depuis
+// assets/brand/docuflow-logo.png. Les tailles déclarées dans index.html sont
+// conservées : un favicon 16 px et un favicon 192 px ne sont pas substituables.
+const DEFAULT_FAVICONS = {
+  '16x16': '/brand/favicon-16.png',
+  '32x32': '/brand/favicon-32.png',
+  '192x192': '/brand/favicon-192.png',
+  '180x180': '/brand/apple-touch-icon.png',
+};
 
 // Couleurs thème par défaut
 const DEFAULT_THEME = {
@@ -23,10 +32,18 @@ const applySiteName = (name) => {
   document.querySelector('meta[name="application-name"]')?.setAttribute('content', title);
 };
 
+/**
+ * Applique le favicon du tenant, ou rétablit les déclinaisons officielles.
+ *
+ * Un tenant ne fournit qu'une seule image : elle remplace alors toutes les
+ * tailles. Sans réglage, chaque balise retrouve la déclinaison correspondant à
+ * son attribut `sizes` — d'où la table DEFAULT_FAVICONS plutôt qu'un seul
+ * fichier appliqué partout.
+ */
 const applyLogo = (url) => {
-  const href = url || DEFAULT_FAVICON;
-  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach(el => {
-    el.setAttribute('href', href);
+  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach((el) => {
+    const fallback = DEFAULT_FAVICONS[el.getAttribute('sizes')] || DEFAULT_FAVICONS['32x32'];
+    el.setAttribute('href', url || fallback);
   });
 };
 
@@ -35,7 +52,6 @@ const applyLogo = (url) => {
  * Les composants qui utilisent var(--color-docuflow-*) seront mis à jour automatiquement.
  */
 const applyThemeColors = (themeData) => {
-  const root = document.documentElement;
   // Injecter dans un <style> avec !important pour overrider les utilitaires Tailwind compile-time
   const styleId = 'docuflow-theme-dynamic';
   let styleEl = document.getElementById(styleId);
@@ -76,20 +92,32 @@ export const SettingsProvider = ({ children }) => {
   });
   const [loaded, setLoaded] = useState(false);
 
-  // Applique les paramètres au DOM (titre, favicon, thème) à chaque changement
+  // Applique les paramètres au DOM (titre, favicon, thème) à chaque changement.
+  // Le favicon dédié (site_favicon) prime sur le logo : c'est un réglage distinct
+  // du catalogue, sans quoi il resterait sans effet visible.
   useEffect(() => {
     applySiteName(settings.site_name);
-    applyLogo(settings.site_logo_url);
+    applyLogo(settings.site_favicon_url || settings.site_logo_url);
     applyThemeColors(settings);
-  }, [settings.site_name, settings.site_logo_url, settings.primary_color, settings.secondary_color, settings.accent_color, settings.dark_color, settings.gold_color]);
+  }, [
+    settings.site_name,
+    settings.site_logo_url,
+    settings.site_favicon_url,
+    settings.primary_color,
+    settings.secondary_color,
+    settings.accent_color,
+    settings.dark_color,
+    settings.gold_color,
+  ]);
 
   useEffect(() => {
     const load = async () => {
       try {
         const data = await settingsService.getSettings();
         setSettings(prev => ({ ...prev, ...data }));
-      } catch (err) {
-        // Fallback silencieux
+      } catch {
+        // Réglages indisponibles (hors ligne, backend non démarré) : les valeurs
+        // par défaut ci-dessus restent en place, l'application reste utilisable.
       } finally {
         setLoaded(true);
       }
@@ -101,8 +129,8 @@ export const SettingsProvider = ({ children }) => {
     try {
       const data = await settingsService.getSettings();
       setSettings(prev => ({ ...prev, ...data }));
-    } catch (err) {
-      // Silent
+    } catch {
+      // Idem : on conserve les réglages déjà chargés.
     }
   }, []);
 
@@ -111,8 +139,10 @@ export const SettingsProvider = ({ children }) => {
     await refresh();
   }, [refresh]);
 
-  const uploadLogo = useCallback(async (file) => {
-    const res = await settingsService.uploadLogo(file);
+  // `key` permet de téléverser aussi le favicon ou le fond de connexion, qui
+  // sont des réglages de type image à part entière.
+  const uploadLogo = useCallback(async (file, key = 'site_logo') => {
+    const res = await settingsService.uploadLogo(file, key);
     await refresh();
     return res;
   }, [refresh]);

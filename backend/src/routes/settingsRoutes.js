@@ -39,7 +39,12 @@ const upload = multer({
 router.get('/', optionalAuthMiddleware, settingsController.getSettings);
 
 // Routes protégées (superadmin)
+// GET /configuration — catalogue typé + valeurs, source de la console de configuration
+router.get('/configuration', authMiddleware, roleMiddleware(['superadmin']), settingsController.getConfiguration);
 router.put('/', authMiddleware, roleMiddleware(['superadmin']), settingsController.updateSettings);
+router.post('/reset', authMiddleware, roleMiddleware(['superadmin']), settingsController.resetSettings);
+// POST /provision — recrée les objets par défaut manquants (idempotent)
+router.post('/provision', authMiddleware, roleMiddleware(['superadmin']), settingsController.provisionDefaults);
 router.post('/logo', authMiddleware, roleMiddleware(['superadmin']), upload.single('logo'), settingsController.uploadLogo);
 
 module.exports = router;

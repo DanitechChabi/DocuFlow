@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
     section VARCHAR(50),
-    role VARCHAR(20) DEFAULT 'demandeur', -- 'superadmin', 'admin', 'archiviste', 'demandeur'
+    role VARCHAR(20) DEFAULT 'demandeur', -- 'superadmin', 'admin', 'demandeur', 'archiviste'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tenant_id, username),
     UNIQUE(tenant_id, email)
