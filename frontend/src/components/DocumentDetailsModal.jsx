@@ -114,8 +114,14 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
     if (!emails.length) return toast.error('Entrez au moins une adresse email valide');
     setShareBusy(true);
     try {
-      await documentService.shareDocument(documentId, emails, shareMessage);
-      toast.success(`Document partagé avec ${emails.length} personne(s)`);
+      const result = await documentService.shareDocument(documentId, emails, shareMessage);
+      // On affiche le compte-rendu du serveur, et non le nombre d'adresses
+      // saisies : si les notifications sont désactivées ou qu'un envoi échoue,
+      // annoncer « partagé avec 3 personnes » ferait attendre des e-mails qui
+      // n'arriveront jamais. Le serveur renvoie `sent` et un message explicite.
+      const message = result?.message || `Document partagé avec ${emails.length} personne(s)`;
+      if (result?.sent === 0) toast.error(message);
+      else toast.success(message);
       setShowShare(false);
       setShareEmails('');
       setShareMessage('');

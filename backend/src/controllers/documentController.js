@@ -60,7 +60,7 @@ function parseTags(tags) {
 // L'implémentation vit dans helpers/htmlEscape : mailService en a besoin aussi,
 // et deux copies divergent tôt ou tard — celle-ci était déjà correcte, mais
 // les gabarits de mailService n'échappaient rien du tout.
-const { escapeHtml } = require('../helpers/htmlEscape');
+const { escapeHtml, sanitizeHeader } = require('../helpers/htmlEscape');
 
 function sanitizeTags(rawTags) {
   let tags;
@@ -648,16 +648,31 @@ exports.shareDocument = async (req, res) => {
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
 
-    const { sendMail } = require('../services/mailService');
+    const { sendMail, loadBranding } = require('../services/mailService');
     // escapeHtml is already defined at module scope above (see TAG SANITISATION section)
-    const senderName = escapeHtml(req.user.full_name || req.user.username);
+    // Deux traitements distincts pour la même donnée : `escapeHtml` pour le corps
+    // HTML, `sanitizeHeader` pour le sujet. Échapper le HTML dans un sujet y
+    // afficherait « O&#39;Brien » au lieu de « O'Brien » — le sujet n'est pas du
+    // HTML, seuls les retours chariot y sont dangereux.
+    const rawSenderName = req.user.full_name || req.user.username;
+    const senderName = escapeHtml(rawSenderName);
 
-    for (const email of emails) {
-      if (!email || !email.includes('@')) continue;
+    // Habillage de l'organisation chargé une seule fois pour tout le lot.
+    const branding = await loadBranding(tenantId);
+    const platformName = escapeHtml(branding.siteName || 'DocuFlow');
+
+    // On itère sur les adresses nettoyées et déjà validées, pas sur le tableau
+    // brut : `emails` peut contenir des espaces de part et d'autre.
+    let sent = 0;
+    let skipped = 0;
+    for (const email of cleaned) {
       try {
-        await sendMail({
+        const result = await sendMail({
           to: email,
-          subject: `📄 ${senderName} vous partage un document — ${escapeHtml(doc.reference_mfile)}`,
+          tenantId,
+          event: 'share',
+          branding,
+          subject: sanitizeHeader(`📄 ${rawSenderName} vous partage un document — ${doc.reference_mfile}`),
           html: `
             <div style="font-family:system-ui,-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;">
               <div style="text-align:center;margin-bottom:24px;">
@@ -673,19 +688,40 @@ exports.shareDocument = async (req, res) => {
                 <p style="margin:0;"><strong style="color:#0f172a;">Année :</strong> ${escapeHtml(doc.annee || '—')}</p>
               </div>
               ${message ? `<p style="color:#64748b;font-size:13px;font-style:italic;margin:16px 0;">"${escapeHtml(message)}"</p>` : ''}
-              <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">Connectez-vous à DocuFlow pour consulter et télécharger ce document.</p>
+              <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">Connectez-vous à ${platformName} pour consulter et télécharger ce document.</p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
-              <p style="color:#cbd5e1;font-size:11px;text-align:center;margin:0;">© ${new Date().getFullYear()} DocuFlow — Plateforme de gestion documentaire</p>
+              <p style="color:#cbd5e1;font-size:11px;text-align:center;margin:0;">© ${new Date().getFullYear()} ${platformName} — Plateforme de gestion documentaire</p>
             </div>`
         });
+        if (result?.sent) sent++;
+        else skipped++;
       } catch (mailErr) {
+        skipped++;
         console.error(`[share] Erreur envoi à ${email}:`, mailErr.message);
       }
     }
 
-    await logHistory(tenantId, doc.id, req.user.id, `Document partagé avec ${emails.length} personne(s)`, null, null);
+    await logHistory(tenantId, doc.id, req.user.id, `Document partagé avec ${cleaned.length} personne(s)`, null, null);
 
-    res.json({ message: `Document partagé avec ${emails.length} personne(s)` });
+    // La réponse dit ce qui s'est réellement passé. Annoncer un partage réussi
+    // alors que les notifications sont désactivées, ou que Resend a refusé les
+    // envois, laisserait l'utilisateur attendre un e-mail qui n'arrivera jamais.
+    if (sent === 0) {
+      return res.json({
+        message: branding.emailsEnabled
+          ? 'Aucun e-mail n\'a pu être envoyé — vérifiez la configuration de la messagerie'
+          : 'Les notifications par e-mail sont désactivées dans la configuration — aucun e-mail envoyé',
+        sent: 0,
+        skipped,
+      });
+    }
+    res.json({
+      message: skipped > 0
+        ? `Document partagé avec ${sent} personne(s) — ${skipped} envoi(s) non abouti(s)`
+        : `Document partagé avec ${sent} personne(s)`,
+      sent,
+      skipped,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du partage du document' });

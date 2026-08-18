@@ -103,12 +103,16 @@ exports.createRequest = async (req, res) => {
     );
 
     // 5. Accusé de réception par e-mail au demandeur
+    // `notify` applique les réglages de l'organisation (nom d'expéditeur,
+    // signature, pied de page) et respecte ses bascules d'activation.
     try {
       const requesterEmail = await getUserEmail(tenantId, userId);
       if (requesterEmail) {
-        await mailService.sendMail({
+        await mailService.notify({
+          tenantId,
           to: requesterEmail,
-          ...mailService.TEMPLATES.request_created(requestRow),
+          event: 'request_created',
+          request: requestRow,
         });
       }
     } catch (emailErr) {
@@ -410,12 +414,11 @@ exports.updateRequestStatus = async (req, res) => {
     try {
       const requesterEmail = await getUserEmail(tenantId, request.id_user);
       if (requesterEmail) {
-        const template = status === 'livré'
-          ? mailService.TEMPLATES.delivered
-          : mailService.TEMPLATES.status_update;
-        await mailService.sendMail({
+        await mailService.notify({
+          tenantId,
           to: requesterEmail,
-          ...template({ ...request, statut: status }),
+          event: status === 'livré' ? 'delivered' : 'status_update',
+          request: { ...request, statut: status },
         });
       }
     } catch (emailErr) {
@@ -493,9 +496,12 @@ exports.assignRequest = async (req, res) => {
     try {
       const assigneeEmail = await getUserEmail(tenantId, assignee_id);
       if (assigneeEmail) {
-        await mailService.sendMail({
+        await mailService.notify({
+          tenantId,
           to: assigneeEmail,
-          ...mailService.TEMPLATES.assigned(request, assignee.full_name),
+          event: 'assigned',
+          request,
+          assigneeName: assignee.full_name,
         });
       }
     } catch (emailErr) {

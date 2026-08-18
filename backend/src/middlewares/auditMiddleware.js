@@ -1,66 +1,213 @@
 const auditService = require('../services/auditService');
 
 /**
- * auditMiddleware — Logs every API request to the audit_logs table.
- * It captures the actor, action, object, and details of each request.
+ * auditMiddleware — journalise les actions métier dans `audit_logs`.
  *
- * This middleware is designed to be used globally. It uses the 'finish' event
- * of the response to ensure that the user has been identified by subsequent
- * auth middlewares and the response status is known.
+ * Il enregistrait auparavant CHAQUE requête HTTP, lectures comprises, sous la
+ * forme « Action: GET /api/requests | Details: Status: 200 | Duration: 12ms ».
+ * Le frontend appelant plusieurs endpoints par écran, le journal se remplissait
+ * de trafic technique : les vraies actions (création de demande, changement de
+ * statut) s'y noyaient, et le tableau de bord affichait du bruit réseau au lieu
+ * de l'activité de l'organisation.
+ *
+ * Trois règles désormais :
+ *   1. seules les écritures sont journalisées (POST, PUT, PATCH, DELETE) — une
+ *      consultation ne modifie rien et n'a pas à figurer dans l'historique ;
+ *   2. chaque route porte un libellé français lisible (voir LABELS) ;
+ *   3. les routes qui écrivent déjà leur propre entrée sont ignorées (SELF_LOGGED),
+ *      sans quoi une même action apparaîtrait deux fois.
+ *
+ * Les échecs restent tracés : un refus d'autorisation est précisément ce qu'un
+ * journal d'audit doit conserver.
  */
+
+// Méthodes qui modifient l'état. GET/HEAD/OPTIONS sont ignorées.
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+// Routes dont le contrôleur écrit lui-même dans `audit_logs`, avec un libellé
+// plus riche que ce que l'URL permet de deviner (il y nomme l'entreprise
+// concernée). Les journaliser ici créerait un doublon par action.
+//   - requestController.createRequest        → « A créé une demande pour X »
+//   - requestController.updateRequestStatus  → « A changé le statut de la demande X vers Y »
+//   - documentController.setDocumentMetadata → documentAuditService (METADATA_UPDATE)
+//   - documentController.createDocumentRelation → documentAuditService (RELATION_CREATED)
+const SELF_LOGGED = new Set([
+  'POST /requests',
+  'PATCH /requests/:id/status',
+  'POST /documents/:id/metadata',
+  'POST /documents/:id/relations',
+]);
+
+// Écritures de pure mécanique d'interface : accusés de lecture déclenchés par
+// l'affichage, pas par une décision de l'utilisateur. Les journaliser
+// reproduirait exactement le bruit que ce filtre supprime — le frontend marque
+// les notifications comme lues à chaque ouverture du panneau.
+const IGNORED = new Set([
+  'PATCH /notifications/:id/read',
+  'PATCH /notifications/read-all',
+  'PATCH /messages/conversations/:id/read',
+]);
+
+// Libellé lisible par route. Clé : « MÉTHODE /chemin » (préfixe /api retiré,
+// identifiants numériques remplacés par :id).
+const LABELS = {
+  // Demandes
+  'PATCH /requests/:id/assign': 'Demande assignée',
+  'PATCH /requests/:id/document': 'Document lié à la demande',
+
+  // Pièces jointes des demandes et messages
+  'POST /upload/request/:id': 'Pièce jointe ajoutée à la demande',
+  'DELETE /upload/request/file/:id': 'Pièce jointe supprimée',
+  'POST /upload/message': 'Pièce jointe envoyée',
+  'POST /upload/message/:id/link': 'Pièce jointe liée au message',
+
+  // Documents (GED)
+  'POST /documents': 'Document indexé',
+  'PATCH /documents/:id': 'Document modifié',
+  'DELETE /documents/:id': 'Document supprimé',
+  'POST /documents/:id/files': 'Fichier ajouté au document',
+  'DELETE /documents/:id/files/:id': 'Fichier retiré du document',
+  'POST /documents/:id/status': 'Statut du document modifié',
+  'POST /documents/:id/checkout': 'Document réservé pour modification',
+  'POST /documents/:id/checkin': 'Document restitué',
+  'POST /documents/:id/share': 'Document partagé par e-mail',
+  'POST /documents/from-request/:id': 'Demande archivée en document',
+  'POST /documents/assembly/generate': 'Document assemblé généré',
+
+  // Dossiers et vues
+  'POST /documents/folders': 'Dossier créé',
+  'PATCH /documents/folders/:id': 'Dossier renommé',
+  'DELETE /documents/folders/:id': 'Dossier supprimé',
+  'POST /documents/dynamic-views': 'Vue dynamique créée',
+
+  // Métadonnées
+  'POST /metadata/schemas': 'Schéma de métadonnées créé',
+  'PUT /metadata/schemas/:id': 'Schéma de métadonnées modifié',
+  'PUT /metadata/schemas/:id/sync': 'Schéma de métadonnées synchronisé',
+  'DELETE /metadata/schemas/:id': 'Schéma de métadonnées supprimé',
+  'POST /metadata/schemas/:id/fields': 'Champ de métadonnée créé',
+  'PUT /metadata/fields/:id': 'Champ de métadonnée modifié',
+  'DELETE /metadata/fields/:id': 'Champ de métadonnée supprimé',
+  'PUT /metadata/documents/:id': 'Métadonnées du document mises à jour',
+  'PUT /metadata/documents/:id/values/:id': 'Métadonnée du document modifiée',
+  'DELETE /metadata/documents/:id/values/:id': 'Métadonnée du document supprimée',
+
+  // Groupes
+  'POST /groups': 'Groupe créé',
+  'PUT /groups/:id': 'Groupe modifié',
+  'DELETE /groups/:id': 'Groupe supprimé',
+  'POST /groups/:id/members': 'Membre ajouté au groupe',
+  'DELETE /groups/:id/members/:id': 'Membre retiré du groupe',
+
+  // Configuration
+  'PUT /settings': 'Réglages de l\'organisation modifiés',
+  'POST /settings/reset': 'Réglages réinitialisés',
+  'POST /settings/provision': 'Configuration par défaut installée',
+  'POST /settings/logo': 'Logo de l\'organisation mis à jour',
+
+  // Comptes
+  'PUT /users/profile': 'Profil modifié',
+  'PUT /users/profile/password': 'Mot de passe changé',
+  'POST /users': 'Utilisateur créé',
+  'PATCH /users/:id/role': 'Rôle d\'un utilisateur modifié',
+  'DELETE /users/:id': 'Utilisateur supprimé',
+
+  // Organisations
+  'POST /tenants': 'Organisation créée',
+  'PATCH /tenants/:id/status': 'Statut d\'une organisation modifié',
+  'DELETE /tenants/:id': 'Organisation supprimée',
+
+  // Console superadministrateur
+  'PATCH /superadmin/requests/:id/archive': 'Demande archivée',
+  'PATCH /superadmin/requests/:id/unarchive': 'Demande désarchivée',
+  'DELETE /superadmin/requests/:id': 'Demande supprimée',
+  'POST /superadmin/users': 'Utilisateur créé',
+  'PATCH /superadmin/users/:id': 'Utilisateur modifié',
+  'DELETE /superadmin/users/:id': 'Utilisateur supprimé',
+  'POST /superadmin/users/:id/reset-password': 'Mot de passe d\'un utilisateur réinitialisé',
+
+  // Divers
+  'POST /messages': 'Message envoyé',
+  'POST /sections': 'Section créée',
+  'DELETE /sections/:id': 'Section supprimée',
+};
+
+// Traduction de la première partie du chemin, pour le libellé de repli d'une
+// route non encore répertoriée. Perdre une écriture serait plus grave que
+// d'afficher un libellé approximatif : un journal d'audit doit rester exhaustif.
+const RESOURCES = {
+  requests: 'une demande',
+  documents: 'un document',
+  metadata: 'les métadonnées',
+  groups: 'un groupe',
+  settings: 'la configuration',
+  users: 'un utilisateur',
+  tenants: 'une organisation',
+  superadmin: 'la console d\'administration',
+  upload: 'un fichier',
+  messages: 'la messagerie',
+  sections: 'une section',
+  notifications: 'les notifications',
+};
+
+/**
+ * Réduit une URL à une clé de route stable : query string retirée, préfixe /api
+ * retiré, segments numériques remplacés par « :id ».
+ * `/api/documents/42/files/7?x=1` → `/documents/:id/files/:id`
+ */
+function routeKey(originalUrl) {
+  const path = originalUrl.split('?')[0].replace(/\/+$/, '') || '/';
+  return path
+    .replace(/^\/api/, '')
+    .split('/')
+    .map((segment) => (/^\d+$/.test(segment) ? ':id' : segment))
+    .join('/');
+}
+
 module.exports = (req, res, next) => {
   const { method, originalUrl, ip } = req;
-  const startTime = Date.now();
 
-  // We use the 'finish' event to log the request after it has been processed.
-  // This allows us to capture the response status and the user identified by authMiddleware.
+  // Filtrage au plus tôt : une lecture n'installe même pas d'écouteur.
+  if (!WRITE_METHODS.has(method)) return next();
+
+  // L'événement 'finish' permet de connaître le code de réponse et de lire
+  // `req.user`, renseigné entre-temps par authMiddleware.
   res.on('finish', async () => {
-    const duration = Date.now() - startTime;
-    const status = res.statusCode;
     const user = req.user;
 
-    // The audit_logs table requires a tenant_id (NOT NULL).
-    // If the user is not authenticated (e.g., login request), we cannot attribute the log to a tenant.
-    if (!user || !user.tenant_id) {
-      return;
-    }
+    // `audit_logs.tenant_id` est NOT NULL : une requête non authentifiée
+    // (connexion, inscription) ne peut être rattachée à aucune organisation.
+    if (!user || !user.tenant_id) return;
 
-    const tenantId = user.tenant_id;
-    const userId = user.id;
-    // Since username is not in the JWT, we use the ID or 'Unknown'
-    const userName = user.username || `User ${userId}`;
+    const key = `${method} ${routeKey(originalUrl)}`;
+    if (SELF_LOGGED.has(key) || IGNORED.has(key)) return;
 
-    // Heuristic to identify the 'object' of the action.
-    // We look for numeric IDs in the URL path.
-    const pathSegments = originalUrl.split('/');
-    const objectId = pathSegments.find(segment => /^\d+$/.test(segment));
+    const resource = routeKey(originalUrl).split('/')[1] || '';
+    const label = LABELS[key] || `Modification sur ${RESOURCES[resource] || resource}`;
 
-    // Determine if the object is a 'request' based on the URL path.
-    const requestId = (objectId && originalUrl.includes('/api/requests'))
-      ? parseInt(objectId, 10)
-      : null;
+    // Un refus ou une erreur reste consigné, explicitement marqué comme tel :
+    // les tentatives infructueuses sont l'intérêt même d'un journal d'audit.
+    const status = res.statusCode;
+    let action = label;
+    if (status === 401 || status === 403) action = `Refusé : ${label}`;
+    else if (status >= 400) action = `Échec : ${label}`;
 
-    // Format the action and details into the action column.
-    // actor: derived from user.id / user.tenant_id
-    // action: HTTP method and path
-    // object: request_id (if applicable)
-    // details: response status and processing time
-    const actionSummary = `${method} ${originalUrl}`;
-    const detailsSummary = `Status: ${status} | Duration: ${duration}ms`;
-
-    const auditAction = `Action: ${actionSummary} | Details: ${detailsSummary}`;
+    // Identifiant de demande, quand la route en désigne une : rend la ligne
+    // cliquable dans l'historique.
+    const idMatch = originalUrl.split('?')[0].match(/\/api\/requests\/(\d+)/);
+    const requestId = idMatch ? parseInt(idMatch[1], 10) : null;
 
     try {
       await auditService.logAction({
-        tenantId,
-        userId,
+        tenantId: user.tenant_id,
+        userId: user.id,
         requestId,
-        action: auditAction,
+        action,
         ipAddress: ip,
-        userName: userName,
+        userName: user.username || `Utilisateur ${user.id}`,
       });
     } catch (err) {
-      console.error('[auditMiddleware] Error writing to audit log:', err.message);
+      console.error('[auditMiddleware] écriture du journal impossible :', err.message);
     }
   });
 
