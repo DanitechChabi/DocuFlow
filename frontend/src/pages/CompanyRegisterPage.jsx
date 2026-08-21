@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { Building2, User, Mail, Lock, UserPlus, AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
+import { useTitrePage } from '../hooks/useTitrePage';
 
 // Convertit un nom en code entreprise : minuscules, sans accents, espaces → tirets
 const toSlug = (value) =>
@@ -36,6 +37,9 @@ const CompanyRegisterPage = () => {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  // Avant le `return` de l'écran de succès : un hook s'appelle à chaque rendu.
+  useTitrePage(success ? 'Entreprise créée' : 'Créer un espace entreprise');
 
   // Le code est auto-suggéré depuis le nom tant que l'utilisateur ne l'a pas modifié
   const handleCompanyName = (e) => {

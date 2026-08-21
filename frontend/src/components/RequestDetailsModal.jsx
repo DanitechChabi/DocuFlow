@@ -31,7 +31,7 @@ const TERMINAL_STATUSES = new Set(['livré', 'rejete', 'annulé']);
 const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClose }) => {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
-  const [mfileData, setMfileData] = useState(null);
+  const [documentTrouve, setDocumentTrouve] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [files, setFiles] = useState([]);
@@ -164,14 +164,14 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
     }
   };
 
-  const handleVerifyMfile = async () => {
+  const handleRechercherDocument = async () => {
     setIsVerifying(true);
-    setMfileData(null);
+    setDocumentTrouve(null);
     try {
-      const res = await requestService.verifyMfile(request.id);
-      setMfileData(res);
+      const res = await requestService.findMatchingDocument(request.id);
+      setDocumentTrouve(res);
     } catch (err) {
-      toast.error('Erreur lors de la vérification Mfile');
+      toast.error('Erreur lors de la recherche dans le référentiel');
     } finally {
       setIsVerifying(false);
     }
@@ -456,24 +456,27 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                     </button>
                   )}
 
-                  <button onClick={handleVerifyMfile} disabled={isVerifying}
+                  <button onClick={handleRechercherDocument} disabled={isVerifying}
                     className="btn-secondary flex items-center justify-center gap-2 flex-1">
                     {isVerifying ? (
                       <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
                     ) : <Search size={18} />}
-                    {isVerifying ? 'Vérification...' : 'Vérifier Mfile'}
+                    {isVerifying ? 'Recherche…' : 'Chercher dans le référentiel'}
                   </button>
                 </div>
 
-                {/* Mfile result */}
-                {mfileData && (
-                  <div className={`p-4 rounded-xl border text-sm ${mfileData.exists ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                {/* Résultat de la recherche dans le référentiel documentaire */}
+                {documentTrouve && (
+                  <div className={`p-4 rounded-xl border text-sm ${documentTrouve.exists ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}`}>
                     <div className="flex items-center gap-2 font-bold mb-1">
-                      {mfileData.exists ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-                      {mfileData.message || (mfileData.exists ? 'Document trouvé' : 'Document introuvable')}
+                      {documentTrouve.exists ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                      {documentTrouve.message || (documentTrouve.exists ? 'Document trouvé' : 'Document introuvable')}
                     </div>
-                    {mfileData.fileUrl && (
-                      <p className="text-xs mt-1 opacity-75">URL : {mfileData.fileUrl}</p>
+                    {documentTrouve.fileUrl && (
+                      <a href={documentTrouve.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs mt-1 underline opacity-75 hover:opacity-100">
+                        Ouvrir le document trouvé
+                      </a>
                     )}
                   </div>
                 )}

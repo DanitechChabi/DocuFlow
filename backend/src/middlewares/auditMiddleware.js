@@ -14,8 +14,9 @@ const auditService = require('../services/auditService');
  *   1. seules les écritures sont journalisées (POST, PUT, PATCH, DELETE) — une
  *      consultation ne modifie rien et n'a pas à figurer dans l'historique ;
  *   2. chaque route porte un libellé français lisible (voir LABELS) ;
- *   3. les routes qui écrivent déjà leur propre entrée sont ignorées (SELF_LOGGED),
- *      sans quoi une même action apparaîtrait deux fois.
+ *   3. les routes qui écrivent déjà leur propre entrée en cas de succès sont
+ *      ignorées dans ce cas précis (SELF_LOGGED), sans quoi une même action
+ *      apparaîtrait deux fois ; leurs échecs restent journalisés ici.
  *
  * Les échecs restent tracés : un refus d'autorisation est précisément ce qu'un
  * journal d'audit doit conserver.
@@ -31,11 +32,22 @@ const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 //   - requestController.updateRequestStatus  → « A changé le statut de la demande X vers Y »
 //   - documentController.setDocumentMetadata → documentAuditService (METADATA_UPDATE)
 //   - documentController.createDocumentRelation → documentAuditService (RELATION_CREATED)
+//   - superadminController.deleteTenant      → nomme l'entreprise et sa volumétrie
+//   - superadminController.purgeAuditLogs    → nombre de lignes purgées et périmètre
+//
+// Le contournement ne vaut QUE pour les réponses en succès : ces contrôleurs
+// n'écrivent leur entrée qu'une fois l'opération aboutie (et, pour la purge,
+// dans la transaction qui l'exécute — un ROLLBACK l'emporte avec elle). Ignorer
+// aussi les échecs ferait disparaître les refus, alors qu'une suppression
+// d'entreprise refusée est précisément ce qu'un journal doit retenir.
 const SELF_LOGGED = new Set([
   'POST /requests',
   'PATCH /requests/:id/status',
   'POST /documents/:id/metadata',
   'POST /documents/:id/relations',
+  'DELETE /superadmin/tenants/:id',
+  'DELETE /tenants/:id',
+  'DELETE /superadmin/audit',
 ]);
 
 // Écritures de pure mécanique d'interface : accusés de lecture déclenchés par
@@ -54,6 +66,15 @@ const LABELS = {
   // Demandes
   'PATCH /requests/:id/assign': 'Demande assignée',
   'PATCH /requests/:id/document': 'Document lié à la demande',
+
+  // Champs configurables du formulaire de demande. Ces trois routes changent ce
+  // que TOUS les demandeurs voient à l'écran : retirer un champ obligatoire ou
+  // en ajouter un modifie le formulaire pour l'organisation entière. Le journal
+  // doit dire qui l'a fait — c'est la seule trace de la raison pour laquelle les
+  // demandes d'avant et d'après ne portent pas les mêmes informations.
+  'PUT /requests/fields': 'Champs du formulaire de demande modifiés',
+  'POST /requests/fields/provision': 'Champs du formulaire de demande réinitialisés',
+  'PATCH /requests/fields/:id/visibility': 'Visibilité d\'un champ de demande modifiée',
 
   // Pièces jointes des demandes et messages
   'POST /upload/request/:id': 'Pièce jointe ajoutée à la demande',
@@ -126,6 +147,23 @@ const LABELS = {
   'DELETE /superadmin/users/:id': 'Utilisateur supprimé',
   'POST /superadmin/users/:id/reset-password': 'Mot de passe d\'un utilisateur réinitialisé',
 
+  // Licences de bureau. Ces quatre routes ont une valeur commerciale directe —
+  // une émission, une prolongation ou une révocation doit laisser une trace
+  // nominative, c'est le journal qui répond à « qui a offert ce mois-ci ? ».
+  //
+  // Les activations côté client (POST /licenses/activate, /refresh) ne figurent
+  // pas ici : elles sont ANONYMES par construction (le poste n'a pas de compte
+  // au moment de s'activer), et `audit_logs.tenant_id` est NOT NULL. Le
+  // middleware les écarte donc en amont, comme il écarte déjà la connexion.
+  'POST /superadmin/licenses': 'Licence de bureau émise',
+  'PATCH /superadmin/licenses/:id': 'Licence de bureau modifiée',
+  'POST /superadmin/licenses/:id/reset-machine': 'Poste délié d\'une licence',
+
+  // Opérations irréversibles : le libellé ne sert qu'aux ÉCHECS (en cas de
+  // succès, le contrôleur écrit lui-même une entrée détaillée — voir SELF_LOGGED).
+  'DELETE /superadmin/tenants/:id': 'Suppression d\'une entreprise',
+  'DELETE /tenants/:id': 'Suppression d\'une entreprise',
+  'DELETE /superadmin/audit': 'Purge du journal d\'audit',
   // Divers
   'POST /messages': 'Message envoyé',
   'POST /sections': 'Section créée',
@@ -148,6 +186,7 @@ const RESOURCES = {
   messages: 'la messagerie',
   sections: 'une section',
   notifications: 'les notifications',
+  licenses: 'une licence',
 };
 
 /**
@@ -180,14 +219,20 @@ module.exports = (req, res, next) => {
     if (!user || !user.tenant_id) return;
 
     const key = `${method} ${routeKey(originalUrl)}`;
-    if (SELF_LOGGED.has(key) || IGNORED.has(key)) return;
+    if (IGNORED.has(key)) return;
+
+    const status = res.statusCode;
+    const succeeded = status >= 200 && status < 400;
+
+    // Le contrôleur a déjà écrit son entrée détaillée : ne rien ajouter. En
+    // revanche, si l'opération a échoué, il n'a rien écrit — on trace le refus.
+    if (SELF_LOGGED.has(key) && succeeded) return;
 
     const resource = routeKey(originalUrl).split('/')[1] || '';
     const label = LABELS[key] || `Modification sur ${RESOURCES[resource] || resource}`;
 
     // Un refus ou une erreur reste consigné, explicitement marqué comme tel :
     // les tentatives infructueuses sont l'intérêt même d'un journal d'audit.
-    const status = res.statusCode;
     let action = label;
     if (status === 401 || status === 403) action = `Refusé : ${label}`;
     else if (status >= 400) action = `Échec : ${label}`;

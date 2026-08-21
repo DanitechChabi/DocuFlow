@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const settingsService = require('../services/settingsService');
 const tenantProvisioningService = require('../services/tenantProvisioningService');
+const { uploadUrl } = require('../helpers/publicUrl');
 require('dotenv').config({ path: './.env' });
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -330,9 +331,7 @@ exports.getCompanyPublic = async (req, res) => {
     settingsResult.rows.forEach((row) => { settings[row.key] = row.value; });
 
     if (settings.site_logo && !settings.site_logo.startsWith('http')) {
-      const host = req.headers.host || '127.0.0.1:30001';
-      const protocol = req.protocol || 'http';
-      settings.site_logo_url = `${protocol}://${host}/uploads/${settings.site_logo}`;
+      settings.site_logo_url = uploadUrl(req, settings.site_logo);
     } else {
       settings.site_logo_url = settings.site_logo || null;
     }

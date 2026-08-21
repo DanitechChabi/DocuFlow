@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { settingsService } from '../services/settingsService';
+import { definirNomSite } from '../utils/titreDocument';
 
 const SettingsContext = createContext({ site_name: 'DocuFlow', site_description: '' });
 
@@ -26,9 +27,18 @@ const DEFAULT_THEME = {
   gold_color: '#d4af37',
 };
 
+/**
+ * Nom du site dans le titre de l'onglet et dans `application-name`.
+ *
+ * La composition du titre appartient à utils/titreDocument : ce module ne fait
+ * que livrer le nom, sans savoir si une page a déjà annoncé le sien. Écrire
+ * `document.title` directement ici écrasait le titre de page, puisque l'effet de
+ * ce provider — placé à la racine — s'exécute APRÈS celui des pages qu'il
+ * contient.
+ */
 const applySiteName = (name) => {
   const title = name || DEFAULT_TITLE;
-  document.title = `${title} — Plateforme de gestion documentaire`;
+  definirNomSite(title);
   document.querySelector('meta[name="application-name"]')?.setAttribute('content', title);
 };
 

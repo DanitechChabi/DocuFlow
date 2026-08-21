@@ -5,6 +5,8 @@ const { UPLOADS_DIR } = require('../config/paths');
 const catalog = require('../config/settingsCatalog');
 const settingsService = require('../services/settingsService');
 const tenantProvisioningService = require('../services/tenantProvisioningService');
+const { uploadUrl } = require('../helpers/publicUrl');
+const requestOptions = require('../helpers/requestOptions');
 
 /**
  * settingsController — configuration intégrale d'une organisation.
@@ -24,25 +26,16 @@ const tenantProvisioningService = require('../services/tenantProvisioningService
 const IMAGE_KEYS = catalog.CATALOG.filter((d) => d.type === 'image').map((d) => d.key);
 
 /**
- * Ajoute une URL absolue (`<clé>_url`) pour chaque réglage de type image.
+ * Ajoute une URL (`<clé>_url`) pour chaque réglage de type image.
  *
  * Le frontend ne peut pas reconstruire ces URLs : le nom de fichier stocké est
- * relatif au dossier d'uploads du serveur, qui n'est pas forcément la même
- * origine que l'application (Render + Vercel). Une valeur déjà absolue
- * (http/https, ex. Cloudinary) est reprise telle quelle.
+ * relatif au dossier d'uploads du serveur. Absolue en mode hébergé, relative en
+ * mode bureau — la règle et son pourquoi sont dans helpers/publicUrl.js.
  */
 function withImageUrls(settings, req) {
   const out = { ...settings };
-  const host = req.headers.host || '127.0.0.1:30001';
-  const protocol = req.protocol || 'http';
-
   for (const key of IMAGE_KEYS) {
-    const value = out[key];
-    if (value && !String(value).startsWith('http')) {
-      out[`${key}_url`] = `${protocol}://${host}/uploads/${value}`;
-    } else {
-      out[`${key}_url`] = value || null;
-    }
+    out[`${key}_url`] = uploadUrl(req, out[key]);
   }
   return out;
 }
@@ -100,6 +93,16 @@ exports.getConfiguration = async (req, res) => {
           label: d.label,
           description: d.description || null,
           type: d.type,
+          // Contrôle de saisie spécialisé, quand le type de stockage ne suffit
+          // pas à le déduire (une liste de choix est du JSON, mais ne doit pas
+          // être saisie comme du JSON). `null` = contrôle déduit du type.
+          editor: d.editor || null,
+          withTone: d.withTone === true,
+          // Le réglage tire ses choix d'une autre liste (voir `optionsFrom` dans
+          // le catalogue). La console la lit dans le formulaire vivant, et non
+          // dans les valeurs stockées : l'administrateur qui ajoute un niveau de
+          // priorité doit pouvoir le choisir comme défaut avant d'enregistrer.
+          optionsFrom: d.optionsFrom || null,
           options: d.options || [],
           min: d.min ?? null,
           max: d.max ?? null,
@@ -109,12 +112,69 @@ exports.getConfiguration = async (req, res) => {
         })),
     })).filter((group) => group.settings.length > 0);
 
-    res.json({ groups, values: withImageUrls(stored, req) });
+    // Les tons de priorité forment une liste fermée côté serveur (les classes
+    // Tailwind correspondantes sont compilées à la construction du frontend).
+    // Les livrer ici évite que la console en tienne sa propre copie, qui
+    // dériverait au premier ton ajouté.
+    res.json({ groups, values: withImageUrls(stored, req), tones: requestOptions.TONES });
   } catch (err) {
     console.error('[settings] getConfiguration :', err.message);
     res.status(500).json({ message: 'Erreur lors du chargement de la configuration' });
   }
 };
+
+/**
+ * Vérifie les réglages qui en désignent un autre (`optionsFrom` du catalogue).
+ *
+ * Le contrôle porte sur l'état RÉSULTANT — valeurs stockées écrasées par les
+ * modifications en cours — et non sur le corps de la requête seul : la console
+ * n'envoie que les champs modifiés, si bien qu'une requête ne contient
+ * généralement qu'un des deux côtés de la paire. Vider la liste des priorités et
+ * ne rien dire de la priorité par défaut doit être refusé tout autant que
+ * l'inverse.
+ *
+ * @param {number} tenantId organisation concernée
+ * @param {Array<{key: string, value: string|null}>} updates modifications validées
+ * @returns {Promise<Array<{key: string, reason: string}>>} incohérences relevées
+ */
+async function checkCrossKeys(tenantId, updates) {
+  const dependants = catalog.CATALOG.filter((d) => d.optionsFrom);
+  if (!dependants.length) return [];
+
+  // Rien à vérifier si la requête ne touche ni un réglage dépendant ni la liste
+  // dont il dépend : inutile de relire les réglages à chaque enregistrement.
+  const touched = new Set(updates.map((u) => u.key));
+  const concerned = dependants.filter((d) => touched.has(d.key) || touched.has(d.optionsFrom));
+  if (!concerned.length) return [];
+
+  const stored = await loadSettings(tenantId);
+  // `null` = suppression de la ligne : la valeur par défaut du catalogue
+  // reprend effet, c'est donc elle qu'il faut confronter et non une valeur vide.
+  const resulting = { ...stored };
+  for (const { key, value } of updates) {
+    resulting[key] = value === null ? (catalog.BY_KEY.get(key)?.default ?? null) : value;
+  }
+
+  const problems = [];
+  for (const definition of concerned) {
+    const source = catalog.BY_KEY.get(definition.optionsFrom);
+    if (!source) continue;
+    const options = requestOptions.normalizeOptions(
+      resulting[definition.optionsFrom],
+      source.default,
+      { withTone: source.withTone === true }
+    );
+    const wanted = String(resulting[definition.key] ?? '').trim();
+    if (!wanted) continue;
+    if (!requestOptions.allowedValues(options).includes(wanted)) {
+      problems.push({
+        key: definition.key,
+        reason: `${definition.label} (« ${wanted} ») ne correspond à aucune entrée de « ${source.label} ».`,
+      });
+    }
+  }
+  return problems;
+}
 
 exports.updateSettings = async (req, res) => {
   const tenantId = req.user.tenant_id;
@@ -148,6 +208,27 @@ exports.updateSettings = async (req, res) => {
   }
   if (!updates.length) {
     return res.status(400).json({ message: 'Aucun paramètre à mettre à jour.' });
+  }
+
+  // Cohérence ENTRE réglages — impossible à vérifier clé par clé.
+  //
+  // `request_default_priority` nomme une entrée de `request_priorities`. Les deux
+  // sont valides isolément, et pourtant supprimer le niveau qui sert de défaut
+  // laisse le formulaire retomber sur le premier de la liste : le réglage
+  // semble ignoré, sans que rien ne l'ait signalé. Le contrôle a lieu sur l'état
+  // RÉSULTANT (stocké + modifications), car une requête ne porte souvent qu'un
+  // seul côté de la paire.
+  try {
+    const incoherences = await checkCrossKeys(tenantId, updates);
+    if (incoherences.length) {
+      return res.status(400).json({
+        message: `Configuration refusée : ${incoherences.map((r) => r.reason).join(' ')}`,
+        rejected: incoherences,
+      });
+    }
+  } catch (err) {
+    console.error('[settings] checkCrossKeys :', err.message);
+    return res.status(500).json({ message: 'Erreur lors de la vérification de la configuration' });
   }
 
   const client = await db.pool.connect();
@@ -297,9 +378,7 @@ exports.uploadLogo = async (req, res) => {
     );
     settingsService.invalidate(tenantId);
 
-    const host = req.headers.host || '127.0.0.1:30001';
-    const protocol = req.protocol || 'http';
-    res.json({ message: 'Image mise à jour', key, filename, url: `${protocol}://${host}/uploads/${filename}` });
+    res.json({ message: 'Image mise à jour', key, filename, url: uploadUrl(req, filename) });
   } catch (err) {
     discardUpload();
     console.error('[settings] uploadLogo :', err.message);

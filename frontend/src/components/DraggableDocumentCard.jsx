@@ -2,6 +2,7 @@ import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Lock } from 'lucide-react';
+import { DocumentThumbnail } from './DocumentPreview';
 
 const STATUS_CLASSES = {
   'disponible': 'status-badge-delivered',
@@ -20,11 +21,15 @@ const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé'
  * (superadmin, admin, archiviste). Laisser un lecteur déplacer une fiche
  * produirait un 403 après coup, donc une poignée qui promet une action refusée.
  *
- * Un document verrouillé (check-out M-Files) n'est pas déplaçable non plus :
- * c'est le sens même du verrou, et le laisser bouger contredirait le badge
- * « Verrouillé » affiché sur la fiche.
+ * Un document verrouillé (extrait pour modification) n'est pas déplaçable non
+ * plus : c'est le sens même du verrou, et le laisser bouger contredirait le
+ * badge « Verrouillé » affiché sur la fiche.
+ *
+ * @param {function} props.onApercu Ouvre l'aperçu plein écran. L'état de cette
+ *   vue appartient au parent : une seule est ouverte à la fois, alors qu'un
+ *   groupe compte des centaines de fiches.
  */
-const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen }) => {
+const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onApercu }) => {
   const locked = !!doc.is_checked_out;
   const draggable = canDrag && !locked;
 
@@ -88,6 +93,15 @@ const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen }) => {
           {doc.num_dossier} / {doc.num_acte} — {doc.annee}
         </p>
       </button>
+      {/* L'aperçu vient après le libellé, pas avant : l'archiviste identifie la
+          fiche par sa référence et son entreprise ; la vignette confirme, elle
+          ne remplace pas. */}
+      <DocumentThumbnail
+        url={doc.apercu_url}
+        mimeType={doc.mime_type}
+        nomFichier={doc.original_name}
+        onAgrandir={onApercu ? () => onApercu(doc) : undefined}
+      />
     </div>
   );
 };

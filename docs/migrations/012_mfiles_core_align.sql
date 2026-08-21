@@ -27,6 +27,26 @@
 --                  details_json, occurred_at
 --    Les deux jeux de colonnes coexistent ; les nouvelles sont nullables.
 -- ----------------------------------------------------------------------------
+
+-- La convergence doit se faire DANS LES DEUX SENS, car la table peut provenir de
+-- deux origines opposées :
+--   * docs/setup_db.sql (production Neon) → colonnes historiques seules ;
+--   * migration 010 (base bâtie par les migrations) → colonnes GED seules.
+-- Les ALTER ci-dessous ajoutaient uniquement les colonnes GED. Sur une base
+-- issue de la 010, la table n'a jamais eu `timestamp` ni `id_user`, et les UPDATE
+-- de rattrapage qui suivent échouaient sur « la colonne timestamp n'existe pas »,
+-- interrompant toute la campagne de migrations. Le code applicatif écrit pourtant
+-- bien dans ces colonnes (requestController, superadminController), qui ne sont
+-- donc pas un vestige : les deux jeux doivent exister partout.
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS id_user INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_id INTEGER REFERENCES requests(id) ON DELETE SET NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name VARCHAR(100);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45);
+-- Sans valeur par défaut, pour la même raison que `occurred_at` plus bas : un
+-- DEFAULT CURRENT_TIMESTAMP daterait les lignes existantes de l'heure de la
+-- migration. Le défaut est posé après le rattrapage.
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS "timestamp" TIMESTAMP;
+
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_username VARCHAR(100);
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS object_type VARCHAR(50);
@@ -61,9 +81,17 @@ UPDATE audit_logs SET actor_username = user_name WHERE actor_username IS NULL AN
 UPDATE audit_logs SET occurred_at = "timestamp"
 WHERE "timestamp" IS NOT NULL AND occurred_at IS DISTINCT FROM "timestamp";
 
+-- Rattrapage inverse, pour une base issue de la 010 : les lignes GED existantes
+-- ont `occurred_at` mais pas `timestamp`, colonne que le code historique lit.
+UPDATE audit_logs SET "timestamp" = occurred_at
+WHERE "timestamp" IS NULL AND occurred_at IS NOT NULL;
+UPDATE audit_logs SET id_user = actor_id WHERE id_user IS NULL AND actor_id IS NOT NULL;
+UPDATE audit_logs SET user_name = actor_username WHERE user_name IS NULL AND actor_username IS NOT NULL;
+
 -- Valeur par défaut pour les insertions futures : posée seulement maintenant,
 -- une fois les lignes historiques réalignées (voir le commentaire de l'ALTER).
 ALTER TABLE audit_logs ALTER COLUMN occurred_at SET DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE audit_logs ALTER COLUMN "timestamp" SET DEFAULT CURRENT_TIMESTAMP;
 
 -- Les insertions passant par l'ancien chemin (auditService) ne renseignent pas
 -- occurred_at ; ce trigger garantit que les deux colonnes de date restent alignées

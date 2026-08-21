@@ -33,6 +33,15 @@ installer/*.exe
 # Script contenant un mot de passe en clair
 backend/set_admin_password.js
 
+# Clé privée de signature des licences de bureau (Ed25519).
+# Elle seule permet d'émettre des licences valides : sa fuite rendrait toute
+# l'application gratuite. Vit uniquement dans la variable d'environnement Render
+# DESKTOP_LICENSE_PRIVATE_KEY. Seule la clé PUBLIQUE est versionnée
+# (backend/src/config/licensePublicKey.js).
+license-keys-GENERATED.txt
+*.pem
+*.key
+
 # Logs
 *.log
 npm-debug.log*

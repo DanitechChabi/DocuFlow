@@ -6,10 +6,9 @@ import { documentService } from '../services/documentService';
 import { toast } from './Toast';
 
 /**
- * DynamicViewBuilder — composition d'une vue dynamique par glisser-déposer
- * (paradigme M-Files) : on fait glisser un champ vers l'emplacement
- * « regrouper par », d'autres vers les emplacements de filtrage, on nomme la vue
- * et on l'enregistre.
+ * DynamicViewBuilder — composition d'une vue dynamique par glisser-déposer :
+ * on fait glisser un champ vers l'emplacement « regrouper par », d'autres vers
+ * les emplacements de filtrage, on nomme la vue et on l'enregistre.
  *
  * Les champs proposés ne sont pas libres : le regroupement est limité à la liste
  * blanche de documentController.getDynamicViewData (toute autre valeur serait

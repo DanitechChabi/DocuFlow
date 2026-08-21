@@ -55,14 +55,33 @@ async function runMigrations() {
     console.log(`🔄 Exécution de ${file}...`);
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
 
+    // Chaque migration s'exécute dans SA transaction, sur une connexion dédiée,
+    // et l'enregistrement dans `migrations` en fait partie. Sans cela, une
+    // migration interrompue en son milieu laissait la base à moitié transformée
+    // ET non enregistrée : la reprise la rejouait depuis le début, sur un schéma
+    // déjà partiellement modifié. Les migrations sont idempotentes, ce qui rend
+    // cette reprise possible, mais l'atomicité évite d'avoir à en dépendre.
+    //
+    // Le corollaire : aucun fichier de migration ne doit contenir son propre
+    // BEGIN/COMMIT. PostgreSQL n'imbrique pas les transactions — un COMMIT dans
+    // le fichier refermerait celle ouverte ici, et les instructions suivantes
+    // s'exécuteraient hors transaction, hors de portée du ROLLBACK.
+    const client = await pool.connect();
     try {
-      await pool.query(sql);
-      await pool.query('INSERT INTO migrations (filename) VALUES ($1)', [file]);
+      await client.query('BEGIN');
+      await client.query(sql);
+      await client.query('INSERT INTO migrations (filename) VALUES ($1)', [file]);
+      await client.query('COMMIT');
       console.log(`✅ ${file} exécutée avec succès.`);
     } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
       console.error(`❌ Erreur sur ${file}:`, err.message);
+      console.error('   Aucune modification n\'a été conservée pour ce fichier.');
+      client.release();
+      await pool.end();
       process.exit(1);
     }
+    client.release();
   }
 
   console.log('🎉 Toutes les migrations sont à jour.');

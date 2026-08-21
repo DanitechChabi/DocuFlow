@@ -1,4 +1,5 @@
 const tenantDb = require('../config/db-tenant');
+const requestFieldService = require('../services/requestFieldService');
 
 exports.getRequestDetails = async (req, res) => {
   const { id } = req.params;
@@ -79,10 +80,29 @@ exports.getRequestDetails = async (req, res) => {
       }
     }
 
+    // Valeurs des champs ajoutés par l'organisation (migration 016).
+    //
+    // Sans cette lecture, les champs personnalisés s'enregistreraient à la
+    // création sans jamais s'afficher ensuite : l'archiviste traiterait la
+    // demande sans voir les informations que le demandeur a pourtant saisies.
+    //
+    // L'échec ne fait pas échouer la réponse : ces valeurs complètent le détail,
+    // elles ne le constituent pas. Sur une base où la migration 016 n'est pas
+    // passée, la fiche doit rester consultable.
+    let customFields = [];
+    try {
+      customFields = await requestFieldService.getValues(tenantId, id);
+    } catch (fieldErr) {
+      if (fieldErr.code !== '42P01') {
+        console.error('[requestDetails] champs personnalisés illisibles :', fieldErr.message);
+      }
+    }
+
     res.json({
       request,
       history: logsResult.rows,
-      stateHistory: stateResult.rows
+      stateHistory: stateResult.rows,
+      customFields
     });
   } catch (err) {
     console.error(err);

@@ -4,6 +4,7 @@ import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { sectionService } from '../services/sectionService';
 import { UserPlus, User, Mail, Building2, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { useTitrePage } from '../hooks/useTitrePage';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -41,6 +42,10 @@ const RegisterPage = () => {
 
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
+
+  // Déclaré avant le `return` de l'écran de succès : un hook doit être appelé à
+  // chaque rendu, quelle que soit la branche empruntée ensuite.
+  useTitrePage(success ? 'Inscription réussie' : 'Créer un compte');
 
   const handleRegister = async (e) => {
     e.preventDefault();

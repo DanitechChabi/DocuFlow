@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 /**
- * relationService — Relations et dépendances inter-documents (M-Files feature #26).
+ * relationService — Relations et dépendances inter-documents.
  * Schéma de référence : docs/migrations/010_metadata_typed.sql
  *   document_relations (tenant_id, source_document_id, target_document_id, relation_type, created_by)
  *   UNIQUE (source_document_id, target_document_id, relation_type)

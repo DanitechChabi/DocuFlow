@@ -21,15 +21,35 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Auto-logout sur 401 (token expiré ou invalide)
+// Auto-logout sur 401 (token expiré ou invalide), signalement sur 402 (licence)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    const status = error.response?.status;
+
+    if (status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+
+    // 402 — licence bureau absente ou expirée (licenseMiddleware).
+    //
+    // ON SIGNALE, ON NE REDIRIGE PAS. Un `window.location.href` ici arracherait
+    // l'utilisateur à son écran — formulaire en cours de saisie compris — sur un
+    // simple appel de fond, par exemple le compteur de notifications qui tourne
+    // en arrière-plan. C'est LicenseContext qui décide de la suite : lui seul
+    // sait si l'on est en mode bureau, et il a accès au routeur.
+    //
+    // La session n'est PAS effacée, contrairement au 401 : la licence est un
+    // problème d'abonnement du poste, pas d'identité de l'utilisateur. Le
+    // déconnecter l'obligerait à retaper son mot de passe après renouvellement.
+    if (status === 402 && error.response?.data?.code === 'LICENSE_REQUIRED') {
+      window.dispatchEvent(new CustomEvent('docuflow:license-required', {
+        detail: error.response.data,
+      }));
+    }
+
     return Promise.reject(error);
   }
 );

@@ -8,6 +8,7 @@
 const path = require('path');
 const fs = require('fs').promises;  // Utiliser fs.promises pour les opérations async
 const cloudinary = require('cloudinary').v2;
+const { uploadUrl } = require('../helpers/publicUrl');
 
 const USE_CLOUDINARY = !!(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -107,7 +108,10 @@ async function deleteFile({ storedName, cloudinaryPublicId, resourceType }) {
 
 /**
  * URL publique d'un fichier (https si Cloudinary, sinon via req).
- * @param {object} req     - requête Express (pour construire l'URL locale)
+ * @param {object} req     - requête Express. Conservée dans la signature pour les
+ *                           sept appelants existants, et parce que Cloudinary
+ *                           pourrait de nouveau en avoir besoin ; les URL locales
+ *                           sont désormais relatives et ne la consultent plus.
  * @param {object} fileRow - ligne document_files (stored_name, cloudinary_public_id,
  *                           mime_type, secure_url)
  * Utilise le secure_url stocké à l'upload (version + format exacts de Cloudinary) ;
@@ -126,9 +130,12 @@ function fileUrl(req, fileRow) {
     const resType = resourceTypeFromMime(fileRow.mime_type);
     return `https://res.cloudinary.com/${cloudName}/${resType}/upload/${fileRow.cloudinary_public_id}`;
   }
-  // Mode local : utiliser le chemin relatif stocké pour supporter les sous-dossiers
-  const relativePath = fileRow.stored_name || '';
-  return `${req.protocol}://${req.get('host')}/uploads/files/${relativePath}`;
+  // Mode local : absolue en hébergé, relative en bureau. La règle et son
+  // pourquoi sont dans helpers/publicUrl.js — en résumé, le port de
+  // l'application de bureau change à chaque lancement, donc une URL absolue y
+  // devient morte, tandis qu'en SaaS le frontend est sur une autre origine et
+  // une URL relative n'y trouverait pas /uploads.
+  return uploadUrl(req, fileRow.stored_name, 'files');
 }
 
 module.exports = { saveFile, deleteFile, fileUrl, USE_CLOUDINARY, resourceTypeFromMime };

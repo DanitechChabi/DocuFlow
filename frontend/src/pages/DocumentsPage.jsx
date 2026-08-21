@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
+  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
@@ -13,6 +14,10 @@ import DocumentDetailsModal from '../components/DocumentDetailsModal';
 import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
 import DynamicViewBuilder from '../components/DynamicViewBuilder';
 import DraggableDocumentGroup from '../components/DraggableDocumentGroup';
+import { DocumentPreviewLightbox } from '../components/DocumentPreview';
+import FolderTree from '../components/FolderTree';
+import PageHeader from '../components/PageHeader';
+import { useOngletUrl } from '../hooks/useOngletUrl';
 
 const STATUS_CLASSES = {
   'disponible': 'status-badge-delivered',
@@ -31,10 +36,15 @@ const UNCLASSIFIED_GROUP = 'Non classé';
 // « Non classé » y est donc impossible : on ne peut pas vider un statut.
 const STATUS_VALUES = ['disponible', 'prêt', 'archivé'];
 
+// Modes d'affichage du référentiel, dans l'ordre des boutons. Hissé hors du
+// composant : useOngletUrl mémorise sur ce tableau, qu'un littéral recréé à
+// chaque rendu invaliderait en permanence.
+const MODES_AFFICHAGE = ['list', 'dynamic'];
+
 const DocumentsPage = () => {
   const user = authService.getCurrentUser();
   const isAdmin = ['superadmin', 'admin', 'archiviste'].includes(user?.role);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Recherche globale depuis la topbar → pré-remplir ?q=
   const [q, setQ] = useState(searchParams.get('q') || '');
@@ -48,7 +58,10 @@ const DocumentsPage = () => {
   const [pageSize] = useState(15);
 
   const [showForm, setShowForm] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'dynamic'
+  // Le mode d'affichage vit dans l'URL (?vue=dynamic) et non dans un état local :
+  // « regarde les documents groupés par type » se transmet alors par un lien, et
+  // F5 ne renvoie plus l'archiviste à la liste plate qu'il venait de quitter.
+  const [viewMode, setViewMode] = useOngletUrl(MODES_AFFICHAGE, 'vue');
   const [groupByField, setGroupByField] = useState('type_document');
   const [dynamicGroups, setDynamicGroups] = useState([]);
   const [dynamicLoading, setDynamicLoading] = useState(false);
@@ -61,6 +74,10 @@ const DocumentsPage = () => {
   const [activeViewId, setActiveViewId] = useState(null);
   const [activeGroupField, setActiveGroupField] = useState('type_document');
   const [pendingDropGroup, setPendingDropGroup] = useState(null);
+  // Aperçu plein écran : l'état vit ici et non dans la fiche, pour qu'une seule
+  // vue soit ouverte à la fois. Portée par chaque carte, une centaine de fiches
+  // porteraient une centaine d'états morts.
+  const [apercuDoc, setApercuDoc] = useState(null);
 
   // 6 px avant de considérer qu'il s'agit d'un glissement : sans cette
   // contrainte, le clic d'ouverture d'une fiche document déclenchait un drag et
@@ -151,7 +168,6 @@ const DocumentsPage = () => {
   const [editingDoc, setEditingDoc] = useState(null);
   const [detailDoc, setDetailDoc] = useState(null);
   const [folderOpen, setFolderOpen] = useState(false);
-  const [folderName, setFolderName] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -195,22 +211,99 @@ const DocumentsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleCreateFolder = async (e) => {
-    e.preventDefault();
-    if (!folderName.trim()) return;
+  // Fiche ouverte depuis l'extérieur de la page : `?doc=<id>`.
+  //
+  // DocuBot trouve un document et doit pouvoir l'OUVRIR. Sans ce relais, son
+  // résultat renvoyait au mieux vers la liste, où il fallait retrouver à la main
+  // le document que le bot venait de nommer. L'identifiant passe par l'URL
+  // plutôt que par un état partagé parce que la fiche vit ici, avec les dossiers
+  // et les droits d'édition qu'elle utilise — et parce que l'adresse obtenue se
+  // transmet alors par un lien.
+  //
+  // Le paramètre est retiré de l'URL à la fermeture, sinon un rechargement
+  // rouvrirait indéfiniment une fiche que l'utilisateur vient de fermer.
+  useEffect(() => {
+    const brut = searchParams.get('doc');
+    if (!brut) return;
+    const id = Number(brut);
+    // Un identifiant non numérique — lien tronqué, adresse bricolée — est ignoré
+    // au lieu d'ouvrir un modal qui échouerait à charger.
+    if (Number.isInteger(id) && id > 0) setDetailDoc(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const fermerFiche = useCallback(() => {
+    setDetailDoc(null);
+    setSearchParams((precedents) => {
+      const suivants = new URLSearchParams(precedents);
+      suivants.delete('doc');
+      return suivants;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // ---- Dossiers : arborescence -------------------------------------------
+  // Les quatre gestionnaires renvoient leur promesse : FolderTree ferme ses
+  // formulaires en ligne seulement après succès, de sorte qu'un refus du backend
+  // (cycle, profondeur, nom en doublon) laisse la saisie en place et le message
+  // d'erreur visible, au lieu de tout refermer comme si l'action avait abouti.
+  const handleCreateFolder = async (nom, parentId = null) => {
+    setError('');
     try {
-      await documentService.createFolder(folderName.trim());
-      setFolderName('');
-      setFolderOpen(false);
+      await documentService.createFolder(nom, parentId);
       await loadFolders();
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur création dossier');
+      throw err;
     }
   };
 
-  const handleFolderFilter = (e) => {
-    const v = e.target.value;
-    setFilters((f) => ({ ...f, dossier_id: v }));
+  const handleRenameFolder = async (id, nom) => {
+    setError('');
+    try {
+      await documentService.renameFolder(id, nom);
+      await loadFolders();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur renommage dossier');
+      throw err;
+    }
+  };
+
+  const handleMoveFolder = async (id, parentId) => {
+    setError('');
+    try {
+      await documentService.moveFolder(id, parentId);
+      await loadFolders();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur déplacement dossier');
+      throw err;
+    }
+  };
+
+  const handleDeleteFolder = async (id, recursif = false) => {
+    setError('');
+    try {
+      const res = await documentService.deleteFolder(id, recursif);
+      // Les documents ne sont pas supprimés avec leur dossier, ils sont
+      // déclassés. Le taire donnerait l'impression d'une perte de données.
+      if (res?.documents_declasses > 0) {
+        toast.success(`Dossier supprimé — ${res.documents_declasses} document(s) déclassé(s)`);
+      }
+      // Le dossier supprimé peut être celui qui filtre la liste : sans cette
+      // remise à zéro, la vue reste filtrée sur un dossier inexistant et
+      // paraît vide.
+      if (String(filters.dossier_id) === String(id)) {
+        setFilters((f) => ({ ...f, dossier_id: '' }));
+        setPage(1);
+      }
+      await Promise.all([loadFolders(), load()]);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur suppression dossier');
+      throw err;
+    }
+  };
+
+  const handleFolderFilter = (v) => {
+    setFilters((f) => ({ ...f, dossier_id: v == null ? '' : String(v) }));
     setPage(1);
   };
 
@@ -220,44 +313,48 @@ const DocumentsPage = () => {
   return (
     <div className="px-4 sm:px-6 md:px-8 py-6 md:py-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 animate-fade-in-down">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <FolderOpen className="text-docuflow-secondary" size={24} />
-                Documents
-              </h1>
-              <p className="text-sm text-slate-400 font-medium">Référentiel documentaire — recherche, classement et versions</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-docuflow-secondary shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-              >
-                Liste standard
-              </button>
-              <button
-                onClick={() => setViewMode('dynamic')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'dynamic' ? 'bg-white text-docuflow-secondary shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-              >
-                📊 Vues Dynamiques (M-Files)
-              </button>
-            </div>
-            {isAdmin && (
-              <>
-                <button onClick={() => setShowAssembly(true)} className="btn-secondary flex items-center gap-1.5 text-xs">
-                  🪄 Assemblage M-Files
+        <PageHeader
+          title="Documents"
+          subtitle="Référentiel documentaire — recherche, classement et versions"
+          icon={FolderOpen}
+          breadcrumb={[
+            { label: 'Tableau de bord', to: '/dashboard' },
+            { label: 'Documents' },
+          ]}
+          actions={
+            <>
+              {/* La primitive .segmented porte l'état sur aria-pressed : le mode
+                  actif est ainsi annoncé aux lecteurs d'écran, alors qu'un simple
+                  fond blanc ne l'était que visuellement. */}
+              <div className="segmented">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  aria-pressed={viewMode === 'list'}
+                >
+                  <List size={14} /> Liste
                 </button>
-                <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn-primary flex items-center gap-2">
-                  <Plus size={18} /> Nouveau document
+                <button
+                  type="button"
+                  onClick={() => setViewMode('dynamic')}
+                  aria-pressed={viewMode === 'dynamic'}
+                >
+                  <LayoutGrid size={14} /> Vues dynamiques
                 </button>
-              </>
-            )}
-          </div>
-        </div>
+              </div>
+              {isAdmin && (
+                <>
+                  <button onClick={() => setShowAssembly(true)} className="btn btn-secondary">
+                    <Wand2 size={15} /> Assemblage de dossier
+                  </button>
+                  <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn btn-primary">
+                    <Plus size={18} /> Nouveau document
+                  </button>
+                </>
+              )}
+            </>
+          }
+        />
 
         {/* Toolbar */}
         <div className="glass-card-premium p-4 mb-6 space-y-4">
@@ -289,12 +386,18 @@ const DocumentsPage = () => {
               value={filters.annee}
               onChange={(e) => { setFilters((f) => ({ ...f, annee: e.target.value })); setPage(1); }}
             />
-            <select className="input-premium w-auto" value={filters.dossier_id} onChange={handleFolderFilter}>
+            {/* Le chemin complet, et non le seul nom : deux dossiers « 2025 »
+                sous deux parents différents seraient indiscernables. */}
+            <select className="input-premium w-auto max-w-64" value={filters.dossier_id}
+              onChange={(e) => handleFolderFilter(e.target.value)}>
               <option value="">Dossier : tous</option>
-              {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>{f.path || f.name}</option>
+              ))}
             </select>
-            <button onClick={() => setFolderOpen((v) => !v)} className="btn-secondary flex items-center gap-2" title="Gérer les dossiers">
-              <FolderPlus size={16} /> Dossiers
+            <button onClick={() => setFolderOpen((v) => !v)}
+              className="btn btn-secondary" aria-pressed={folderOpen} title="Gérer l'arborescence des dossiers">
+              <FolderTreeIcon size={16} /> Dossiers
             </button>
           </div>
 
@@ -319,15 +422,23 @@ const DocumentsPage = () => {
           )}
 
           {folderOpen && (
-            <form onSubmit={handleCreateFolder} className="flex items-center gap-2 pt-2 border-t border-slate-100">
-              <input
-                className="input-premium flex-1"
-                placeholder="Nom du nouveau dossier (ex. Archives 2026)"
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
+            <div className="pt-3 border-t border-slate-100">
+              <FolderTree
+                dossiers={folders}
+                isAdmin={isAdmin}
+                dossierActif={filters.dossier_id}
+                onSelectionner={handleFolderFilter}
+                onCreer={handleCreateFolder}
+                onRenommer={handleRenameFolder}
+                onDeplacer={handleMoveFolder}
+                onSupprimer={handleDeleteFolder}
               />
-              <button type="submit" className="btn-primary">Créer</button>
-            </form>
+              {/* Le comportement n'est pas devinable : sélectionner « Archives »
+                  ramène aussi les documents de « Archives / 2025 ». */}
+              <p className="text-[11px] text-slate-400 mt-2">
+                Sélectionner un dossier affiche aussi les documents de ses sous-dossiers.
+              </p>
+            </div>
           )}
 
           <div className="text-xs text-slate-400 font-medium">
@@ -341,7 +452,7 @@ const DocumentsPage = () => {
           </div>
         )}
 
-        {/* Vues Dynamiques M-Files */}
+        {/* Vues dynamiques : regroupement par métadonnée */}
         {viewMode === 'dynamic' && (
           <div className="space-y-4">
             <div className="glass-card-premium p-4 space-y-3">
@@ -436,6 +547,7 @@ const DocumentsPage = () => {
                         acceptsDrop={isAdmin && !(activeGroupField === 'statut' && grp.group_name === UNCLASSIFIED_GROUP)}
                         isPending={pendingDropGroup === grp.group_name}
                         onOpenDocument={setDetailDoc}
+                        onApercuDocument={setApercuDoc}
                       />
                     </div>
                   ))}
@@ -542,8 +654,17 @@ const DocumentsPage = () => {
           documentId={detailDoc}
           isAdmin={isAdmin}
           folders={folders}
-          onClose={() => setDetailDoc(null)}
+          onClose={fermerFiche}
           onChanged={() => { load(); }}
+        />
+      )}
+      {apercuDoc && (
+        <DocumentPreviewLightbox
+          url={apercuDoc.apercu_url}
+          mimeType={apercuDoc.mime_type}
+          nomFichier={apercuDoc.original_name}
+          titre={`${apercuDoc.reference_mfile} — ${apercuDoc.nom_entreprise}`}
+          onClose={() => setApercuDoc(null)}
         />
       )}
     </div>

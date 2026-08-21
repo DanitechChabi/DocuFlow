@@ -1,62 +1,197 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   Système de design DocuFlow — refonte
+   ----------------------------------------------------------------------------
+   Deux règles gouvernent ce fichier.
+
+   1. TOUTE couleur d'accent DÉRIVE des cinq variables --color-docuflow-*.
+      ThemeManager les réécrit dans :root avec !important pour chaque
+      organisation. L'ancien fichier codait en dur rgba(59,130,246,…) dans les
+      anneaux de focus, les halos et les ombres : un client en thème Émeraude
+      obtenait une interface verte parsemée de focus bleus. color-mix() résout
+      la variable au moment du calcul, donc la dérivation suit le thème sans que
+      ThemeManager ait à injecter davantage de variables.
+
+   2. La DENSITÉ prime sur l'effet. Un archiviste balaie des centaines de lignes
+      par jour ; les cartes translucides et les rembourrages généreux réduisent
+      le nombre de documents visibles sans rien apporter à la lecture. Les
+      surfaces sont opaques, les hauteurs de ligne calibrées, le flou réservé
+      aux voiles de modale — là où il sépare deux plans au lieu de brouiller du
+      texte.
+   ============================================================================ */
+
 @theme {
+  /* Les cinq couleurs pilotées par organisation. Ne pas renommer : elles sont
+     l'interface entre le thème (base de données) et le CSS, et les utilitaires
+     Tailwind bg-docuflow-* / text-docuflow-* en sont générés. */
   --color-docuflow-primary: #0f172a;
-  --color-docuflow-secondary: #3b82f6;
+  --color-docuflow-secondary: #2563eb;
   --color-docuflow-accent: #f8fafc;
   --color-docuflow-dark: #1e293b;
-  --color-docuflow-gold: #d4af37;
+  --color-docuflow-gold: #b8860b;
 
-  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-elevated: 0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
-  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.25);
-  --shadow-glow-primary: 0 0 20px rgba(15, 23, 42, 0.2);
+  /* Élévation — quatre niveaux, pas davantage. Une échelle plus fine ne se
+     distingue pas à l'œil et finit appliquée au hasard. */
+  --shadow-flat: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-raised: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-floating: 0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-overlay: 0 24px 48px -12px rgba(15, 23, 42, 0.18), 0 8px 16px -8px rgba(15, 23, 42, 0.12);
+
+  /* Alias conservés : ces noms sont utilisés dans les composants existants
+     (shadow-premium, shadow-elevated…). Les redéfinir ici évite d'éditer
+     chaque fichier pour un gain nul. */
+  --shadow-premium: var(--shadow-raised);
+  --shadow-glass: var(--shadow-floating);
+  --shadow-elevated: var(--shadow-overlay);
+  --shadow-glow-blue: 0 0 0 3px color-mix(in srgb, var(--color-docuflow-secondary) 18%, transparent);
+  --shadow-glow-primary: 0 0 0 3px color-mix(in srgb, var(--color-docuflow-primary) 18%, transparent);
+}
+
+/* ----------------------------------------------------------------------------
+   Jetons dérivés
+   ----------------------------------------------------------------------------
+   Déclarés hors @theme : ce sont des valeurs calculées à l'exécution, pas des
+   entrées du générateur d'utilitaires Tailwind. Les placer dans @theme
+   produirait des classes utilitaires inutiles pour chacune.
+   ---------------------------------------------------------------------------- */
+:root {
+  /* Teintes de l'accent, du voile au plein. Employées pour les états (survol,
+     sélection, focus) : elles restent lisibles quel que soit le thème, car un
+     mélange vers `transparent` conserve la teinte du client. */
+  --df-accent-02: color-mix(in srgb, var(--color-docuflow-secondary) 4%, transparent);
+  --df-accent-05: color-mix(in srgb, var(--color-docuflow-secondary) 8%, transparent);
+  --df-accent-10: color-mix(in srgb, var(--color-docuflow-secondary) 14%, transparent);
+  --df-accent-20: color-mix(in srgb, var(--color-docuflow-secondary) 24%, transparent);
+  --df-accent-40: color-mix(in srgb, var(--color-docuflow-secondary) 45%, transparent);
+
+  /* Neutres. Volontairement légèrement bleutés pour s'accorder à n'importe
+     quelle teinte d'accent sans jurer, contrairement à un gris pur. */
+  --df-surface: #ffffff;
+  --df-surface-sunken: #f8fafc;
+  --df-surface-hover: #f1f5f9;
+  --df-border: #e2e8f0;
+  --df-border-strong: #cbd5e1;
+  --df-text: #0f172a;
+  --df-text-muted: #64748b;
+  --df-text-faint: #94a3b8;
+
+  /* Statuts — indépendants du thème : le vert d'un succès ne doit pas virer au
+     rouge parce que l'organisation a choisi une charte corail. */
+  --df-ok: #047857;
+  --df-ok-bg: #ecfdf5;
+  --df-warn: #b45309;
+  --df-warn-bg: #fffbeb;
+  --df-danger: #b91c1c;
+  --df-danger-bg: #fef2f2;
+  --df-info: #1d4ed8;
+  --df-info-bg: #eff6ff;
+
+  /* Rayon — piloté par le réglage `border_radius` du catalogue. La valeur par
+     défaut du catalogue est 12 px ; les composants s'y réfèrent au lieu de
+     répéter des rem, pour qu'un changement de réglage soit réellement global. */
+  --df-radius: 12px;
+  --df-radius-sm: calc(var(--df-radius) * 0.5);
+  --df-radius-lg: calc(var(--df-radius) * 1.5);
+
+  /* Densité — hauteur d'une ligne de tableau. Réduite de 64 px à 44 px : à
+     hauteur d'écran égale, l'archiviste voit environ deux fois plus de
+     documents, ce qui est le geste métier dominant. */
+  --df-row-h: 2.75rem;
+  --df-control-h: 2.5rem;
+
+  /* Courbe d'accélération unique. Plusieurs courbes concurrentes donnent une
+     interface qui « respire » de façon incohérente d'un composant à l'autre. */
+  --df-ease: cubic-bezier(0.2, 0, 0, 1);
+  --df-duration: 160ms;
 }
 
 @layer base {
   body {
-    background-color: var(--color-slate-50);
-    color: var(--color-slate-900);
+    background-color: var(--df-surface-sunken);
+    color: var(--df-text);
     -webkit-font-smoothing: antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    /* Chiffres à chasse fixe : dans un tableau de références et de montants,
+       des chiffres proportionnels désalignent les colonnes d'une ligne à
+       l'autre et rendent la comparaison verticale pénible. */
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9375rem;
+    line-height: 1.5;
   }
 
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  /* Hiérarchie typographique. L'ancienne interface employait font-black (900)
+     jusque dans les libellés de champ : tout criait, donc plus rien ne
+     ressortait. Le poids maximal est ramené à 650 et la hiérarchie repose sur
+     la taille et la couleur. */
+  h1, h2, h3, h4 {
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    color: var(--df-text);
+  }
+  h1 { font-size: 1.5rem; line-height: 1.25; }
+  h2 { font-size: 1.1875rem; line-height: 1.3; }
+  h3 { font-size: 1rem; line-height: 1.4; }
+  h4 { font-size: 0.875rem; line-height: 1.4; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-slate-300);
+    background: var(--df-border-strong);
     border-radius: 9999px;
+    /* La bordure transparente amincit visuellement la poignée tout en gardant
+       une cible de 10 px : confortable à la souris, discrète à l'œil. */
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-slate-400);
+  ::-webkit-scrollbar-thumb:hover { background: var(--df-text-faint); background-clip: content-box; }
+
+  /* Focus visible dérivé du thème. Le double anneau (blanc puis accent) reste
+     perceptible aussi bien sur fond clair que sur une surface colorée. */
+  *:focus-visible {
+    outline: 2px solid var(--color-docuflow-secondary);
+    outline-offset: 2px;
+    border-radius: var(--df-radius-sm);
   }
 
-  *:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 0 4px white;
+  /* Respect de la préférence système. Sans cela, les animations d'entrée
+     déclenchent des nausées chez les personnes sensibles au mouvement — et la
+     GED est un outil de travail quotidien, pas une vitrine. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-/* =========== KEYFRAMES =========== */
+/* =========== ANIMATIONS =========== */
+/* Les noms sont conservés à l'identique : ils sont référencés des centaines de
+   fois dans les pages. Seules les durées et l'amplitude changent — les
+   déplacements sont divisés par deux, une interface de production devant
+   paraître instantanée plutôt que démonstrative. */
+
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fade-in-down {
-  from { opacity: 0; transform: translateY(-12px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fade-in-left {
-  from { opacity: 0; transform: translateX(-12px); }
+  from { opacity: 0; transform: translateX(-6px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes fade-in-right {
-  from { opacity: 0; transform: translateX(12px); }
+  from { opacity: 0; transform: translateX(6px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.98); }
   to   { opacity: 1; transform: scale(1); }
 }
 @keyframes slide-in-right {
@@ -69,334 +204,758 @@
 }
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.6; }
+  50%      { opacity: 0.55; }
 }
 @keyframes glow-pulse {
-  0%, 100% { opacity: 0.4; filter: blur(16px); }
-  50%      { opacity: 0.7; filter: blur(20px); }
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.6; }
 }
 @keyframes float {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+  50%      { transform: translateY(-4px); }
 }
 @keyframes spinner {
   to { transform: rotate(360deg); }
 }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 @keyframes docuflow-ring-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 0 20px 4px rgba(59, 130, 246, 0.45); }
-  50%      { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.4), 0 0 34px 8px rgba(59, 130, 246, 0.65); }
+  0%, 100% { box-shadow: 0 0 0 4px var(--df-accent-20); }
+  50%      { box-shadow: 0 0 0 7px var(--df-accent-10); }
 }
 
-/* =========== UTILITY CLASSES =========== */
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out both;
-}
-.animate-fade-in-down {
-  animation: fade-in-down 0.4s ease-out both;
-}
-.animate-fade-in-left {
-  animation: fade-in-left 0.4s ease-out both;
-}
-.animate-fade-in-right {
-  animation: fade-in-right 0.4s ease-out both;
-}
-.animate-scale-in {
-  animation: scale-in 0.35s ease-out both;
-}
-.animate-slide-in-right {
-  animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
+.animate-fade-in-up     { animation: fade-in-up 0.32s var(--df-ease) both; }
+.animate-fade-in-down   { animation: fade-in-down 0.28s var(--df-ease) both; }
+.animate-fade-in-left   { animation: fade-in-left 0.28s var(--df-ease) both; }
+.animate-fade-in-right  { animation: fade-in-right 0.28s var(--df-ease) both; }
+.animate-scale-in       { animation: scale-in 0.22s var(--df-ease) both; }
+.animate-slide-in-right { animation: slide-in-right 0.28s var(--df-ease) both; }
+.animate-pulse-soft     { animation: pulse-soft 2s ease-in-out infinite; }
+.animate-glow-pulse     { animation: glow-pulse 3s ease-in-out infinite; }
+.animate-float          { animation: float 3s ease-in-out infinite; }
+.animate-toast-in       { animation: toast-in 0.24s var(--df-ease) both; }
 .animate-shimmer {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background: linear-gradient(90deg, var(--df-surface-sunken) 25%, var(--df-surface-hover) 50%, var(--df-surface-sunken) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-.animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
-}
-.animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+  animation: shimmer 1.4s ease-in-out infinite;
 }
 
-/* Anneau du tour d'onboarding — désigne l'élément mis en avant (spotlight sans flèche) */
+/* Anneau du tour d'accueil — désigne l'élément mis en avant. */
 .docuflow-ring {
-  border: 3px solid #3b82f6;
+  border: 2px solid var(--color-docuflow-secondary);
+  border-radius: var(--df-radius);
   animation: docuflow-ring-pulse 1.6s ease-in-out infinite;
 }
 
-.delay-100 { animation-delay: 100ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-400 { animation-delay: 400ms; }
-.delay-500 { animation-delay: 500ms; }
+/* Les délais en cascade restent utiles pour l'apparition d'une liste : ils
+   suggèrent l'ordre de lecture. Raccourcis pour ne pas retarder l'affichage
+   complet au-delà d'un tiers de seconde. */
+.delay-100 { animation-delay: 60ms; }
+.delay-200 { animation-delay: 120ms; }
+.delay-300 { animation-delay: 180ms; }
+.delay-400 { animation-delay: 240ms; }
+.delay-500 { animation-delay: 300ms; }
 
-/* =========== COMPONENT CLASSES =========== */
+/* =========== SURFACES =========== */
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1rem;
-  box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+/* Carte standard. `glass-card` et `glass-card-premium` conservent leur nom
+   (près de cinquante usages) mais perdent la translucidité : un fond
+   semi-transparent sur une page qui défile laisse transparaître le contenu
+   sous-jacent, ce qui dégrade le contraste du texte de façon imprévisible. */
+.glass-card,
+.glass-card-premium,
+.surface {
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-lg);
+  box-shadow: var(--shadow-raised);
+  transition: border-color var(--df-duration) var(--df-ease),
+              box-shadow var(--df-duration) var(--df-ease);
 }
-.glass-card:hover {
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-}
-
-.glass-card-premium {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-  border-radius: 1rem;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
+.glass-card:hover,
 .glass-card-premium:hover {
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.1);
-  border-color: rgba(59, 130, 246, 0.2);
-  transform: translateY(-2px);
+  border-color: var(--df-border-strong);
+  box-shadow: var(--shadow-floating);
 }
 
+/* Surface encastrée — zones de dépôt, aperçus, panneaux secondaires. */
+.surface-sunken {
+  background: var(--df-surface-sunken);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+}
+
+/* Bandeau d'outils au-dessus d'une liste : filtres, recherche, actions
+   groupées. Collant, car les actions groupées doivent rester atteignables
+   pendant le défilement d'une longue sélection. */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.625rem 0.875rem;
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: var(--shadow-flat);
+}
+
+/* =========== BOUTONS =========== */
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--df-control-h);
+  padding: 0 0.9375rem;
+  border-radius: var(--df-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color var(--df-duration) var(--df-ease),
+              border-color var(--df-duration) var(--df-ease),
+              color var(--df-duration) var(--df-ease),
+              box-shadow var(--df-duration) var(--df-ease);
+}
+
+/* L'action principale porte la couleur primaire de l'organisation. */
 .btn-primary {
   background-color: var(--color-docuflow-primary);
-  color: white;
-  border-radius: 0.75rem;
-  font-weight: 700;
-  padding: 0.75rem 1.5rem;
-  transition: all 0.2s;
+  color: #ffffff;
+  box-shadow: var(--shadow-flat);
 }
-.btn-primary:hover {
-  background-color: var(--color-docuflow-dark);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  transform: translateY(-1px);
+.btn-primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-docuflow-primary) 88%, #ffffff);
+  box-shadow: var(--shadow-raised);
 }
-.btn-primary:active {
-  transform: scale(0.97);
-}
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-primary:disabled:hover {
+.btn-primary:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-docuflow-primary) 92%, #000000);
   box-shadow: none;
-  transform: none;
 }
 
 .btn-secondary {
-  background-color: white;
-  color: var(--color-slate-700);
-  border: 1px solid var(--color-slate-200);
-  border-radius: 0.75rem;
-  font-weight: 700;
-  padding: 0.75rem 1.5rem;
-  transition: all 0.2s;
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  border-color: var(--df-border);
+  box-shadow: var(--shadow-flat);
 }
-.btn-secondary:hover {
-  background-color: var(--color-slate-50);
-  border-color: var(--color-slate-300);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--df-surface-hover);
+  border-color: var(--df-border-strong);
 }
-.btn-secondary:active {
-  transform: scale(0.97);
+.btn-secondary:active:not(:disabled) {
+  background-color: var(--df-border);
 }
 
-/* Champs de formulaire — base unique.
-   Placés dans @layer components (pattern Tailwind v4) pour que les utilitaires
-   (pl-12, pr-12, …) puissent les surcharger. Hors layer, ils les écraseraient. */
+/* Bouton discret — actions de ligne, barres d'outils denses. Sans bordure au
+   repos pour ne pas saturer un tableau de traits verticaux. */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--df-text-muted);
+}
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--df-surface-hover);
+  color: var(--df-text);
+}
+
+/* Action destructrice. Le rouge ne vient pas du thème : une suppression doit
+   rester identifiable quelle que soit la charte du client. */
+.btn-danger {
+  background-color: var(--df-danger);
+  color: #ffffff;
+}
+.btn-danger:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--df-danger) 88%, #000000);
+}
+
+.btn:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled,
+.btn-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-sm { height: 2rem; padding: 0 0.625rem; font-size: 0.8125rem; gap: 0.375rem; }
+.btn-lg { height: 2.875rem; padding: 0 1.25rem; font-size: 0.9375rem; }
+
+/* Bouton purement iconique — carré, pour que la cible reste conforme aux
+   recommandations d'accessibilité même sans libellé. */
+.btn-icon {
+  width: var(--df-control-h);
+  padding: 0;
+  flex-shrink: 0;
+}
+.btn-icon.btn-sm { width: 2rem; }
+
+/* =========== CHAMPS DE FORMULAIRE =========== */
+/* Dans @layer components (motif Tailwind v4) pour que les utilitaires posés sur
+   l'élément — pl-12 quand une icône précède le texte, pr-12 pour un bouton en
+   suffixe — puissent surcharger le rembourrage. Hors layer, la spécificité de
+   la classe l'emporterait sur l'utilitaire et l'icône chevaucherait la saisie. */
 @layer components {
   .input-premium {
     width: 100%;
     box-sizing: border-box;
-    min-height: 3rem;
-    padding: 0.625rem 1rem;
-    background-color: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: 0.75rem;
+    height: var(--df-control-h);
+    min-height: var(--df-control-h);
+    padding: 0 0.75rem;
+    background-color: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
     outline: none;
-    transition: all 0.2s;
-    color: var(--color-slate-800);
-    font-size: 1rem;
-    font-weight: 500;
-    line-height: 1.5rem;
+    color: var(--df-text);
+    font-size: 0.875rem;
+    font-weight: 450;
+    line-height: 1.5;
+    transition: border-color var(--df-duration) var(--df-ease),
+                box-shadow var(--df-duration) var(--df-ease);
   }
-  input.input-premium {
-    height: 3rem;
+  textarea.input-premium {
+    height: auto;
+    min-height: 5rem;
+    padding: 0.5rem 0.75rem;
+    resize: vertical;
   }
   select.input-premium {
-    height: 3rem;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    /* Le chevron est encodé en data-URI : une icône SVG externe ajouterait une
+       requête réseau pour chaque champ de sélection. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 0.875rem center;
+    background-position: right 0.625rem center;
     background-size: 1rem;
-    padding-right: 2.5rem;
+    padding-right: 2.25rem;
     cursor: pointer;
   }
-  .input-premium::placeholder {
-    color: var(--color-slate-300);
-  }
+  .input-premium::placeholder { color: var(--df-text-faint); }
+  .input-premium:hover:not(:focus):not(:disabled) { border-color: var(--df-border-strong); }
   .input-premium:focus {
     border-color: var(--color-docuflow-secondary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 3px var(--df-accent-10);
+  }
+  /* Champ en erreur : la couleur seule ne suffit pas pour un daltonien, d'où le
+     message associé (.field-error) que les formulaires doivent afficher. */
+  .input-premium[aria-invalid='true'] {
+    border-color: var(--df-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--df-danger) 12%, transparent);
   }
 
-  .input-disabled {
+  .input-disabled,
+  .input-premium:disabled {
     width: 100%;
     box-sizing: border-box;
-    min-height: 3rem;
-    padding: 0.625rem 1rem;
-    background-color: var(--color-slate-100);
-    border: 1px solid var(--color-slate-200);
-    border-radius: 0.75rem;
-    color: var(--color-slate-400);
-    font-size: 1rem;
-    font-weight: 500;
-    line-height: 1.5rem;
+    height: var(--df-control-h);
+    min-height: var(--df-control-h);
+    padding: 0 0.75rem;
+    background-color: var(--df-surface-sunken);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-text-faint);
+    font-size: 0.875rem;
+    font-weight: 450;
+    line-height: 1.5;
     cursor: not-allowed;
+  }
+
+  /* Libellé de champ. L'ancien style — majuscules, interlettrage large, graisse
+     900 — occupait plus de place visuelle que la valeur qu'il annonçait. */
+  .field-label {
+    display: block;
+    margin-bottom: 0.3125rem;
+    font-size: 0.8125rem;
+    font-weight: 550;
+    color: var(--df-text-muted);
+  }
+  .field-label[data-required]::after {
+    content: ' *';
+    color: var(--df-danger);
+    font-weight: 600;
+  }
+  .field-hint {
+    margin-top: 0.3125rem;
+    font-size: 0.75rem;
+    color: var(--df-text-faint);
+  }
+  .field-error {
+    margin-top: 0.3125rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--df-danger);
   }
 }
 
-/* Status badges */
-.status-badge {
+/* Case à cocher — indispensable à la sélection multiple, absente de l'ancienne
+   interface. Dimensionnée à 1 rem pour rester cliquable sans dominer la ligne. */
+.checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border: 1.5px solid var(--df-border-strong);
+  border-radius: 4px;
+  background-color: var(--df-surface);
+  cursor: pointer;
+  transition: background-color var(--df-duration) var(--df-ease),
+              border-color var(--df-duration) var(--df-ease);
+}
+.checkbox:hover { border-color: var(--color-docuflow-secondary); }
+.checkbox:checked,
+.checkbox:indeterminate {
+  background-color: var(--color-docuflow-secondary);
+  border-color: var(--color-docuflow-secondary);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.75rem;
+}
+.checkbox:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+}
+/* État indéterminé : en-tête de tableau lorsqu'une partie seulement des lignes
+   est sélectionnée. Sans lui, la case d'en-tête ment sur l'état de la sélection. */
+.checkbox:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round'%3E%3Cline x1='6' y1='12' x2='18' y2='12'%3E%3C/line%3E%3C/svg%3E");
+}
+
+/* =========== TABLEAU DE DONNÉES =========== */
+/* Le cœur d'une GED. Trois exigences : lignes denses, en-tête figé pendant le
+   défilement, et colonnes alignées sur des chiffres tabulaires. */
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* Fond opaque obligatoire : en sticky, les lignes défilent SOUS l'en-tête et
+     transparaîtraient à travers un fond translucide. */
+  background: var(--df-surface-sunken);
+  padding: 0 0.75rem;
+  height: 2.25rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--df-text-muted);
+  border-bottom: 1px solid var(--df-border);
+  white-space: nowrap;
+  user-select: none;
+}
+.data-table thead th[aria-sort] { cursor: pointer; }
+.data-table thead th[aria-sort]:hover { color: var(--df-text); background: var(--df-surface-hover); }
+.data-table tbody td {
+  height: var(--df-row-h);
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--df-border);
+  color: var(--df-text);
+  vertical-align: middle;
+}
+.data-table tbody tr {
+  transition: background-color var(--df-duration) var(--df-ease);
+}
+.data-table tbody tr:hover { background-color: var(--df-accent-02); }
+/* Ligne sélectionnée : teinte d'accent plus marquée, et liseré à gauche pour
+   que la sélection reste perceptible en niveaux de gris. */
+.data-table tbody tr[aria-selected='true'] { background-color: var(--df-accent-05); }
+.data-table tbody tr[aria-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--color-docuflow-secondary);
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* Cellule numérique ou de référence — alignée à droite pour comparer les
+   ordres de grandeur d'un coup d'œil. */
+.data-table .cell-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Cellule d'actions : ne déclenche pas l'ouverture de la ligne. */
+.data-table .cell-actions { width: 1%; white-space: nowrap; text-align: right; }
+
+/* Ligne cliquable. `tabindex` et le gestionnaire clavier restent à la charge du
+   composant : le style seul ne rend pas une ligne atteignable au clavier. */
+.row-clickable { cursor: pointer; }
+.row-clickable:focus-visible {
+  outline: 2px solid var(--color-docuflow-secondary);
+  outline-offset: -2px;
+}
+
+/* Conservé : l'indicateur de survol de l'ancienne interface. */
+tr.hover-indicator:hover td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--color-docuflow-secondary);
+}
+
+/* =========== BADGES & PASTILLES =========== */
+
+.status-badge,
+.badge {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.25rem 0.75rem;
+  padding: 0.125rem 0.5rem;
+  height: 1.375rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 550;
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
 .status-badge::before {
   content: '';
   width: 0.375rem;
   height: 0.375rem;
   border-radius: 9999px;
+  flex-shrink: 0;
+  background-color: currentColor;
 }
 
-.status-badge-pending {
-  background-color: #fff7ed;
-  color: #ea580c;
-  border: 1px solid #fed7aa;
-}
-.status-badge-pending::before { background-color: #ea580c; }
+/* Les six statuts métier. Les couleurs sont fixes (voir --df-ok et suivants) :
+   un statut « rejeté » doit rester rouge même sous une charte verte. */
+.status-badge-pending     { background-color: var(--df-warn-bg);   color: var(--df-warn);   border-color: color-mix(in srgb, var(--df-warn) 22%, transparent); }
+.status-badge-progress    { background-color: #f5f3ff;             color: #6d28d9;          border-color: color-mix(in srgb, #6d28d9 22%, transparent); }
+.status-badge-transmitted { background-color: var(--df-ok-bg);     color: var(--df-ok);     border-color: color-mix(in srgb, var(--df-ok) 22%, transparent); }
+.status-badge-delivered   { background-color: var(--df-info-bg);   color: var(--df-info);   border-color: color-mix(in srgb, var(--df-info) 22%, transparent); }
+.status-badge-rejected    { background-color: var(--df-danger-bg); color: var(--df-danger); border-color: color-mix(in srgb, var(--df-danger) 22%, transparent); }
+.status-badge-annulled    { background-color: var(--df-surface-hover); color: var(--df-text-muted); border-color: var(--df-border); }
 
-.status-badge-progress {
-  background-color: #faf5ff;
-  color: #9333ea;
-  border: 1px solid #e9d5ff;
-}
-.status-badge-progress::before { background-color: #9333ea; }
+/* Badges neutres, sans pastille — comptages, types, versions. */
+.badge-neutral { background-color: var(--df-surface-hover); color: var(--df-text-muted); border-color: var(--df-border); }
+.badge-accent  { background-color: var(--df-accent-05); color: var(--color-docuflow-secondary); border-color: var(--df-accent-20); }
+.badge-ok      { background-color: var(--df-ok-bg); color: var(--df-ok); }
+.badge-warn    { background-color: var(--df-warn-bg); color: var(--df-warn); }
+.badge-danger  { background-color: var(--df-danger-bg); color: var(--df-danger); }
 
-.status-badge-transmitted {
-  background-color: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
+/* Étiquette supprimable — mots-clés, filtres actifs. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.625rem;
+  padding: 0 0.5rem;
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-surface-hover);
+  border: 1px solid var(--df-border);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--df-text);
 }
-.status-badge-transmitted::before { background-color: #16a34a; }
-
-.status-badge-delivered {
-  background-color: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+.chip button {
+  display: inline-flex;
+  color: var(--df-text-faint);
+  cursor: pointer;
+  transition: color var(--df-duration) var(--df-ease);
 }
-.status-badge-delivered::before { background-color: #2563eb; }
+.chip button:hover { color: var(--df-danger); }
 
-.status-badge-rejected {
-  background-color: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+/* =========== SÉLECTEUR SEGMENTÉ =========== */
+/* Bascule entre modes d'affichage (liste / vues dynamiques). Préféré à deux
+   boutons distincts : l'exclusivité mutuelle est visible dans la forme. */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background-color: var(--df-surface-hover);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
 }
-.status-badge-rejected::before { background-color: #dc2626; }
-
-.status-badge-annulled {
-  background-color: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
+.segmented > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.625rem;
+  border-radius: calc(var(--df-radius-sm) - 2px);
+  font-size: 0.8125rem;
+  font-weight: 550;
+  color: var(--df-text-muted);
+  cursor: pointer;
+  transition: background-color var(--df-duration) var(--df-ease),
+              color var(--df-duration) var(--df-ease);
 }
-.status-badge-annulled::before { background-color: #64748b; }
+.segmented > button:hover { color: var(--df-text); }
+.segmented > button[aria-pressed='true'] {
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  box-shadow: var(--shadow-flat);
+}
 
-/* Skeleton */
+/* =========== MODALES =========== */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  /* Le flou est ici justifié : il éloigne le plan de l'arrière-plan sans en
+     masquer le contexte, et aucun texte n'a besoin d'y rester lisible. */
+  background-color: color-mix(in srgb, var(--color-docuflow-primary) 32%, transparent);
+  backdrop-filter: blur(3px);
+  animation: fade-in-up 0.18s var(--df-ease) both;
+}
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 90vh;
+  background: var(--df-surface);
+  border-radius: var(--df-radius-lg);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  animation: scale-in 0.2s var(--df-ease) both;
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.125rem;
+  border-bottom: 1px solid var(--df-border);
+  flex-shrink: 0;
+}
+.dialog-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.125rem;
+}
+/* Pied collant : sur un formulaire long, les boutons d'enregistrement doivent
+   rester accessibles sans dérouler jusqu'en bas. */
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.125rem;
+  border-top: 1px solid var(--df-border);
+  background: var(--df-surface-sunken);
+  flex-shrink: 0;
+}
+
+/* =========== APERÇU DE DOCUMENT =========== */
+/* Vignette employée dans les vues dynamiques et les cartes de document. Le
+   rapport 4/3 est imposé par le CSS plutôt que par les dimensions du fichier :
+   sans cela, chaque carte prend une hauteur différente et la grille se
+   disloque au chargement des images. */
+.doc-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-surface-sunken);
+  border: 1px solid var(--df-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.doc-thumb img,
+.doc-thumb iframe,
+.doc-thumb canvas {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.doc-thumb img { object-fit: cover; object-position: top center; }
+/* Le PDF est rendu dans un iframe non interactif : sans cette neutralisation,
+   la molette défile le document au lieu de la liste, et le glisser-déposer de
+   la carte est capté par le lecteur intégré. */
+.doc-thumb iframe { pointer-events: none; }
+.doc-thumb-empty {
+  flex-direction: column;
+  gap: 0.375rem;
+  color: var(--df-text-faint);
+  font-size: 0.75rem;
+}
+/* Voile d'actions au survol de la vignette (ouvrir, télécharger). */
+.doc-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  opacity: 0;
+  background-color: color-mix(in srgb, var(--color-docuflow-primary) 55%, transparent);
+  transition: opacity var(--df-duration) var(--df-ease);
+}
+.doc-thumb:hover .doc-thumb-overlay,
+.doc-thumb:focus-within .doc-thumb-overlay { opacity: 1; }
+
+/* =========== INDICATEURS CHIFFRÉS =========== */
+
+/* Carte de statistique. Le tableau de bord et le portail de gestion système
+   dessinaient chacun la leur, à la main, avec des valeurs en font-black et des
+   tailles différentes (text-4xl ici, text-3xl là) : deux écrans censés donner la
+   même nature d'information ne se ressemblaient pas, et le chiffre criait plus
+   fort que le titre de la page.
+
+   Le libellé passe avant la valeur dans le DOM — un lecteur d'écran annonce
+   « En attente, 12 » et non « 12 » suivi d'un mot orphelin. */
+.stat-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: var(--shadow-flat);
+  transition: border-color var(--df-duration) var(--df-ease),
+              box-shadow var(--df-duration) var(--df-ease);
+}
+.stat-card:hover {
+  border-color: var(--df-border-strong);
+  box-shadow: var(--shadow-raised);
+}
+
+.stat-card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--df-text-muted);
+  /* Pas de majuscules forcées : « À TRAITER » perd son accent dans plusieurs
+     polices, et les capitales se lisent plus lentement qu'un bas-de-casse. */
+  letter-spacing: 0;
+}
+
+/* La valeur reste sous la taille du titre de page (1.5rem) : un compteur ne
+   prime pas sur l'endroit où l'on se trouve. */
+.stat-card-value {
+  margin-top: 0.125rem;
+  font-size: 1.375rem;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--df-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pastille d'icône. La couleur est passée en variables par l'appelant afin que
+   la sémantique (attente, rejet, livré) reste décidée par la page, pas ici. */
+.stat-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--df-radius-sm);
+  flex-shrink: 0;
+  background: var(--df-surface-hover);
+  color: var(--df-text-muted);
+}
+
+/* =========== ÉTATS =========== */
+
+/* Écran vide. Un tableau sans lignes et sans explication laisse croire à une
+   panne ; l'état vide doit nommer la cause et proposer l'action suivante. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--df-text-muted);
+}
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background-color: var(--df-surface-hover);
+  color: var(--df-text-faint);
+}
+
 .skeleton {
-  border-radius: 0.75rem;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  border-radius: var(--df-radius-sm);
+  background: linear-gradient(90deg, var(--df-surface-sunken) 25%, var(--df-surface-hover) 50%, var(--df-surface-sunken) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+  animation: shimmer 1.4s ease-in-out infinite;
 }
 
-/* Avatar circle */
 .avatar-circle {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 0.875rem;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.75rem;
   flex-shrink: 0;
+  user-select: none;
 }
 
-/* =========== UX IMPROVEMENTS =========== */
-
-/* Smooth scroll for the whole app */
-html {
-  scroll-behavior: smooth;
+/* Raccourci clavier affiché dans l'interface (Ctrl+K, Échap…). */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  background-color: var(--df-surface-hover);
+  border: 1px solid var(--df-border);
+  border-bottom-width: 2px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.6875rem;
+  color: var(--df-text-muted);
 }
 
-/* Remove tap highlight on mobile for a more app-like feel */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+/* =========== DIVERS =========== */
 
-/* Scrollbar for modals and panels */
-.modal-scrollbar::-webkit-scrollbar { width: 4px; }
-.modal-scrollbar::-webkit-scrollbar-thumb { background: var(--color-slate-200); border-radius: 9999px; }
-.modal-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-slate-300); }
+html { scroll-behavior: smooth; }
+* { -webkit-tap-highlight-color: transparent; }
+#root { min-height: 100dvh; }
 
-/* Better disabled button state */
-button:disabled, [disabled] {
-  cursor: not-allowed !important;
-}
+button:disabled, [disabled] { cursor: not-allowed; }
 
-/* Prevent layout shift on page transitions */
-#root {
-  min-height: 100dvh;
-}
+.modal-scrollbar::-webkit-scrollbar { width: 6px; }
+.modal-scrollbar::-webkit-scrollbar-thumb { background: var(--df-border-strong); border-radius: 9999px; }
+.modal-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--df-text-faint); }
 
-/* Textarea auto-resize helper */
-.textarea-auto {
-  field-sizing: content;
-  min-height: 3rem;
-  max-height: 12rem;
-}
-
-/* Scrollbar-none for horizontal scroll containers */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Better select dropdown arrow on Firefox */
-select.input-premium {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.875rem center;
-  background-size: 1rem;
+.textarea-auto {
+  field-sizing: content;
+  min-height: 2.5rem;
+  max-height: 12rem;
 }
 
-/* Table row hover indicator — subtle left border on hover */
-tr.hover-indicator:hover td:first-child {
-  box-shadow: inset 3px 0 0 0 var(--color-docuflow-secondary);
+/* Coupe le texte après N lignes — descriptions de documents en carte. */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Accessible hidden text */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -407,13 +966,4 @@ tr.hover-indicator:hover td:first-child {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
-}
-
-/* Toast animation */
-@keyframes toast-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.animate-toast-in {
-  animation: toast-in 0.3s ease-out both;
 }

@@ -16,15 +16,31 @@ Stratégie : **hybride** — frontend sur **Vercel** (gratuit), backend Express 
    - `DB_HOST` = HOST
    - `DB_PORT` = `5432`
    - `DB_NAME` = DBNAME (par défaut `neondb`)
-4. **Appliquer le schéma** (dans l'ordre) :
-   - `docs/setup_db.sql`
-   - `docs/migrations/001_multi_tenant.sql`
-   - `docs/migrations/002_file_attachments.sql`
+4. **Appliquer le schéma** : `docs/setup_db.sql`, puis TOUTES les migrations de
+   `docs/migrations/` dans l'ordre numérique (001 → 014). Elles sont idempotentes :
+   les réexécuter est sans effet.
 
-   Via l'éditeur **SQL Editor** de Neon (coller le contenu de chaque fichier et exécuter), ou en ligne de commande :
+   Via l'éditeur **SQL Editor** de Neon (coller le contenu de chaque fichier), ou
+   en ligne de commande :
    ```bash
    psql "postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f docs/setup_db.sql
+   for f in docs/migrations/*.sql; do
+     psql "postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f "$f"
+   done
    ```
+
+   Depuis `backend/`, avec `DATABASE_URL` déjà configurée dans `.env`, `run_sql.js`
+   cible la même base que l'application (SSL et Neon compris) :
+   ```bash
+   node run_sql.js ../docs/migrations/014_admin_deletion_rules.sql
+   ```
+
+   > N'utilisez PAS `backend/migrate.js` sur Neon : il ne lit que les variables
+   > `DB_*` et ignore `DATABASE_URL`, donc il viserait `localhost`.
+
+   Les migrations ne sont pas facultatives. Sans **014**, la suppression d'un
+   utilisateur ou d'une entreprise échoue en erreur de clé étrangère, et la purge
+   du journal d'audit est refusée par le trigger append-only.
 
 ---
 

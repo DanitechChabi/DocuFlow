@@ -642,4 +642,10 @@ module.exports = {
   // Utilitaires exposés pour les autres services / tests
   validateValue,
   slugify,
+  // Exporté pour requestFieldService, qui applique la même règle de préservation
+  // des `value` par libellé. Le dupliquer aurait dupliqué le piège documenté
+  // ci-dessus : deux copies de cette fonction, et la première corrigée seule
+  // laisserait l'autre re-slugifier les valeurs au moindre réordonnancement.
+  optionsToCanonical,
+  optionsToStrings,
 };

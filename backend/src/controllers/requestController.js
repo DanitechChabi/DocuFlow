@@ -5,9 +5,35 @@ const mailService = require('../services/mailService');
 const storage = require('../services/storageService');
 const { indexRequestToDocuments } = require('../services/documentIndexService');
 const auditService = require('../services/auditService');
+const settingsService = require('../services/settingsService');
+const requestFieldService = require('../services/requestFieldService');
+const catalog = require('../config/settingsCatalog');
+const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
+
+/**
+ * Listes de choix effectives de l'organisation (types de document, motifs,
+ * priorités), telles que le formulaire les propose.
+ *
+ * La validation côté serveur n'est pas une redite du formulaire : un client peut
+ * appeler l'API directement, et surtout un choix retiré par l'administrateur
+ * resterait insérable tant que rien ne le refuse ici. Sans ce contrôle, la
+ * colonne `type_document` accumulerait des valeurs absentes de toute liste, que
+ * les filtres et les regroupements de la GED ne sauraient plus rattacher.
+ */
+async function getRequestOptions(tenantId) {
+  const settings = await settingsService.getAll(tenantId);
+  const fallback = (key) => catalog.BY_KEY.get(key)?.default;
+
+  return {
+    documentTypes: normalizeOptions(settings.request_document_types, fallback('request_document_types')),
+    motifs: normalizeOptions(settings.request_motifs, fallback('request_motifs')),
+    priorities: normalizeOptions(settings.request_priorities, fallback('request_priorities'), { withTone: true }),
+    defaultPriority: settings.request_default_priority,
+  };
+}
 
 // Enregistre une étape horodatée dans request_history (machine à états)
 async function insertStateHistory(tenantId, { requestId, userId, userName, action, previousStatus, newStatus, comment }) {
@@ -63,16 +89,96 @@ exports.createRequest = async (req, res) => {
   const tenantId = req.user.tenant_id;
 
   try {
+    // Les trois champs à choix sont vérifiés contre les listes de l'organisation.
+    //
+    // Deux cas à ne pas confondre :
+    //   * champ ABSENT du corps → le serveur retient le choix par défaut. Le
+    //     formulaire présélectionne toujours motif et priorité ; un appel qui les
+    //     omet n'exprime aucune intention, et `motif` est NOT NULL en base.
+    //   * champ RENSEIGNÉ mais hors liste → refus. Réécrire en silence le motif
+    //     qu'un demandeur a choisi consignerait une raison qui n'est pas la
+    //     sienne : la demande partirait en traitement sous un prétexte inventé
+    //     par le serveur, et les tableaux de bord compteraient ce motif faux.
+    //     Un refus explicite fait recharger les listes au formulaire.
+    const options = await getRequestOptions(tenantId);
+
+    const typeFourni = String(type_document || '').trim();
+    // `type_document` reste facultatif — le formulaire l'ouvre sur
+    // « Sélectionner… » — mais s'il est renseigné il doit appartenir à la liste :
+    // une valeur libre échapperait ensuite aux filtres et aux regroupements de la
+    // GED, qui s'appuient sur cette colonne.
+    if (typeFourni && !allowedValues(options.documentTypes).includes(typeFourni)) {
+      return res.status(400).json({
+        message: `Type de document non proposé : « ${typeFourni} ».`,
+      });
+    }
+
+    const motifFourni = String(motif || '').trim();
+    if (motifFourni && !allowedValues(options.motifs).includes(motifFourni)) {
+      return res.status(400).json({ message: `Motif non proposé : « ${motifFourni} ».` });
+    }
+    const motifRetenu = motifFourni || options.motifs[0]?.value || null;
+    // La colonne est NOT NULL : sans motif retenu, l'insertion échouerait sur une
+    // violation de contrainte, c'est-à-dire une erreur 500 illisible pour le
+    // demandeur. Le cas suppose une liste de motifs vide malgré le repli sur le
+    // catalogue — donc un catalogue lui-même vidé —, mais il vaut un message clair.
+    if (!motifRetenu) {
+      return res.status(400).json({
+        message: 'Aucun motif de demande n\'est configuré pour votre organisation.',
+      });
+    }
+
+    const prioriteFournie = String(priorite || '').trim();
+    const prioritesAdmises = allowedValues(options.priorities);
+    if (prioriteFournie && !prioritesAdmises.includes(prioriteFournie)) {
+      return res.status(400).json({ message: `Priorité non proposée : « ${prioriteFournie} ».` });
+    }
+    // À défaut de priorité fournie, celle réglée par l'organisation — à condition
+    // qu'elle figure encore dans la liste, un administrateur pouvant avoir retiré
+    // le niveau désigné comme défaut sans corriger ce réglage.
+    const prioriteParDefaut = String(options.defaultPriority || '').trim();
+    const prioriteRetenue = prioriteFournie
+      || (prioritesAdmises.includes(prioriteParDefaut) ? prioriteParDefaut : options.priorities[0]?.value)
+      || null;
+
+    // Champs personnalisés ajoutés par l'organisation (migration 016). Ils sont
+    // validés AVANT l'insertion : un champ obligatoire manquant doit faire
+    // échouer la création, pas laisser en base une demande incomplète qu'aucun
+    // écran ne signale. Le service reste silencieux si la migration n'est pas
+    // passée — déployer avant de migrer ne doit pas empêcher d'enregistrer.
+    let champsPersonnalises = [];
+    if (await requestFieldService.isAvailable()) {
+      const { customValues, missing } = await requestFieldService.collectValues(tenantId, req.body);
+      if (missing.length) {
+        return res.status(400).json({ message: missing.join(' ') });
+      }
+      champsPersonnalises = customValues;
+    }
+
     // 1. Enregistrement de la demande (Statut : en attente)
     const newRequest = await tenantDb.insert(
       tenantId,
       'requests',
       ['id_user', 'nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'motif', 'priorite', 'statut'],
-      [userId, nom_entreprise, num_dossier, num_acte, annee, type_document, motif, priorite, 'en attente']
+      [userId, nom_entreprise, num_dossier, num_acte, annee, typeFourni || null, motifRetenu, prioriteRetenue, 'en attente']
     );
 
     const requestId = newRequest.rows[0].id;
     const requestRow = newRequest.rows[0];
+
+    // 1bis. Valeurs des champs personnalisés.
+    //
+    // Après l'insertion, faute de clé étrangère satisfaite avant elle. L'échec
+    // est journalisé sans interrompre : la demande existe et vaut mieux qu'un
+    // 500 qui laisserait le demandeur croire à une perte, alors que les champs
+    // système — ceux dont dépend le traitement — sont bien enregistrés.
+    if (champsPersonnalises.length) {
+      try {
+        await requestFieldService.saveValues(requestId, champsPersonnalises);
+      } catch (fieldErr) {
+        console.error('[request] valeurs des champs personnalisés non enregistrées :', fieldErr.message);
+      }
+    }
 
     // 2. Historique d'état initial (machine à états)
     await insertStateHistory(tenantId, {
@@ -130,7 +236,33 @@ exports.createRequest = async (req, res) => {
   }
 };
 
-exports.verifyMfile = async (req, res) => {
+/**
+ * Listes de choix du formulaire de demande.
+ *
+ * Le formulaire lit normalement ces valeurs depuis les réglages déjà chargés par
+ * SettingsContext ; cette route existe pour que la source de vérité reste
+ * unique et interrogeable — c'est elle qui fait autorité en cas de doute sur ce
+ * que le serveur accepte réellement, puisqu'elle applique la même normalisation
+ * que la validation de createRequest.
+ */
+exports.getRequestOptions = async (req, res) => {
+  try {
+    const options = await getRequestOptions(req.user.tenant_id);
+    res.json(options);
+  } catch (err) {
+    console.error('[request] getRequestOptions :', err.message);
+    res.status(500).json({ message: 'Erreur lors du chargement des listes de choix' });
+  }
+};
+
+/**
+ * Recherche, dans le référentiel documentaire, un document correspondant à une
+ * demande (même numéro de dossier ET même numéro d'acte).
+ *
+ * Sert à l'archiviste avant traitement : si le document est déjà indexé, la
+ * demande peut être satisfaite immédiatement sans nouvelle numérisation.
+ */
+exports.findMatchingDocument = async (req, res) => {
   const { id } = req.params;
   const tenantId = req.user.tenant_id;
 

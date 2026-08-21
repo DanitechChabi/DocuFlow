@@ -18,6 +18,7 @@ const metadataRoutes = require('./routes/metadataRoutes');
 const superadminRoutes = require('./routes/superadminRoutes');
 const groupRoutes = require('./routes/groupRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const licenseRoutes = require('./routes/licenseRoutes');
 
 const path = require('path');
 
@@ -38,6 +39,16 @@ const ALLOWED_ORIGINS = isDev
       process.env.APP_URL,
       'https://docuflow.vercel.app',
       'https://docuflow-afgc.vercel.app',
+      // Site vitrine : c'est LUI qui porte la page de tarifs et appelle
+      // /api/billing. Sans ces entrées, le bouton de paiement échouerait sur un
+      // refus CORS — et le navigateur n'en dirait rien d'exploitable au client.
+      // LANDING_URL permet d'ajouter les URL de prévisualisation Vercel sans
+      // toucher au code ; le domaine ci-dessous est celui des balises canonical
+      // du site vitrine (cf. useSEO.js), donc l'adresse réelle des acheteurs.
+      process.env.LANDING_URL,
+      'https://getdocuflow.vercel.app',
+      'https://docuflow-afgc.com',
+      'https://www.docuflow-afgc.com',
     ].filter(Boolean).flatMap((o) => o.includes(',') ? o.split(',').map((s) => s.trim()) : [o]);
 
 app.use(cors(
@@ -45,15 +56,38 @@ app.use(cors(
     ? { origin: true, credentials: true }
     : {
         origin: (origin, cb) => {
+          // Une origine refusée n'est PAS une erreur du serveur : rendre la main
+          // avec `false` laisse la requête continuer sans l'en-tête
+          // d'autorisation, et c'est le navigateur qui bloque la lecture de la
+          // réponse — le comportement attendu.
+          //
+          // Passer un Error ici, en revanche, le propulse jusqu'au gestionnaire
+          // global : 500 et pile d'appels dans les journaux, à chaque visiteur
+          // d'une origine inconnue. Le vrai incident (un déploiement dont
+          // l'URL n'est pas dans la liste) devient alors indiscernable d'une
+          // panne, et les journaux de Render se remplissent de bruit.
           if (!origin || ALLOWED_ORIGINS.includes(origin)) {
             cb(null, true);
           } else {
-            cb(new Error('Non autorisé par CORS'));
+            console.warn(`[cors] Origine refusée : ${origin}`);
+            cb(null, false);
           }
         },
         credentials: true,
       }
 ));
+// --- Facturation ----------------------------------------------------------
+// Monté AVANT express.json, et cet ordre est OBLIGATOIRE : les webhooks de
+// paiement vérifient une signature calculée sur les octets bruts du corps, et
+// body-parser ignore tout corps déjà consommé. Analyser le JSON en premier
+// remplirait req.body d'un objet et ferait échouer la vérification de TOUS les
+// paiements — sans erreur visible, juste des licences jamais émises.
+// Chaque route de billingRoutes déclare donc l'analyseur qui lui convient.
+//
+// Également avant licenseMiddleware : l'achat doit rester possible depuis un
+// poste dont la licence est précisément expirée.
+app.use('/api/billing', require('./routes/billingRoutes'));
+
 app.use(express.json({ limit: '10mb' }));
 
 // Dossier uploads en statique (logo)
@@ -67,6 +101,19 @@ app.use((req, res, next) => {
 
 const auditMiddleware = require('./middlewares/auditMiddleware');
 app.use(auditMiddleware);
+
+// --- Licence de bureau ---------------------------------------------------
+// Monté AVANT les routes métier : sans licence valide, aucune donnée ne sort.
+// Sans effet hors mode bureau (le middleware rend la main immédiatement si
+// SERVE_FRONTEND n'est pas 'true') — le SaaS Render n'est donc pas concerné.
+//
+// Les routes de l'écran de licence sont montées juste avant, pour qu'elles
+// restent joignables même quand la licence est refusée : c'est par elles que le
+// client saisit sa clé.
+if (process.env.SERVE_FRONTEND === 'true') {
+  app.use('/api/license', require('./routes/desktopLicenseRoutes'));
+}
+app.use(require('./middlewares/licenseMiddleware'));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -84,6 +131,10 @@ app.use('/api/metadata', metadataRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/audit', auditRoutes);
+// Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
+// au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
+// des licences est montée sous /api/superadmin, derrière ses trois middlewares.
+app.use('/api/licenses', licenseRoutes);
 
 // Dossier des fichiers uploadés (local + sous-dossier documents)
 app.use('/uploads/files', express.static(FILES_DIR));

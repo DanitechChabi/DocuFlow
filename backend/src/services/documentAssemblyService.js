@@ -1,5 +1,5 @@
 /**
- * DocumentAssemblyService — Assemblage automatique de documents M-Files
+ * DocumentAssemblyService — Assemblage automatique de documents
  * Génère des documents à partir de modèles de texte/HTML et de variables de métadonnées.
  */
 

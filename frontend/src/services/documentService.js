@@ -41,12 +41,16 @@ export const documentService = {
     return response.data;
   },
 
-  // Dossiers
+  // Dossiers — arborescence. `getFolders` renvoie une liste PLATE mais ordonnée
+  // en parcours d'arbre, chaque entrée portant `parent_id`, `depth`, `path` et
+  // `path_ids`. La forme plate est délibérée : elle reste directement utilisable
+  // dans un <select> de filtre, alors qu'un arbre imbriqué obligerait chaque
+  // appelant à l'aplatir de nouveau.
   getFolders: async () => {
     const response = await api.get('/documents/folders');
     return response.data;
   },
-  createFolder: async (name, parentId) => {
+  createFolder: async (name, parentId = null) => {
     const response = await api.post('/documents/folders', { name, parent_id: parentId });
     return response.data;
   },
@@ -54,8 +58,27 @@ export const documentService = {
     const response = await api.patch(`/documents/folders/${id}`, { name });
     return response.data;
   },
-  deleteFolder: async (id) => {
-    const response = await api.delete(`/documents/folders/${id}`);
+  /**
+   * Déplace un dossier sous un autre (ou à la racine avec `null`).
+   *
+   * `parent_id` est envoyé SEUL, sans `name` : le backend ne traite le
+   * déplacement que si la clé est présente dans le corps, et ne touche au nom
+   * que s'il est fourni. Envoyer les deux ferait d'un déplacement un renommage
+   * accidentel.
+   */
+  moveFolder: async (id, parentId) => {
+    const response = await api.patch(`/documents/folders/${id}`, { parent_id: parentId });
+    return response.data;
+  },
+  /**
+   * Supprime un dossier. Sans `recursif`, le backend répond 409 si le dossier
+   * contient des sous-dossiers, au lieu de les remonter silencieusement à la
+   * racine — l'appelant peut alors proposer le choix à l'utilisateur.
+   */
+  deleteFolder: async (id, recursif = false) => {
+    const response = await api.delete(`/documents/folders/${id}`, {
+      params: recursif ? { recursif: 'true' } : {},
+    });
     return response.data;
   },
 
@@ -75,7 +98,7 @@ export const documentService = {
     return response.data;
   },
 
-  // M-Files Verrouillage (Check-in / Check-out)
+  // Verrouillage pour édition (check-out / check-in)
   checkoutDocument: async (id) => {
     const response = await api.post(`/documents/${id}/checkout`);
     return response.data;
@@ -85,7 +108,7 @@ export const documentService = {
     return response.data;
   },
 
-  // M-Files Vues Dynamiques
+  // Vues dynamiques
   getDynamicViews: async () => {
     const response = await api.get('/documents/dynamic-views/list');
     return response.data;
@@ -95,7 +118,7 @@ export const documentService = {
     return response.data;
   },
   /**
-   * Regroupement dynamique des documents par métadonnée (paradigme M-Files).
+   * Regroupement dynamique des documents par métadonnée.
    * Le nom du paramètre doit rester `groupBy` : c'est celui que lit
    * documentController.getDynamicViewData, qui n'accepte qu'une liste blanche de
    * champs (type_document, annee, statut, nom_entreprise, auteur).
@@ -120,7 +143,7 @@ export const documentService = {
     if (Array.isArray(data)) return { group_by_field: groupBy, groups: data };
     return { group_by_field: data?.group_by_field || groupBy, groups: data?.groups || [] };
   },
-  // M-Files Assemblage Automatique (Document Assembly)
+  // Assemblage automatique de dossier
   getAssemblyTemplates: async () => {
     const response = await api.get('/documents/assembly/templates');
     return response.data;
@@ -130,7 +153,7 @@ export const documentService = {
     return response.data;
   },
 
-  // M-Files Relations
+  // Relations entre documents
   getRelations: async (id) => {
     const response = await api.get(`/documents/${id}/relations`);
     return response.data;

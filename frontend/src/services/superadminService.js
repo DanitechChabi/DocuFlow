@@ -58,4 +58,26 @@ export const superadminService = {
     const res = await api.delete(`/superadmin/requests/${id}`);
     return res.data;
   },
+
+  // Entreprises — suppression définitive.
+  // `confirm` doit reprendre le nom exact de l'entreprise : le backend refuse
+  // sinon (garde-fou contre le clic sur la mauvaise carte).
+  deleteTenant: async (id, confirm) => {
+    const res = await api.delete(`/superadmin/tenants/${id}`, { data: { confirm } });
+    return res.data;
+  },
+
+  // Journal d'audit global (toutes entreprises)
+  getAuditLogs: async (params = {}) => {
+    const res = await api.get('/superadmin/audit', { params });
+    return res.data;
+  },
+
+  // Purge du journal. `confirm` doit valoir exactement « VIDER LE JOURNAL ».
+  // Options : { tenant_id } pour une seule entreprise, { before } (ISO 8601)
+  // pour ne purger que les entrées antérieures à une date.
+  purgeAuditLogs: async ({ confirm, tenant_id, before } = {}) => {
+    const res = await api.delete('/superadmin/audit', { data: { confirm, tenant_id, before } });
+    return res.data;
+  },
 };

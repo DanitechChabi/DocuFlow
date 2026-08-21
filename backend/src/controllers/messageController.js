@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
+const { uploadUrl } = require('../helpers/publicUrl');
 
 exports.sendMessage = async (req, res) => {
   const senderId = req.user.id;
@@ -59,10 +60,12 @@ exports.sendMessage = async (req, res) => {
         );
         attachments.push(attResult.rows[0]);
       }
-      // Ajouter l'URL de téléchargement
+      // URL de téléchargement : relative en mode bureau (le port change à chaque
+      // lancement), absolue en mode hébergé (frontend sur une autre origine).
+      // Voir helpers/publicUrl.js.
       attachments = attachments.map(a => ({
         ...a,
-        url: `${req.protocol}://${req.get('host')}/uploads/files/${a.stored_name}`
+        url: uploadUrl(req, a.stored_name, 'files')
       }));
     }
 
@@ -218,7 +221,8 @@ exports.getConversation = async (req, res) => {
           if (!attachmentsByMessage[a.message_id]) attachmentsByMessage[a.message_id] = [];
           attachmentsByMessage[a.message_id].push({
             ...a,
-            url: `${req.protocol}://${req.get('host')}/uploads/files/${a.stored_name}`
+            // Voir le commentaire de sendMessage plus haut.
+            url: uploadUrl(req, a.stored_name, 'files')
           });
         });
         messages.forEach(m => {

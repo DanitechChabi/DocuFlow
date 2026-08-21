@@ -37,20 +37,20 @@ router.post('/:id/files', roleMiddleware(ADMIN_ROLES), uploadMultiple, uploadPol
 router.delete('/:id/files/:fileId', roleMiddleware(ADMIN_ROLES), documentController.deleteFile);
 router.post('/:id/status', roleMiddleware(ADMIN_ROLES), documentController.setStatus);
 
-// M-Files Assemblage Automatique (Document Assembly)
+// Assemblage automatique de dossier
 router.get('/assembly/templates', documentController.getAssemblyTemplates);
 router.post('/assembly/generate', roleMiddleware(ADMIN_ROLES), documentController.generateAssembledDocument);
 
-// M-Files Relations & Dépendances
+// Relations et dépendances entre documents
 router.get('/:id/relations', roleMiddleware(ADMIN_ROLES), documentController.getDocumentRelations);
 router.post('/:id/relations', roleMiddleware(ADMIN_ROLES), documentController.createDocumentRelation);
 
-// M-Files Métadonnées & Audit
+// Métadonnées et journal d'audit
 router.get('/:id/metadata', roleMiddleware(ADMIN_ROLES), documentController.getDocumentMetadata);
 router.post('/:id/metadata', roleMiddleware(ADMIN_ROLES), documentController.setDocumentMetadata);
 router.get('/:id/audit', roleMiddleware(ADMIN_ROLES), documentController.getDocumentAudit);
 
-// Verrouillage M-Files (Check-in / Check-out)
+// Verrouillage pour édition (check-out / check-in)
 router.post('/:id/checkout', documentController.checkoutDocument);
 router.post('/:id/checkin', documentController.checkinDocument);
 

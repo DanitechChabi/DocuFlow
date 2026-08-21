@@ -3,3 +3,8 @@ release/
 app-stage/
 build/
 *.log
+
+# Binaires PostgreSQL portables (~150 Mo) récupérés par scripts/fetch-postgres.js.
+# Jamais versionnés : artefacts de compilation reconstructibles à la commande, et
+# ce dépôt est public.
+vendor/

@@ -206,34 +206,75 @@ exports.resetPassword = async (req, res) => {
 /**
  * DELETE /:id — Supprime un utilisateur (y compris superadmin).
  * Garde-fous : pas d'auto-suppression, pas de suppression du dernier superadmin.
+ *
+ * La suppression échouait auparavant pour tout compte ayant une activité : treize
+ * clés étrangères pointaient vers `users(id)` sans clause ON DELETE, dont
+ * `audit_logs.id_user` — et `auditMiddleware` écrit une ligne d'audit à chaque
+ * écriture HTTP. Postgres renvoyait 23503, converti ici en 500 opaque. La
+ * migration 014 pose les règles manquantes (SET NULL sur l'attribution, CASCADE
+ * sur les notifications) ; ce contrôleur en tire parti et, surtout, ne masque
+ * plus la cause quand quelque chose bloque encore.
  */
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
   const userId = Number(id);
 
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ message: 'Identifiant utilisateur invalide' });
+  }
   if (userId === req.user.id) {
     return res.status(400).json({ message: 'Vous ne pouvez pas supprimer votre propre compte' });
   }
 
+  const client = await db.pool.connect();
   try {
-    const targetRes = await db.query('SELECT id, role FROM users WHERE id = $1', [userId]);
+    await client.query('BEGIN');
+
+    const targetRes = await client.query(
+      'SELECT id, role, username, full_name, tenant_id FROM users WHERE id = $1',
+      [userId]
+    );
     const target = targetRes.rows[0];
     if (!target) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
     if (target.role === 'superadmin') {
-      const saCount = await db.query("SELECT COUNT(*)::int AS n FROM users WHERE role = 'superadmin'");
+      const saCount = await client.query("SELECT COUNT(*)::int AS n FROM users WHERE role = 'superadmin'");
       if (saCount.rows[0].n <= 1) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ message: 'Impossible de supprimer le dernier superadmin de la plateforme' });
       }
     }
 
-    await db.query('DELETE FROM users WHERE id = $1', [userId]);
-    res.json({ message: 'Utilisateur supprimé avec succès' });
+    // Le SET NULL de la migration 014 sur `audit_logs.id_user` / `actor_id` est
+    // un UPDATE, que le trigger append-only refuse. Le drapeau l'autorise pour
+    // cette seule anonymisation ; SET LOCAL le confine à cette transaction, il
+    // ne peut pas fuir vers une autre requête via le pool.
+    await client.query("SET LOCAL docuflow.audit_override = 'on'");
+
+    await client.query('DELETE FROM users WHERE id = $1', [userId]);
+
+    await client.query('COMMIT');
+    res.json({
+      message: `Utilisateur « ${target.full_name || target.username} » supprimé avec succès`,
+    });
   } catch (err) {
-    console.error(err);
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[superadmin] suppression utilisateur impossible :', err);
+
+    // 23503 = violation de clé étrangère. Nommer la table blocante évite de
+    // renvoyer « Erreur » quand il manque simplement la migration 014.
+    if (err.code === '23503') {
+      return res.status(409).json({
+        message: `Suppression impossible : des données liées le référencent encore (table « ${err.table || 'inconnue'} »). `
+          + 'La migration 014_admin_deletion_rules.sql doit être appliquée sur cette base.',
+      });
+    }
     res.status(500).json({ message: "Erreur lors de la suppression de l'utilisateur" });
+  } finally {
+    client.release();
   }
 };
 
@@ -413,10 +454,17 @@ exports.deleteRequest = async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
-    // Supprimer les tables liées (sans ON DELETE CASCADE)
-    await client.query('DELETE FROM request_history WHERE request_id = $1', [id]).catch(() => {});
-    await client.query('DELETE FROM audit_logs WHERE request_id = $1', [id]).catch(() => {});
-    await client.query('DELETE FROM request_files WHERE request_id = $1', [id]).catch(() => {});
+    // Le trigger append-only refuse le DELETE sur audit_logs, et le refus
+    // avortait toute la transaction : le `.catch(() => {})` qui entourait
+    // autrefois ces requêtes masquait l'erreur JS mais pas l'abandon Postgres,
+    // si bien que les suppressions suivantes échouaient en cascade avec
+    // « current transaction is aborted ». Le drapeau lève le blocage à la
+    // source, et les requêtes n'ont plus besoin d'être tolérées en échec.
+    await client.query("SET LOCAL docuflow.audit_override = 'on'");
+
+    await client.query('DELETE FROM request_history WHERE request_id = $1', [id]);
+    await client.query('DELETE FROM audit_logs WHERE request_id = $1', [id]);
+    await client.query('DELETE FROM request_files WHERE request_id = $1', [id]);
 
     // Supprimer la demande
     await client.query('DELETE FROM requests WHERE id = $1', [id]);
@@ -427,6 +475,289 @@ exports.deleteRequest = async (req, res) => {
     await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la suppression de la demande" });
+  } finally {
+    client.release();
+  }
+};
+
+// ============================================================================
+// Suppression d'entreprise et purge du journal d'audit
+// ============================================================================
+
+/**
+ * Tenant du propriétaire de la plateforme. Il héberge le compte superadmin
+ * global : le supprimer rendrait la console d'administration inaccessible et
+ * orphelines toutes les autres entreprises. Refus par conception.
+ */
+const PLATFORM_TENANT_ID = 1;
+
+/**
+ * DELETE /tenants/:id — Supprime définitivement une entreprise et ses données.
+ *
+ * Irréversible. Deux garde-fous plutôt qu'un :
+ *   - le tenant 1 (plateforme) est intouchable ;
+ *   - l'appelant doit renvoyer le nom exact de l'entreprise dans `confirm`, ce
+ *     qui écarte le clic accidentel sur la mauvaise carte — la confirmation
+ *     porte sur l'identité de la cible, pas sur l'intention de supprimer.
+ *
+ * La suppression repose sur les CASCADE posées par la migration 014 (les dix
+ * colonnes `tenant_id` étaient en NO ACTION). `tenantController.deleteTenant`
+ * affirmait déjà « les contraintes FK gèrent » : c'est vrai depuis 014 seulement.
+ */
+exports.deleteTenant = async (req, res) => {
+  const tenantId = Number(req.params.id);
+  const { confirm } = req.body || {};
+
+  if (!Number.isInteger(tenantId) || tenantId <= 0) {
+    return res.status(400).json({ message: 'Identifiant d\'entreprise invalide' });
+  }
+  if (tenantId === PLATFORM_TENANT_ID) {
+    return res.status(400).json({
+      message: 'L\'entreprise propriétaire de la plateforme ne peut pas être supprimée',
+    });
+  }
+  if (tenantId === req.user.tenant_id) {
+    return res.status(400).json({ message: 'Vous ne pouvez pas supprimer votre propre entreprise' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const tenantRes = await client.query('SELECT id, name, slug FROM tenants WHERE id = $1', [tenantId]);
+    const tenant = tenantRes.rows[0];
+    if (!tenant) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Entreprise introuvable' });
+    }
+
+    // Comparaison insensible à la casse et aux espaces de bord : on vérifie que
+    // l'appelant a désigné la bonne entreprise, pas sa dextérité au clavier.
+    const expected = String(tenant.name || '').trim().toLowerCase();
+    if (String(confirm || '').trim().toLowerCase() !== expected) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        message: `Confirmation invalide : saisissez exactement « ${tenant.name} » pour confirmer la suppression`,
+      });
+    }
+
+    // Volumétrie relevée AVANT la suppression : elle part dans le journal, seule
+    // trace de ce que l'entreprise contenait une fois ses lignes disparues.
+    const counts = await client.query(
+      `SELECT (SELECT COUNT(*) FROM users     WHERE tenant_id = $1)::int AS users,
+              (SELECT COUNT(*) FROM requests  WHERE tenant_id = $1)::int AS requests,
+              (SELECT COUNT(*) FROM documents WHERE tenant_id = $1)::int AS documents,
+              (SELECT COUNT(*) FROM audit_logs WHERE tenant_id = $1)::int AS audit_logs`,
+      [tenantId]
+    );
+    const removed = counts.rows[0];
+
+    // Les CASCADE de 014 emportent `audit_logs` du tenant : c'est un DELETE, que
+    // le trigger append-only refuse sans ce drapeau. Le journal de l'entreprise
+    // disparaît avec elle — le conserver serait d'ailleurs contraire à la
+    // minimisation des données une fois le client parti.
+    await client.query("SET LOCAL docuflow.audit_override = 'on'");
+
+    await client.query('DELETE FROM tenants WHERE id = $1', [tenantId]);
+
+    // Journalisé dans le tenant de la plateforme, pas dans celui qui vient de
+    // disparaître : l'écrire dans le tenant supprimé violerait la clé étrangère.
+    await client.query(
+      `INSERT INTO audit_logs (tenant_id, id_user, action, ip_address, user_name)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.user.tenant_id,
+        req.user.id,
+        `Entreprise supprimée : « ${tenant.name} » (${tenant.slug || 'sans slug'}) — `
+          + `${removed.users} utilisateur(s), ${removed.requests} demande(s), `
+          + `${removed.documents} document(s), ${removed.audit_logs} entrée(s) de journal`,
+        req.ip,
+        req.user.username || `Utilisateur ${req.user.id}`,
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: `Entreprise « ${tenant.name} » supprimée définitivement`, removed });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[superadmin] suppression entreprise impossible :', err);
+
+    if (err.code === '23503') {
+      return res.status(409).json({
+        message: `Suppression impossible : des données liées subsistent (table « ${err.table || 'inconnue'} »). `
+          + 'La migration 014_admin_deletion_rules.sql doit être appliquée sur cette base.',
+      });
+    }
+    res.status(500).json({ message: "Erreur lors de la suppression de l'entreprise" });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * GET /audit — Journal d'audit de TOUTES les entreprises.
+ *
+ * `auditService.getLogs` passe par db-tenant, qui restreint au tenant appelant :
+ * inadapté à la console globale, qui doit voir la plateforme entière. La requête
+ * est donc écrite directement ici, en lecture seule.
+ *
+ * Query : ?tenant_id=<n> pour cibler une entreprise, ?limit / ?offset.
+ */
+exports.getGlobalAuditLogs = async (req, res) => {
+  const { tenant_id } = req.query;
+  const parsedLimit = parseInt(req.query.limit, 10);
+  const parsedOffset = parseInt(req.query.offset, 10);
+  const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 500) : 100;
+  const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+
+  const params = [];
+  let where = '';
+  if (tenant_id) {
+    const tid = Number(tenant_id);
+    if (!Number.isInteger(tid) || tid <= 0) {
+      return res.status(400).json({ message: 'Identifiant d\'entreprise invalide' });
+    }
+    params.push(tid);
+    where = `WHERE a.tenant_id = $${params.length}`;
+  }
+
+  try {
+    // Tri sur `id` : monotone et toujours renseigné, contrairement aux deux
+    // colonnes de date (`timestamp` historique, `occurred_at` GED) dont l'une
+    // peut être nulle selon la génération de la ligne.
+    const result = await db.query(
+      `SELECT a.id, a.tenant_id, a.action, a.ip_address, a.request_id,
+              a.id_user, a.actor_id, a.user_name, a.actor_username,
+              a."timestamp", a.occurred_at, a.details_json,
+              t.name AS tenant_name, u.full_name AS actor_full_name
+       FROM audit_logs a
+       LEFT JOIN tenants t ON t.id = a.tenant_id
+       LEFT JOIN users u ON u.id = COALESCE(a.actor_id, a.id_user)
+       ${where}
+       ORDER BY a.id DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+
+    const totalRes = await db.query(
+      `SELECT COUNT(*)::int AS n FROM audit_logs a ${where}`,
+      params
+    );
+
+    // Même normalisation que auditService : le frontend lit un seul contrat,
+    // quelle que soit la génération de colonnes de la ligne.
+    const logs = result.rows.map((row) => ({
+      ...row,
+      actor_name: row.actor_username || row.user_name || row.actor_full_name || null,
+      occurred_at: row.occurred_at || row.timestamp || null,
+      details: row.details_json ?? null,
+    }));
+
+    res.json({ logs, total: totalRes.rows[0].n, limit, offset });
+  } catch (err) {
+    if (isMissingTable(err)) {
+      return res.json({ logs: [], total: 0, limit, offset });
+    }
+    console.error('[superadmin] lecture du journal impossible :', err);
+    res.status(500).json({ message: 'Erreur lors de la récupération du journal d\'audit' });
+  }
+};
+
+/**
+ * DELETE /audit — Purge le journal d'audit.
+ *
+ * `audit_logs` est append-only par conception (trigger `trg_audit_no_update`,
+ * exigences GoBD / NF Z42-013). Cette route est la seule dérogation, et elle est
+ * construite pour rester une exception traçable :
+ *
+ *   - elle exige `confirm: 'VIDER LE JOURNAL'`, saisi à la main ;
+ *   - elle ouvre le drapeau `docuflow.audit_override` par SET LOCAL, donc pour
+ *     cette transaction seulement ;
+ *   - elle écrit, dans la même transaction, une entrée indiquant combien de
+ *     lignes ont été purgées, par qui et depuis quelle IP. Le journal ne
+ *     redémarre jamais vide : sa première ligne est le récit de sa purge.
+ *
+ * Filtres : ?tenant_id=<n> (une entreprise), ?before=<ISO 8601> (archivage
+ * glissant, l'usage le plus sain — ne purger que le passé lointain).
+ */
+exports.purgeAuditLogs = async (req, res) => {
+  const { confirm, tenant_id, before } = req.body || {};
+
+  if (String(confirm || '').trim() !== 'VIDER LE JOURNAL') {
+    return res.status(400).json({
+      message: 'Confirmation requise : saisissez exactement « VIDER LE JOURNAL »',
+    });
+  }
+
+  const conditions = [];
+  const params = [];
+  let scope = 'toutes les entreprises';
+
+  if (tenant_id !== undefined && tenant_id !== null && tenant_id !== '') {
+    const tid = Number(tenant_id);
+    if (!Number.isInteger(tid) || tid <= 0) {
+      return res.status(400).json({ message: 'Identifiant d\'entreprise invalide' });
+    }
+    params.push(tid);
+    conditions.push(`tenant_id = $${params.length}`);
+    scope = `entreprise #${tid}`;
+  }
+
+  if (before) {
+    const cutoff = new Date(before);
+    if (Number.isNaN(cutoff.getTime())) {
+      return res.status(400).json({ message: 'Date « before » invalide (format ISO 8601 attendu)' });
+    }
+    params.push(cutoff.toISOString());
+    // COALESCE : les lignes anciennes n'ont que `timestamp`, les récentes
+    // `occurred_at`. Filtrer sur une seule colonne épargnerait la moitié du
+    // journal sans le dire.
+    conditions.push(`COALESCE(occurred_at, "timestamp") < $${params.length}`);
+    scope += ` antérieur au ${cutoff.toISOString().slice(0, 10)}`;
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL docuflow.audit_override = 'on'");
+
+    const deleted = await client.query(`DELETE FROM audit_logs ${where}`, params);
+
+    // Trace de la purge, écrite après le DELETE pour ne pas être emportée par
+    // lui : le journal conserve toujours au minimum le récit de son effacement.
+    await client.query(
+      `INSERT INTO audit_logs (tenant_id, id_user, action, ip_address, user_name)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.user.tenant_id,
+        req.user.id,
+        `Journal d'audit purgé : ${deleted.rowCount} entrée(s) supprimée(s) (${scope})`,
+        req.ip,
+        req.user.username || `Utilisateur ${req.user.id}`,
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({
+      message: `${deleted.rowCount} entrée(s) supprimée(s) du journal d'audit`,
+      deleted: deleted.rowCount,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[superadmin] purge du journal impossible :', err);
+
+    // 23514 (check_violation) : code posé par le trigger append-only quand le
+    // drapeau n'a pas été reconnu — signe que la migration 014 manque et que
+    // l'ancien trigger, sans dérogation, est encore en place.
+    if (err.code === '23514' || /append-only/i.test(err.message || '')) {
+      return res.status(409).json({
+        message: 'Le journal est verrouillé en append-only par la base. '
+          + 'La migration 014_admin_deletion_rules.sql doit être appliquée pour autoriser la purge administrative.',
+      });
+    }
+    res.status(500).json({ message: 'Erreur lors de la purge du journal d\'audit' });
   } finally {
     client.release();
   }

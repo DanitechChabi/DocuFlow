@@ -20,12 +20,39 @@
  *   options      [{value,label}] pour type 'select'
  *   min/max      bornes pour type 'number'
  *   editable     false = information système, non modifiable (défaut : true)
+ *   editor       contrôle de saisie spécialisé (voir ci-dessous)
+ *   withTone     pour editor 'optionlist' : chaque entrée porte un ton
+ *   optionsFrom  clé d'une liste 'optionlist' dont ce réglage tire ses choix ;
+ *                la console y puise un sélecteur au lieu d'un champ libre, de
+ *                sorte qu'un réglage ne puisse pas nommer une entrée supprimée
+ *
+ * POURQUOI `editor` EST DISTINCT DE `type`
+ *
+ * `type` décrit comment la valeur est STOCKÉE et validée ; `editor` décrit
+ * comment elle est SAISIE. Les trois listes de choix du formulaire de demande
+ * sont du JSON en base — c'est le bon format de stockage — mais les faire saisir
+ * comme du JSON était une faute : pour ajouter un motif, un administrateur
+ * devait écrire à la main des accolades, des guillemets doubles et des virgules,
+ * sans oublier d'échapper l'apostrophe de « PV d'Assemblée ». Une erreur de
+ * frappe et le réglage entier était refusé, ou pire, accepté mais vide de sens.
+ *
+ * `editor` reste facultatif : les réglages qui n'en déclarent pas gardent le
+ * contrôle déduit de leur `type`. Le champ ne change donc rien à l'existant.
+ *
+ * `value_type` en base n'est PAS étendu pour autant : la contrainte CHECK de
+ * `setting_definitions` (migration 013) n'admet que huit types, et y introduire
+ * une neuvième valeur ferait échouer syncSettingDefinitions au démarrage —
+ * silencieusement, puisque l'erreur n'est que journalisée. Le stockage reste
+ * donc « json », ce qu'il est réellement.
  */
+
+const { normalizeOptions } = require('../helpers/requestOptions');
 
 const GROUPS = [
   { name: 'branding',      label: 'Identité',      description: "Nom, logo et informations légales de l'organisation." },
   { name: 'theme',         label: 'Apparence',     description: "Couleurs et mise en page de l'interface." },
   { name: 'documents',     label: 'Documents',     description: 'Bibliothèque documentaire, téléversement et cycle de vie.' },
+  { name: 'requests',      label: 'Demandes',      description: 'Formulaire de demande et listes de choix proposées aux demandeurs.' },
   { name: 'security',      label: 'Sécurité',      description: 'Mots de passe, sessions, accès et journalisation.' },
   { name: 'notifications', label: 'Notifications', description: 'Alertes par courrier électronique.' },
   { name: 'localization',  label: 'Localisation',  description: 'Langue, formats et fuseau horaire.' },
@@ -79,6 +106,58 @@ const CATALOG = [
   { key: 'enable_versioning',       group: 'documents', label: 'Versionnage',               description: "Conserver l'historique complet des versions.", type: 'boolean', default: 'true' },
   { key: 'require_metadata',        group: 'documents', label: 'Métadonnées obligatoires',  description: "Refuser l'enregistrement si un champ obligatoire est vide.", type: 'boolean', default: 'true' },
   { key: 'document_statuses',       group: 'documents', label: 'Statuts de document',       description: 'Liste ordonnée des statuts du cycle de vie.', type: 'json', default: '["disponible","prêt","archivé"]' },
+
+  // ---------------------------------------------------------------- DEMANDES
+  // Ces trois listes étaient codées en dur dans RequestForm.jsx : changer un
+  // type de document ou un motif exigeait un redéploiement du frontend, alors
+  // que ces valeurs sont propres au métier de chaque organisation.
+  //
+  // Le format est un tableau JSON d'objets { value, label } — et non de simples
+  // chaînes. `value` est ce qui part en base (colonnes requests.type_document,
+  // motif, priorite) et doit donc rester stable ; `label` est ce que voit
+  // l'utilisateur et peut être reformulé sans invalider les demandes déjà
+  // enregistrées. Une liste de chaînes nues aurait lié les deux, et renommer un
+  // libellé aurait rendu illisibles les demandes existantes.
+  //
+  // Une chaîne nue reste acceptée à la lecture (voir requestOptions.js) : c'est
+  // la forme la plus naturelle à saisir à la main dans la console.
+  //
+  // `editor: 'optionlist'` remplace le pavé de JSON par une liste de lignes
+  // ajoutables et supprimables. Voir l'en-tête de ce fichier pour le motif.
+  { key: 'request_document_types', group: 'requests', label: 'Types de document',
+    description: 'Choix proposés dans le champ « Type de document » du formulaire de demande.',
+    type: 'json', editor: 'optionlist',
+    default: '[{"value":"Statuts","label":"Statuts"},{"value":"PV d\'Assemblée","label":"PV d\'Assemblée"},{"value":"Bilan Financier","label":"Bilan Financier"},{"value":"Registre de Commerce","label":"Registre de Commerce"},{"value":"Contrat","label":"Contrat"},{"value":"Autre","label":"Autre"}]' },
+  { key: 'request_motifs', group: 'requests', label: 'Motifs de demande',
+    description: 'Choix proposés dans le champ « Motif » du formulaire de demande.',
+    type: 'json', editor: 'optionlist',
+    default: '[{"value":"Actualisation","label":"Actualisation"},{"value":"Création","label":"Création d\'entreprise"},{"value":"Modification","label":"Modification"},{"value":"Radiation","label":"Radiation"},{"value":"Consultation","label":"Consultation"},{"value":"Contentieux","label":"Contentieux"}]' },
+  // `tone` est volontairement contraint à une liste fermée (voir
+  // helpers/requestOptions.TONES) : les couleurs de priorité sont des classes
+  // Tailwind compilées à la construction. Une couleur libre ne produirait
+  // aucune classe et la pastille s'afficherait sans style.
+  { key: 'request_priorities', group: 'requests', label: 'Niveaux de priorité',
+    description: "Niveaux proposés dans le formulaire. Chaque entrée accepte un ton : neutre, info, attention, urgent.",
+    type: 'json', editor: 'optionlist', withTone: true,
+    default: '[{"value":"basse","label":"Basse","tone":"neutre"},{"value":"normale","label":"Normale","tone":"info"},{"value":"haute","label":"Haute","tone":"attention"},{"value":"urgente","label":"Urgente","tone":"urgent"}]' },
+  // Ce réglage NOMME une valeur de la liste ci-dessus. Depuis que celle-ci
+  // s'édite d'un clic, supprimer « normale » laisse ici une valeur qui ne
+  // désigne plus rien : le formulaire retombe alors sur le premier niveau (voir
+  // requestFormOptions), si bien que le réglage paraît ignoré. `optionsFrom` dit
+  // à la console de tirer ses choix de la liste vivante plutôt que d'accepter du
+  // texte libre — l'incohérence devient impossible à saisir, et une incohérence
+  // déjà en base est signalée à l'écran.
+  { key: 'request_default_priority', group: 'requests', label: 'Priorité par défaut',
+    description: 'Niveau présélectionné à l\'ouverture du formulaire. Doit correspondre à une valeur des niveaux ci-dessus.',
+    type: 'string', optionsFrom: 'request_priorities', default: 'normale' },
+  // Le maximum de 5 n'est pas arbitraire : multer est construit avec
+  // `upload.array('files', 5)` (helpers/upload.js) et fixe ses limites une fois
+  // pour toutes, sans connaître le tenant de la requête. Ce réglage ne peut donc
+  // que RESTREINDRE, jamais élargir — annoncer davantage donnerait un formulaire
+  // qui accepte des fichiers que le serveur refusera.
+  { key: 'request_max_files', group: 'requests', label: 'Pièces jointes par demande',
+    description: 'Nombre maximal de fichiers joints à une demande (5 au plus, limite du serveur).',
+    type: 'number', default: '5', min: 1, max: 5 },
 
   // ---------------------------------------------------------------- SÉCURITÉ
   { key: 'password_min_length',      group: 'security', label: 'Longueur minimale du mot de passe', description: 'Nombre minimal de caractères exigé.', type: 'number', default: '8', min: 6, max: 128 },
@@ -157,6 +236,36 @@ function coerce(definition, rawValue) {
 
   // Une valeur vide efface le réglage (retour à la valeur par défaut).
   if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+
+  // Les listes de choix sont validées avant l'aiguillage par type : elles sont
+  // stockées en JSON, mais un JSON syntaxiquement correct ne suffit pas. Une
+  // liste vide, ou dont aucune entrée n'a de valeur exploitable, laisserait
+  // requestOptions retomber sur les valeurs d'origine — l'administrateur verrait
+  // donc réapparaître ce qu'il vient de supprimer, et lirait cela comme un
+  // enregistrement ignoré. Mieux vaut le refuser en le disant.
+  if (definition.editor === 'optionlist') {
+    let parsed = rawValue;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        throw new Error(`${label} : JSON invalide.`);
+      }
+    }
+    if (!Array.isArray(parsed)) {
+      throw new Error(`${label} : une liste de choix est attendue.`);
+    }
+    // Sans repli : on veut savoir si la saisie elle-même est exploitable, pas si
+    // le catalogue peut la remplacer.
+    const cleaned = normalizeOptions(parsed, [], { withTone: definition.withTone === true });
+    if (!cleaned.length) {
+      throw new Error(`${label} : au moins un choix est nécessaire, sinon le formulaire de demande devient inutilisable.`);
+    }
+    // Stocké sous forme canonique : la console relit ensuite exactement ce
+    // qu'elle a envoyé, et le compteur de modifications en attente ne signale
+    // plus une différence née du seul formatage.
+    return JSON.stringify(cleaned);
+  }
 
   switch (definition.type) {
     case 'number': {

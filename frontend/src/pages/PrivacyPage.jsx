@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield, Eye, Database, Lock, Trash2, Mail, User } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { useTitrePage } from '../hooks/useTitrePage';
 
 const Section = ({ icon: Icon, title, children }) => (
   <div className="glass-card-premium p-6">
@@ -17,6 +18,12 @@ const PrivacyPage = ({ type = 'privacy' }) => {
   const settings = useSettings();
   const isPrivacy = type === 'privacy';
   const title = isPrivacy ? 'Politique de Confidentialité' : 'Politique de Cookies';
+
+  // Le composant sert deux routes distinctes (/privacy et /cookies) : sans titre
+  // propre à chacune, les deux onglets sont indiscernables alors qu'ils ne
+  // disent pas la même chose. Version courte pour l'onglet — « Politique de
+  // Confidentialité · DocuFlow » ne laisse rien voir du mot utile.
+  useTitrePage(isPrivacy ? 'Confidentialité' : 'Cookies');
 
   return (
     <div className="px-4 sm:px-6 md:px-8 py-6 md:py-8">

@@ -11,7 +11,8 @@
     "build:frontend": "cd ../frontend && npm run build -- --mode desktop",
     "icon": "node scripts/make-icon.js",
     "brand": "node scripts/make-brand.js",
-    "dist": "electron-builder --win"
+    "dist": "npm run build:frontend && electron-builder --win",
+    "dist:only": "electron-builder --win"
   },
   "devDependencies": {
     "electron": "^37.0.0",
@@ -22,7 +23,7 @@
   "build": {
     "appId": "com.docuflow.app",
     "productName": "DocuFlow",
-    "asar": false,
+    "asar": true,
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -30,13 +31,18 @@
     "files": [
       "main.js",
       "preload.js",
+      "splash.html",
       { "from": "../backend/src", "to": "backend/src" },
+      { "from": "../backend/package.json", "to": "backend/package.json" },
       { "from": "../backend/node_modules", "to": "backend/node_modules", "filter": ["**/*", "!nodemon/**", "!**/.bin/**"] },
       { "from": "../frontend/dist", "to": "frontend/dist" },
       { "from": "../docs", "to": "docs", "filter": ["**/*.sql"] }
     ],
+    "extraResources": [
+      { "from": "vendor/pgsql", "to": "pgsql" }
+    ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": ["nsis"],
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -47,9 +53,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "DocuFlow",
       "artifactName": "DocuFlow-Setup-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "DocuFlow-Portable-${version}.exe"
     }
   }
 }

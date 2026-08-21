@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 /**
  * documentAuditService — Journal d'audit append-only pour les actions documentaires
- * (M-Files feature #9, conformité GoBD / NF Z42-013).
+ * (conformité GoBD / NF Z42-013).
  *
  * Écrit dans `audit_logs` (docs/migrations/010_metadata_typed.sql), protégée par le
  * trigger `prevent_audit_modification()` : aucun UPDATE/DELETE n'est possible.

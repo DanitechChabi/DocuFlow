@@ -11,13 +11,15 @@ import {
   Globe, ToggleLeft, ToggleRight, Crown, UserCog, KeyRound,
   TrendingUp, Activity, Mail, Lock, Eye, EyeOff, Pencil, Image,
   FileText, Archive, ArchiveRestore, Inbox, Calendar, Clock, SlidersHorizontal,
-  Database, FolderTree
+  Database, FolderTree, ScrollText, Eraser, RefreshCw
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ThemeManager from '../components/ThemeManager';
 import ConfigurationConsole from '../components/admin/ConfigurationConsole';
 import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
 import FolderManager from '../components/admin/FolderManager';
+import PageHeader from '../components/PageHeader';
+import { useOngletUrl } from '../hooks/useOngletUrl';
 import { toast } from '../components/Toast';
 import { authService } from '../services/authService';
 
@@ -28,6 +30,27 @@ const ALL_ROLES = [
   { key: 'superadmin', label: 'Super Admin', color: 'bg-red-100 text-red-600' },
 ];
 const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-slate-100 text-slate-600';
+
+// Hors du composant, pour la même raison que dans CompanyAdminPage : useOngletUrl
+// mémorise sur cette référence. Le premier élément est l'onglet par défaut.
+const PANNEAUX = [
+  'dashboard', 'requests', 'users', 'superadmins', 'sections', 'metadata',
+  'folders', 'tenants', 'audit', 'branding', 'configuration',
+];
+
+const NOMS_PANNEAUX = {
+  dashboard: 'Tableau de bord',
+  requests: 'Demandes',
+  users: 'Utilisateurs',
+  superadmins: 'Super Admins',
+  sections: 'Sections',
+  metadata: 'Métadonnées',
+  folders: 'Dossiers',
+  tenants: 'Entreprises',
+  audit: 'Journal',
+  branding: 'Branding',
+  configuration: 'Configuration',
+};
 
 const SuperAdminPage = () => {
   const navigate = useNavigate();
@@ -49,7 +72,9 @@ const SuperAdminPage = () => {
 
   // State
   const [loading, setLoading] = useState(true);
-  const [activePanel, setActivePanel] = useState('dashboard');
+  // Onglet porté par l'URL : partageable, résistant à F5, traversé par le bouton
+  // Retour. Voir useOngletUrl.
+  const [activePanel, setActivePanel] = useOngletUrl(PANNEAUX);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [tenantFilter, setTenantFilter] = useState('all');
@@ -71,6 +96,27 @@ const SuperAdminPage = () => {
   const [requests, setRequests] = useState([]);
   const [requestFilter, setRequestFilter] = useState('active'); // 'active' | 'archived' | 'all'
   const [requestSearch, setRequestSearch] = useState('');
+
+  // Journal d'audit global. Chargé à la demande (onglet « Journal ») et non par
+  // fetchAll : la table dépasse le millier de lignes et n'a pas à ralentir
+  // l'ouverture du portail.
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditTenant, setAuditTenant] = useState('all');
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  // Suppression d'entreprise : nom à retaper (garde-fou anti-clic)
+  const [deleteTenantTarget, setDeleteTenantTarget] = useState(null);
+  const [deleteTenantConfirm, setDeleteTenantConfirm] = useState('');
+  const [deleteTenantBusy, setDeleteTenantBusy] = useState(false);
+
+  // Purge du journal : phrase à retaper + périmètre optionnel
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgeConfirm, setPurgeConfirm] = useState('');
+  const [purgeScope, setPurgeScope] = useState('all'); // 'all' | 'tenant' | 'before'
+  const [purgeTenant, setPurgeTenant] = useState('');
+  const [purgeBefore, setPurgeBefore] = useState('');
+  const [purgeBusy, setPurgeBusy] = useState(false);
 
   // Modals
   const [editUser, setEditUser] = useState(null);
@@ -178,13 +224,17 @@ const SuperAdminPage = () => {
     setConfirm({
       open: true,
       title: `Supprimer ${u.full_name} ?`,
-      message: `Cette action supprimera définitivement le compte de ${u.full_name} (${u.role}). Cette opération est irréversible.`,
+      // Le compte disparaît, son activité reste : les demandes, documents et
+      // entrées de journal qu'il a produits sont conservés et simplement
+      // détachés de lui (voir migration 014). L'annoncer évite de croire qu'on
+      // efface l'historique de l'entreprise avec l'employé.
+      message: `Le compte de ${u.full_name} (${u.role}) sera définitivement supprimé. Ses demandes, documents et entrées de journal sont conservés mais ne lui seront plus rattachés. Cette opération est irréversible.`,
       type: 'danger',
       onConfirm: async () => {
         setConfirmLoading(true);
         try {
-          await superadminService.deleteUser(u.id);
-          toast.success('Utilisateur supprimé');
+          const res = await superadminService.deleteUser(u.id);
+          toast.success(res?.message || 'Utilisateur supprimé');
           fetchAll();
         } catch (err) {
           toast.error(err.response?.data?.message || 'Erreur');
@@ -279,13 +329,90 @@ const SuperAdminPage = () => {
           toast.success(`Entreprise ${newStatus === 'active' ? 'réactivée' : 'suspendue'}`);
           fetchAll();
         } catch (err) {
-          toast.error('Erreur');
+          toast.error(err.response?.data?.message || 'Erreur');
         } finally {
           setConfirmLoading(false);
           setConfirm({ ...confirm, open: false });
         }
       },
     });
+  };
+
+  // Suppression définitive d'une entreprise.
+  //
+  // Pas un ConfirmDialog : celui-ci n'accepte qu'un bouton, et un seul clic est
+  // trop peu pour une opération qui détruit les données de toute une société.
+  // Retaper le nom force à lire la carte visée — la confusion à éviter n'est pas
+  // « supprimer par mégarde », c'est « supprimer la mauvaise entreprise ».
+  const handleAskDeleteTenant = (t) => {
+    setDeleteTenantTarget(t);
+    setDeleteTenantConfirm('');
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!deleteTenantTarget) return;
+    setDeleteTenantBusy(true);
+    try {
+      const res = await superadminService.deleteTenant(deleteTenantTarget.id, deleteTenantConfirm);
+      toast.success(res?.message || 'Entreprise supprimée');
+      setDeleteTenantTarget(null);
+      setDeleteTenantConfirm('');
+      fetchAll();
+      // Le journal affiché peut contenir des lignes de l'entreprise disparue.
+      if (activePanel === 'audit') fetchAuditLogs();
+    } catch (err) {
+      // Message du backend tel quel : il nomme la contrainte ou la migration
+      // manquante, information qu'un « Erreur » générique ferait perdre.
+      toast.error(err.response?.data?.message || 'Erreur lors de la suppression');
+    } finally {
+      setDeleteTenantBusy(false);
+    }
+  };
+
+  // --- JOURNAL D'AUDIT ---
+  const fetchAuditLogs = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const params = { limit: 200 };
+      if (auditTenant !== 'all') params.tenant_id = auditTenant;
+      const data = await superadminService.getAuditLogs(params);
+      setAuditLogs(data.logs || []);
+      setAuditTotal(data.total || 0);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors du chargement du journal');
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [auditTenant]);
+
+  // Chargement à l'ouverture de l'onglet et à chaque changement de filtre.
+  useEffect(() => {
+    if (activePanel === 'audit') fetchAuditLogs();
+  }, [activePanel, fetchAuditLogs]);
+
+  const handlePurgeAudit = async () => {
+    setPurgeBusy(true);
+    try {
+      const payload = { confirm: purgeConfirm };
+      if (purgeScope === 'tenant' && purgeTenant) payload.tenant_id = purgeTenant;
+      // <input type="date"> donne « AAAA-MM-JJ » : on borne à la fin de la
+      // journée choisie pour que « avant le 15 » inclue bien le 15 en entier.
+      if (purgeScope === 'before' && purgeBefore) {
+        payload.before = new Date(`${purgeBefore}T23:59:59`).toISOString();
+      }
+      const res = await superadminService.purgeAuditLogs(payload);
+      toast.success(res?.message || 'Journal purgé');
+      setPurgeOpen(false);
+      setPurgeConfirm('');
+      setPurgeBefore('');
+      setPurgeScope('all');
+      setPurgeTenant('');
+      fetchAuditLogs();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la purge');
+    } finally {
+      setPurgeBusy(false);
+    }
   };
 
   // --- BRANDING ---
@@ -402,6 +529,7 @@ const SuperAdminPage = () => {
     { id: 'metadata', label: 'Métadonnées', icon: Database },
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'tenants', label: 'Entreprises', icon: Building2, badge: stats.totalTenants },
+    { id: 'audit', label: 'Journal', icon: ScrollText },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
   ];
@@ -413,26 +541,34 @@ const SuperAdminPage = () => {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
-          <div className="flex items-center gap-3 md:gap-5">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="p-2 md:p-2.5 bg-gradient-to-br from-red-500 to-red-700 text-white rounded-2xl shadow-lg">
-                <Crown size={22} />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">Ultra Admin</h1>
-                <p className="text-xs md:text-sm text-slate-500 font-medium md:ml-1">Contrôle total de la plateforme</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Onze panneaux : sans le dernier segment du fil d'Ariane, savoir où l'on
+            se trouve supposait de relire la rangée d'onglets et d'y repérer le
+            fond sombre. Le titre de l'onglet du navigateur le porte aussi — un
+            propriétaire de plateforme travaille couramment avec plusieurs fenêtres
+            d'administration ouvertes en parallèle. */}
+        <PageHeader
+          title="Ultra Admin"
+          subtitle="Contrôle total de la plateforme"
+          icon={Crown}
+          documentTitle={`${NOMS_PANNEAUX[activePanel]} — Ultra Admin`}
+          breadcrumb={[
+            { label: 'Tableau de bord', to: '/dashboard' },
+            { label: 'Gestion système' },
+            { label: NOMS_PANNEAUX[activePanel] },
+          ]}
+        />
 
-        {/* Tabs */}
-        <div className="flex gap-1.5 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 overflow-x-auto scrollbar-none">
+        {/* Onglets — voir CompanyAdminPage pour le motif ARIA. */}
+        <div
+          role="tablist"
+          aria-label="Rubriques de gestion système"
+          className="flex gap-1.5 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 overflow-x-auto scrollbar-none"
+        >
           {tabs.map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={activePanel === id}
               onClick={() => setActivePanel(id)}
               className={`px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
                 activePanel === id ? 'bg-docuflow-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
@@ -743,6 +879,11 @@ const SuperAdminPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {tenants.map((t) => {
                 const suspended = t.status === 'suspended';
+                // Le tenant 1 héberge le compte propriétaire : le supprimer
+                // fermerait cette console. Le backend refuse de toute façon,
+                // mais mieux vaut ne pas proposer un bouton qui ne peut qu'échouer.
+                const isPlatform = t.id === 1;
+                const userCount = allUsers.filter((u) => u.tenant_id === t.id).length;
                 return (
                   <div key={t.id} className={`glass-card-premium p-5 border transition-all ${suspended ? 'opacity-60 border-red-200' : 'border-transparent'}`}>
                     <div className="flex items-start justify-between mb-3">
@@ -751,7 +892,10 @@ const SuperAdminPage = () => {
                           <Building2 size={20} />
                         </div>
                         <div>
-                          <h3 className="font-bold text-slate-800 text-sm">{t.name}</h3>
+                          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                            {t.name}
+                            {isPlatform && <Crown size={12} className="text-amber-500" title="Entreprise propriétaire de la plateforme" />}
+                          </h3>
                           <p className="text-xs text-slate-400 font-mono">{t.slug}</p>
                         </div>
                       </div>
@@ -759,15 +903,115 @@ const SuperAdminPage = () => {
                         {suspended ? 'Suspendue' : 'Active'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mb-3">{new Date(t.created_at).toLocaleDateString('fr-FR')}</p>
+                    <p className="text-xs text-slate-400 mb-3">
+                      {new Date(t.created_at).toLocaleDateString('fr-FR')} · {userCount} utilisateur{userCount > 1 ? 's' : ''}
+                    </p>
                     <div className="flex gap-2 pt-3 border-t border-slate-100">
-                      <button onClick={() => handleToggleTenant(t)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${suspended ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}>
+                      <button onClick={() => handleToggleTenant(t)} disabled={isPlatform} title={isPlatform ? 'Entreprise propriétaire : non suspendable' : undefined} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed ${suspended ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}>
                         {suspended ? <><ToggleRight size={14} /> Réactiver</> : <><ToggleLeft size={14} /> Suspendre</>}
+                      </button>
+                      <button
+                        onClick={() => handleAskDeleteTenant(t)}
+                        disabled={isPlatform}
+                        title={isPlatform ? 'Entreprise propriétaire : non supprimable' : 'Supprimer définitivement cette entreprise'}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 size={14} /> Supprimer
                       </button>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ============ JOURNAL D'AUDIT ============ */}
+        {activePanel === 'audit' && (
+          <div className="space-y-4 animate-fade-in-up">
+            <div className="glass-card-premium p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><ScrollText size={18} /> Journal d'audit</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {auditTotal.toLocaleString('fr-FR')} entrée{auditTotal > 1 ? 's' : ''} au total
+                    {auditLogs.length < auditTotal && ` — ${auditLogs.length} affichée${auditLogs.length > 1 ? 's' : ''} (les plus récentes)`}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select className="input-premium py-2 text-sm" value={auditTenant} onChange={(e) => setAuditTenant(e.target.value)}>
+                    <option value="all">Toutes les entreprises</option>
+                    {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <button onClick={fetchAuditLogs} disabled={auditLoading} className="btn-secondary flex items-center gap-2 py-2 text-sm disabled:opacity-50">
+                    <RefreshCw size={15} className={auditLoading ? 'animate-spin' : ''} /> Actualiser
+                  </button>
+                  <button onClick={() => { setPurgeOpen(true); setPurgeConfirm(''); }} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-600 hover:bg-red-200">
+                    <Eraser size={15} /> Vider le journal
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Rappel du régime du journal : il est append-only par conception,
+                et la purge est une dérogation, pas une commodité. */}
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+              <ShieldAlert size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Ce journal est <strong>inaltérable</strong> (append-only) : aucune entrée ne peut être modifiée,
+                conformément aux exigences de traçabilité (GoBD, NF Z42-013). La purge est une opération
+                administrative exceptionnelle et <strong>irréversible</strong> — elle est elle-même journalisée.
+              </p>
+            </div>
+
+            <div className="glass-card-premium overflow-hidden">
+              {auditLoading ? (
+                <div className="p-12 flex justify-center">
+                  <div className="w-8 h-8 border-2 border-slate-200 border-t-docuflow-primary rounded-full animate-spin" />
+                </div>
+              ) : auditLogs.length === 0 ? (
+                <div className="p-12 text-center">
+                  <Inbox size={40} className="text-slate-200 mx-auto mb-3" />
+                  <p className="text-sm text-slate-400 font-medium">Aucune entrée dans le journal</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Date</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Entreprise</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Auteur</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Action</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log) => {
+                        const refused = /^Refusé/.test(log.action || '');
+                        const failed = /^Échec/.test(log.action || '');
+                        return (
+                          <tr key={log.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                            <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                              {log.occurred_at ? new Date(log.occurred_at).toLocaleString('fr-FR') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{log.tenant_name || `#${log.tenant_id}`}</td>
+                            <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                              {/* Auteur anonymisé : le compte a été supprimé, le nom
+                                  dénormalisé reste la seule imputabilité. */}
+                              {log.actor_name || <span className="text-slate-300 italic">compte supprimé</span>}
+                            </td>
+                            <td className={`px-4 py-3 text-xs font-medium ${refused ? 'text-red-600' : failed ? 'text-amber-600' : 'text-slate-700'}`}>
+                              {log.action}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400 font-mono whitespace-nowrap">{log.ip_address || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1001,6 +1245,162 @@ const SuperAdminPage = () => {
                 <button type="button" onClick={() => setIsTenantFormOpen(false)} className="btn-secondary flex-1">Annuler</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Supprimer une entreprise — confirmation par le nom exact */}
+      {deleteTenantTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => !deleteTenantBusy && setDeleteTenantTarget(null)}>
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Trash2 size={18} className="text-red-500" /> Supprimer l'entreprise
+              </h2>
+              <button onClick={() => setDeleteTenantTarget(null)} disabled={deleteTenantBusy} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-50"><X size={18} className="text-slate-400" /></button>
+            </div>
+            <div className="p-8 space-y-5">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-200">
+                <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-red-800 leading-relaxed">
+                  <p className="font-bold mb-1">Action irréversible</p>
+                  <p>
+                    Tous les comptes, demandes, documents, messages et entrées de journal
+                    de <strong>{deleteTenantTarget.name}</strong> seront définitivement supprimés.
+                    Aucune restauration n'est possible.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Saisissez « {deleteTenantTarget.name} » pour confirmer
+                </label>
+                <input
+                  className="input-premium"
+                  value={deleteTenantConfirm}
+                  onChange={(e) => setDeleteTenantConfirm(e.target.value)}
+                  placeholder={deleteTenantTarget.name}
+                  autoFocus
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteTenantTarget(null)} disabled={deleteTenantBusy} className="btn-secondary flex-1">Annuler</button>
+                <button
+                  onClick={handleDeleteTenant}
+                  disabled={deleteTenantBusy || deleteTenantConfirm.trim().toLowerCase() !== String(deleteTenantTarget.name || '').trim().toLowerCase()}
+                  className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {deleteTenantBusy
+                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <Trash2 size={16} />}
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vider le journal d'audit — confirmation par phrase exacte */}
+      {purgeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => !purgeBusy && setPurgeOpen(false)}>
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Eraser size={18} className="text-red-500" /> Vider le journal d'audit
+              </h2>
+              <button onClick={() => setPurgeOpen(false)} disabled={purgeBusy} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-50"><X size={18} className="text-slate-400" /></button>
+            </div>
+            <div className="p-8 space-y-5 max-h-[70vh] overflow-y-auto">
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-200">
+                <ShieldAlert size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-red-800 leading-relaxed">
+                  <p className="font-bold mb-1">Vous levez une garantie d'inaltérabilité</p>
+                  <p>
+                    Le journal est append-only par conception. Cette purge est tracée :
+                    une entrée indiquant qui l'a effectuée et combien de lignes ont été
+                    supprimées sera écrite immédiatement après.
+                  </p>
+                </div>
+              </div>
+
+              {/* Périmètre : purger tout est rarement le bon choix. Le proposer
+                  restreint évite d'effacer plus que nécessaire. */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Périmètre</label>
+                <div className="space-y-2">
+                  {[
+                    { key: 'all', label: 'Tout le journal', hint: 'Toutes les entreprises, toutes les dates' },
+                    { key: 'tenant', label: 'Une seule entreprise', hint: 'Utile après le départ d\'un client' },
+                    { key: 'before', label: 'Avant une date', hint: 'Recommandé : ne purge que le passé lointain' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setPurgeScope(opt.key)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                        purgeScope === opt.key ? 'border-docuflow-primary bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <p className="text-sm font-bold text-slate-800">{opt.label}</p>
+                      <p className="text-xs text-slate-400">{opt.hint}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {purgeScope === 'tenant' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Entreprise</label>
+                  <select className="input-premium" value={purgeTenant} onChange={(e) => setPurgeTenant(e.target.value)}>
+                    <option value="">— Choisir —</option>
+                    {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {purgeScope === 'before' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Supprimer les entrées antérieures au</label>
+                  <input type="date" className="input-premium" value={purgeBefore} onChange={(e) => setPurgeBefore(e.target.value)} />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  Saisissez « VIDER LE JOURNAL » pour confirmer
+                </label>
+                <input
+                  className="input-premium"
+                  value={purgeConfirm}
+                  onChange={(e) => setPurgeConfirm(e.target.value)}
+                  placeholder="VIDER LE JOURNAL"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setPurgeOpen(false)} disabled={purgeBusy} className="btn-secondary flex-1">Annuler</button>
+                <button
+                  onClick={handlePurgeAudit}
+                  disabled={
+                    purgeBusy
+                    || purgeConfirm.trim() !== 'VIDER LE JOURNAL'
+                    || (purgeScope === 'tenant' && !purgeTenant)
+                    || (purgeScope === 'before' && !purgeBefore)
+                  }
+                  className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {purgeBusy
+                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <Eraser size={16} />}
+                  Purger
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

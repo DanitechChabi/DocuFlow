@@ -50,15 +50,24 @@ echo [2/3] Configuration...
   echo DB_NAME=%DB_NAME%
   echo JWT_SECRET=DOCUFLOW_PROD_SECRET_%RANDOM%%RANDOM%
   echo SERVE_FRONTEND=true
-  echo HOST=0.0.0.0
+  REM 127.0.0.1 et non 0.0.0.0 : l'application est destinée au poste sur lequel
+  REM elle est installée. Écouter sur toutes les interfaces publierait la GED sur
+  REM le réseau local — sans authentification pour /uploads, n'importe quelle
+  REM machine du même réseau pourrait lire les documents.
+  echo HOST=127.0.0.1
 ) > "%APP_DIR%\backend\.env"
 echo [OK] Fichier .env créé.
 
 REM --- Migrations + seed ---
+REM Chemin réel de la CLI : backend\src\desktop\run-migrations-cli.js.
+REM L'ancien "%APP_DIR%\scripts\run-migrations.js" n'a jamais existé — node
+REM renvoyait alors le code 1, la migration était annoncée en échec, et selon
+REM l'ordre des étapes l'installation pouvait se conclure sur un « terminé »
+REM alors qu'aucune table n'avait été créée.
 echo.
 echo [3/3] Migration de la base de données...
 cd /d "%APP_DIR%"
-"%NODE%" "%APP_DIR%\scripts\run-migrations.js"
+"%NODE%" "%APP_DIR%\backend\src\desktop\run-migrations-cli.js"
 if errorlevel 1 (
   echo [ERREUR] Migration échouée. Vérifiez que PostgreSQL est démarré.
   exit /b 1

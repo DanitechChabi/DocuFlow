@@ -50,7 +50,7 @@ const DocumentAssemblyModal = ({ onClose, onSuccess }) => {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wand2 className="text-docuflow-secondary" size={20} />
-            <h2 className="text-lg font-black text-slate-900">Assemblage Automatique M-Files</h2>
+            <h2 className="text-lg font-black text-slate-900">Assemblage automatique de dossier</h2>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={18} /></button>
         </div>

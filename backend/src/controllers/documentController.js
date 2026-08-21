@@ -18,6 +18,14 @@ const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 // la chaîne littérale « Non classé », que plus aucun COALESCE ne rattraperait.
 const UNCLASSIFIED_GROUP = 'Non classé';
 
+// Profondeur maximale de l'arborescence des dossiers : la racine est au niveau 0,
+// donc dix niveaux de sous-dossiers. Au-delà, le chemin affiché ne tient plus
+// dans une colonne, et la borne protège les CTE récursives d'une descente
+// pathologique. Déclarée ici, en tête : `listDocuments` s'en sert bien avant la
+// section Dossiers, et un `const` n'est pas hissé — le placer plus bas
+// provoquerait un ReferenceError au premier filtrage par dossier.
+const MAX_FOLDER_DEPTH = 10;
+
 // Listes blanches des vues dynamiques, partagées par `createDynamicView` (qui
 // refuse d'enregistrer hors liste) et `getDynamicViewData` (qui calcule). Deux
 // copies divergentes laisseraient enregistrer une vue dont le regroupement
@@ -176,7 +184,35 @@ exports.listDocuments = async (req, res) => {
   if (type_document) { vals.push(type_document); conds.push(`d.type_document = $${vals.length}`); }
   if (annee) { vals.push(Number(annee)); conds.push(`d.annee = $${vals.length}`); }
   if (statut) { vals.push(statut); conds.push(`d.statut = $${vals.length}`); }
-  if (dossier_id) { vals.push(Number(dossier_id)); conds.push(`d.dossier_id = $${vals.length}`); }
+  if (dossier_id) {
+    vals.push(Number(dossier_id));
+    // Un dossier INCLUT ses sous-dossiers. Sans cette descente récursive,
+    // sélectionner « Archives » n'affiche rien dès lors que les documents sont
+    // rangés dans « Archives / 2025 » : l'arborescence rendrait alors la
+    // consultation plus difficile qu'une liste plate, ce qui serait absurde.
+    //
+    // La récursion est bornée en profondeur et exclut les identifiants déjà
+    // visités : une donnée héritée formant un cycle boucherait sinon la requête.
+    //
+    // Attention : ici `depth` compte à partir du dossier SÉLECTIONNÉ, pas depuis
+    // la racine. La borne n'est donc pas la limite d'arborescence — c'est un
+    // simple garde-fou d'arrêt, et il est volontairement large. Un filtre qui
+    // s'arrête trop tôt omettrait des documents en silence, ce qui est bien pire
+    // qu'une itération de trop : on ne resserre pas cette borne pour l'aligner
+    // sur celle de chargerArborescence().
+    conds.push(`d.dossier_id IN (
+      WITH RECURSIVE descendance AS (
+        SELECT id, 0 AS depth, ARRAY[id] AS vus
+        FROM document_folders WHERE id = $${vals.length} AND tenant_id = $1
+        UNION ALL
+        SELECT e.id, dsc.depth + 1, dsc.vus || e.id
+        FROM document_folders e
+        JOIN descendance dsc ON e.parent_id = dsc.id
+        WHERE e.tenant_id = $1 AND dsc.depth < ${MAX_FOLDER_DEPTH} AND NOT (e.id = ANY(dsc.vus))
+      )
+      SELECT id FROM descendance
+    )`);
+  }
   if (tag) {
     vals.push(tag);
     conds.push(`$${vals.length} = ANY(d.tags)`);
@@ -517,36 +553,179 @@ exports.indexFromRequest = async (req, res) => {
 
 /* ===== Dossiers ===== */
 
+/**
+ * L'arborescence des dossiers.
+ *
+ * `document_folders.parent_id` existe depuis la migration 004 — la colonne y est
+ * même commentée « arborescence ». Seule la LECTURE était plate : l'interface
+ * n'avait donc aucun moyen de montrer une hiérarchie pourtant stockable. Aucune
+ * migration n'est nécessaire ici.
+ *
+ * Trois règles gouvernent cette section.
+ *
+ * 1. TOUT parent_id VENANT DU CLIENT EST VÉRIFIÉ. `req.body.parent_id` est un
+ *    entier arbitraire : sans contrôle d'appartenance, une organisation
+ *    rattachait son dossier sous celui d'une autre. Le dossier devenait alors
+ *    invisible pour les deux (son parent n'apparaît pas dans leur arbre) et le
+ *    nom du parent d'autrui fuitait dans le chemin.
+ *
+ * 2. AUCUN CYCLE. Déplacer un dossier sous l'un de ses propres descendants
+ *    détache la branche entière de la racine : les dossiers existent toujours en
+ *    base mais aucune requête récursive partant de la racine ne les atteint. Ils
+ *    disparaissent de l'interface sans qu'aucune erreur ne le signale.
+ *
+ * 3. LA PROFONDEUR EST BORNÉE. Une arborescence sans limite produit des chemins
+ *    illisibles et une interface impraticable ; la borne protège aussi la CTE
+ *    récursive d'une profondeur pathologique. Voir MAX_FOLDER_DEPTH en tête de
+ *    fichier.
+ */
+
+/**
+ * Charge l'arborescence complète d'une organisation, avec chemin et profondeur.
+ *
+ * La CTE récursive descend depuis les racines. `path_ids` sert aux garde-fous
+ * anti-cycle et au filtrage par descendance ; `path` est le libellé affiché.
+ *
+ * Le tri par `path_labels` (et non par nom) est ce qui produit l'ordre naturel
+ * d'un explorateur de fichiers : chaque dossier apparaît immédiatement après son
+ * parent, et non regroupé avec les autres dossiers de même niveau.
+ */
+async function chargerArborescence(tenantId) {
+  const { rows } = await db.query(
+    `WITH RECURSIVE arbre AS (
+       SELECT f.id, f.parent_id, f.name, f.created_by, f.created_at,
+              0 AS depth,
+              ARRAY[f.id] AS path_ids,
+              ARRAY[f.name]::text[] AS path_labels
+       FROM document_folders f
+       WHERE f.tenant_id = $1 AND f.parent_id IS NULL
+       UNION ALL
+       SELECT e.id, e.parent_id, e.name, e.created_by, e.created_at,
+              a.depth + 1,
+              a.path_ids || e.id,
+              a.path_labels || e.name
+       FROM document_folders e
+       JOIN arbre a ON e.parent_id = a.id
+       -- Deux rôles pour cette clause, et une borne à ne pas décaler.
+       --
+       -- La comparaison porte sur a.depth + 1, c'est-à-dire la profondeur DE
+       -- L'ENFANT, celle que le SELECT ci-dessus calcule. Bornée sur a.depth
+       -- seul, la lecture remonterait un niveau de plus que validerParent()
+       -- n'autorise à en créer : la limite annoncée à l'utilisateur
+       -- (« 10 niveaux ») serait fausse en lecture et vraie en écriture.
+       --
+       -- Le second rôle est l'arrêt : même en présence d'un cycle en base
+       -- (donnée héritée), la récursion se termine.
+       WHERE e.tenant_id = $1 AND a.depth + 1 < $2 AND NOT (e.id = ANY(a.path_ids))
+     )
+     SELECT a.*,
+            array_to_string(a.path_labels, ' / ') AS path,
+            (SELECT COUNT(*) FROM documents d
+              WHERE d.dossier_id = a.id AND d.tenant_id = $1)::int AS doc_count,
+            (SELECT COUNT(*) FROM document_folders c
+              WHERE c.parent_id = a.id AND c.tenant_id = $1)::int AS child_count
+     FROM arbre a
+     ORDER BY a.path_labels`,
+    [tenantId, MAX_FOLDER_DEPTH]
+  );
+  return rows;
+}
+
+/**
+ * Dossiers rattachés à un parent hors arborescence atteignable.
+ *
+ * Un `parent_id` pointant vers un dossier supprimé passe en NULL (ON DELETE SET
+ * NULL) et remonte donc à la racine — c'est traité. Restent les données héritées
+ * d'avant ces garde-fous : parent d'une autre organisation, ou cycle. La CTE ne
+ * les atteint jamais, et ils resteraient invisibles indéfiniment. On les
+ * rattache visuellement à la racine plutôt que de les taire.
+ */
+function rattacherOrphelins(arbre, toutes, tenantId) {
+  const atteints = new Set(arbre.map((f) => f.id));
+  return toutes
+    .filter((f) => !atteints.has(f.id))
+    .map((f) => ({
+      ...f,
+      // parent_id remis à null pour l'affichage seulement : la base n'est pas
+      // modifiée à la lecture. Le drapeau permet à l'interface de le signaler.
+      parent_id: null,
+      depth: 0,
+      path_ids: [f.id],
+      path: f.name,
+      orphelin: true,
+      doc_count: 0,
+      child_count: 0,
+    }));
+}
+
 exports.listFolders = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
-    // Utiliser db.query avec jointure explicite pour éviter les problèmes de multi-tenant
-    // Filtrer documents par tenant_id dans la sous-requête
-    const result = await db.query(
-      `SELECT f.*,
-              (SELECT COUNT(*) FROM documents d WHERE d.dossier_id = f.id AND d.tenant_id = $1) AS doc_count
-       FROM document_folders f
-       WHERE f.tenant_id = $1
-       ORDER BY f.name ASC`,
+    const arbre = await chargerArborescence(tenantId);
+
+    // Un dossier présent en base mais absent de l'arbre signale une donnée
+    // héritée incohérente. Le comparatif coûte une requête simple et évite un
+    // dossier définitivement introuvable dans l'interface.
+    const toutes = await db.query(
+      `SELECT f.id, f.parent_id, f.name, f.created_by, f.created_at
+       FROM document_folders f WHERE f.tenant_id = $1`,
       [tenantId]
     );
-    res.json(result.rows);
+    const orphelins = rattacherOrphelins(arbre, toutes.rows, tenantId);
+    if (orphelins.length) {
+      console.warn(`[dossiers] ${orphelins.length} dossier(s) hors arborescence pour l'organisation ${tenantId}`);
+    }
+
+    res.json([...arbre, ...orphelins]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du chargement des dossiers' });
   }
 };
 
+/**
+ * Valide un parent proposé : appartenance à l'organisation et profondeur.
+ * @returns {Promise<{erreur?: string, parentId: number|null}>}
+ */
+async function validerParent(tenantId, parentIdBrut) {
+  if (parentIdBrut === undefined || parentIdBrut === null || parentIdBrut === '') {
+    return { parentId: null };
+  }
+  const parentId = Number(parentIdBrut);
+  if (!Number.isInteger(parentId) || parentId <= 0) {
+    return { erreur: 'Dossier parent invalide' };
+  }
+  // Le filtre tenant_id est le cœur du contrôle : sans lui, l'appelant
+  // rattacherait son dossier sous celui d'une autre organisation.
+  const { rows } = await db.query(
+    'SELECT id FROM document_folders WHERE id = $1 AND tenant_id = $2',
+    [parentId, tenantId]
+  );
+  if (!rows.length) return { erreur: 'Dossier parent introuvable' };
+
+  const arbre = await chargerArborescence(tenantId);
+  const parent = arbre.find((f) => f.id === parentId);
+  if (parent && parent.depth + 1 >= MAX_FOLDER_DEPTH) {
+    return { erreur: `Profondeur maximale atteinte (${MAX_FOLDER_DEPTH} niveaux)` };
+  }
+  return { parentId };
+}
+
 exports.createFolder = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { name, parent_id } = req.body;
-  if (!name) return res.status(400).json({ message: 'Nom du dossier requis' });
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ message: 'Nom du dossier requis' });
+  }
   try {
+    const { erreur, parentId } = await validerParent(tenantId, parent_id);
+    if (erreur) return res.status(400).json({ message: erreur });
+
     const result = await tenantDb.insert(
       tenantId,
       'document_folders',
       ['name', 'parent_id', 'created_by'],
-      [name, parent_id || null, req.user.id]
+      [String(name).trim(), parentId, req.user.id]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -555,44 +734,141 @@ exports.createFolder = async (req, res) => {
   }
 };
 
+/**
+ * Renomme et/ou déplace un dossier.
+ *
+ * Le déplacement passe par la même route que le renommage : côté client, glisser
+ * un dossier sur un autre et le renommer sont deux modifications du même objet.
+ * `parent_id` n'est traité que s'il est explicitement présent dans le corps —
+ * sinon un simple renommage remonterait le dossier à la racine.
+ */
 exports.renameFolder = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
-  const { name } = req.body;
+  const { name, parent_id } = req.body;
+  const deplacement = Object.prototype.hasOwnProperty.call(req.body, 'parent_id');
+
   // Sans cette validation, un nom vide était accepté : le dossier restait dans
   // la base mais devenait invisible dans toute liste triée par nom.
-  if (!name || !String(name).trim()) {
+  if (name !== undefined && !String(name || '').trim()) {
     return res.status(400).json({ message: 'Nom du dossier requis' });
   }
+  if (name === undefined && !deplacement) {
+    return res.status(400).json({ message: 'Aucune modification demandée' });
+  }
+
   try {
+    const dossierId = Number(id);
+    const champs = [];
+    const vals = [];
+
+    if (name !== undefined) {
+      vals.push(String(name).trim());
+      champs.push(`name = $${vals.length}`);
+    }
+
+    if (deplacement) {
+      const { erreur, parentId } = await validerParent(tenantId, parent_id);
+      if (erreur) return res.status(400).json({ message: erreur });
+
+      if (parentId === dossierId) {
+        return res.status(400).json({ message: 'Un dossier ne peut pas être son propre parent' });
+      }
+      if (parentId !== null) {
+        // Le garde-fou décisif. Déplacer un dossier sous l'un de ses propres
+        // descendants détache la branche entière de la racine : les dossiers
+        // subsistent en base mais aucune descente récursive ne les atteint, donc
+        // ils disparaissent de l'interface sans le moindre message.
+        const arbre = await chargerArborescence(tenantId);
+        const cible = arbre.find((f) => f.id === parentId);
+        if (cible && (cible.path_ids || []).includes(dossierId)) {
+          return res.status(400).json({
+            message: 'Déplacement impossible : le dossier de destination est l\'un de ses sous-dossiers',
+          });
+        }
+        // La profondeur se vérifie sur la BRANCHE déplacée, pas sur le seul
+        // dossier : déplacer une branche de trois niveaux sous un dossier déjà
+        // profond dépasserait la borne sans que ce contrôle la voie.
+        const noeud = arbre.find((f) => f.id === dossierId);
+        if (noeud && cible) {
+          const hauteurBranche = arbre
+            .filter((f) => (f.path_ids || []).includes(dossierId))
+            .reduce((max, f) => Math.max(max, f.depth - noeud.depth), 0);
+          if (cible.depth + 1 + hauteurBranche >= MAX_FOLDER_DEPTH) {
+            return res.status(400).json({
+              message: `Profondeur maximale atteinte (${MAX_FOLDER_DEPTH} niveaux)`,
+            });
+          }
+        }
+      }
+      vals.push(parentId);
+      champs.push(`parent_id = $${vals.length}`);
+    }
+
+    vals.push(dossierId);
     const result = await tenantDb.query(
       tenantId,
-      'UPDATE document_folders SET name = $1 WHERE id = $2',
-      [String(name).trim(), id]
+      `UPDATE document_folders SET ${champs.join(', ')} WHERE id = $${vals.length}`,
+      vals
     );
     if (!result.rowCount) return res.status(404).json({ message: 'Dossier non trouvé' });
-    res.json({ message: 'Dossier renommé' });
+    res.json({ message: deplacement && name === undefined ? 'Dossier déplacé' : 'Dossier renommé' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Erreur lors du renommage du dossier' });
+    res.status(500).json({ message: 'Erreur lors de la modification du dossier' });
   }
 };
 
 exports.deleteFolder = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
+  const recursif = req.query.recursif === 'true' || req.query.recursif === '1';
   try {
+    const dossierId = Number(id);
+    const arbre = await chargerArborescence(tenantId);
+    const noeud = arbre.find((f) => f.id === dossierId);
+
+    // La branche complète, dossier compris. `path_ids` la donne sans nouvelle
+    // requête récursive.
+    const branche = arbre.filter((f) => (f.path_ids || []).includes(dossierId));
+    const descendants = branche.filter((f) => f.id !== dossierId);
+
+    // Un dossier qui contient des sous-dossiers n'est pas supprimé par accident.
+    // `parent_id` est en ON DELETE SET NULL : les enfants remonteraient
+    // silencieusement à la racine, ce qui ressemble à une perte de classement
+    // alors qu'ils sont simplement déplacés. On exige donc un choix explicite.
+    if (noeud && descendants.length && !recursif) {
+      return res.status(409).json({
+        message: `Ce dossier contient ${descendants.length} sous-dossier(s).`,
+        sous_dossiers: descendants.length,
+        // L'interface propose alors les deux options en toute connaissance.
+        options: ['recursif', 'annuler'],
+      });
+    }
+
+    const ids = recursif ? branche.map((f) => f.id) : [dossierId];
+
     // `documents.dossier_id` est en ON DELETE SET NULL : la suppression déclasse
     // les documents au lieu de les détruire. On renvoie leur nombre pour que
     // l'interface puisse le dire, et un 404 franc si le dossier n'existe pas —
     // auparavant une suppression sans effet répondait « Dossier supprimé ».
     const countRes = await db.query(
-      'SELECT COUNT(*)::int AS n FROM documents WHERE dossier_id = $1 AND tenant_id = $2',
-      [id, tenantId]
+      'SELECT COUNT(*)::int AS n FROM documents WHERE dossier_id = ANY($1::int[]) AND tenant_id = $2',
+      [ids, tenantId]
     );
-    const result = await tenantDb.query(tenantId, 'DELETE FROM document_folders WHERE id = $1', [id]);
+    // Le filtre tenant_id porte sur le DELETE lui-même : `ids` vient de l'arbre
+    // de cette organisation, mais la contrainte doit rester dans la requête et
+    // ne pas dépendre de la correction du calcul en amont.
+    const result = await db.query(
+      'DELETE FROM document_folders WHERE id = ANY($1::int[]) AND tenant_id = $2',
+      [ids, tenantId]
+    );
     if (!result.rowCount) return res.status(404).json({ message: 'Dossier non trouvé' });
-    res.json({ message: 'Dossier supprimé', documents_declasses: countRes.rows[0]?.n || 0 });
+    res.json({
+      message: result.rowCount > 1 ? `${result.rowCount} dossiers supprimés` : 'Dossier supprimé',
+      dossiers_supprimes: result.rowCount,
+      documents_declasses: countRes.rows[0]?.n || 0,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression du dossier' });
@@ -728,7 +1004,7 @@ exports.shareDocument = async (req, res) => {
   }
 };
 
-/* ===== M-Files Feature: Check-in / Check-out (Verrouillage) ===== */
+/* ===== Verrouillage pour édition (check-out / check-in) ===== */
 
 exports.checkoutDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
@@ -802,7 +1078,7 @@ exports.checkinDocument = async (req, res) => {
   }
 };
 
-/* ===== M-Files Feature: Vues Dynamiques (Dynamic Views) ===== */
+/* ===== Vues dynamiques ===== */
 
 exports.getDynamicViews = async (req, res) => {
   const tenantId = req.user.tenant_id;
@@ -886,7 +1162,7 @@ exports.createDynamicView = async (req, res) => {
 };
 
 /**
- * Regroupement dynamique des documents (paradigme M-Files).
+ * Regroupement dynamique des documents par métadonnée.
  *
  * Deux modes :
  *   - `groupBy` : regroupement ad hoc sur un champ de la liste blanche ;
@@ -926,7 +1202,10 @@ exports.getDynamicViewData = async (req, res) => {
     const groupField = ALLOWED_GROUP.includes(requestedGroup) ? requestedGroup : 'type_document';
 
     const vals = [tenantId];
-    const conds = ['tenant_id = $1'];
+    // Conditions préfixées « d. » : la requête joint désormais document_files,
+    // et une colonne comme `tenant_id` ou `annee` non qualifiée serait ambiguë
+    // ou, pire, résolue sur la mauvaise table.
+    const conds = ['d.tenant_id = $1'];
     for (const [key, kind] of Object.entries(ALLOWED_FILTERS)) {
       const raw = filters[key];
       if (raw === undefined || raw === null || raw === '') continue;
@@ -934,42 +1213,93 @@ exports.getDynamicViewData = async (req, res) => {
         const n = Number(raw);
         if (!Number.isFinite(n)) continue; // filtre illisible : ignoré, pas d'erreur 500
         vals.push(n);
-        conds.push(`${key} = $${vals.length}`);
+        conds.push(`d.${key} = $${vals.length}`);
       } else if (kind === 'ilike') {
         vals.push(`%${String(raw)}%`);
-        conds.push(`${key} ILIKE $${vals.length}`);
+        conds.push(`d.${key} ILIKE $${vals.length}`);
       } else {
         vals.push(String(raw));
-        conds.push(`${key} = $${vals.length}`);
+        conds.push(`d.${key} = $${vals.length}`);
       }
     }
 
-    const query = `
-      SELECT COALESCE(${groupField}::text, '${UNCLASSIFIED_GROUP}') as group_name,
+    // L'aperçu exige les données du fichier le plus récent de chaque document.
+    // DISTINCT ON les récupère en une passe, sans sous-requête corrélée par
+    // ligne : sur une vue qui regroupe plusieurs milliers de documents, la
+    // différence se voit à l'écran.
+    //
+    // La jointure est LEFT : un document non numérisé (fiche saisie sans
+    // fichier) doit rester présent dans son groupe. Un INNER JOIN le ferait
+    // disparaître de la vue, et le total affiché ne correspondrait plus au
+    // nombre réel de documents.
+    const construireRequete = (avecFichiers) => `
+      ${avecFichiers ? `WITH dernier_fichier AS (
+        SELECT DISTINCT ON (df.document_id)
+               df.document_id, df.stored_name, df.secure_url,
+               df.cloudinary_public_id, df.mime_type, df.original_name, df.version
+        FROM document_files df
+        ORDER BY df.document_id, df.version DESC, df.id DESC
+      )` : ''}
+      SELECT COALESCE(d.${groupField}::text, '${UNCLASSIFIED_GROUP}') as group_name,
              COUNT(*)::int as count,
              JSON_AGG(JSON_BUILD_OBJECT(
-               'id', id,
-               'reference_mfile', reference_mfile,
-               'num_dossier', num_dossier,
-               'num_acte', num_acte,
-               'nom_entreprise', nom_entreprise,
-               'type_document', type_document,
-               'annee', annee,
-               'statut', statut,
-               'auteur', auteur,
-               'is_checked_out', is_checked_out,
-               'checked_out_by', checked_out_by
-             ) ORDER BY created_at DESC) as documents
-      FROM documents
+               'id', d.id,
+               'reference_mfile', d.reference_mfile,
+               'num_dossier', d.num_dossier,
+               'num_acte', d.num_acte,
+               'nom_entreprise', d.nom_entreprise,
+               'type_document', d.type_document,
+               'annee', d.annee,
+               'statut', d.statut,
+               'auteur', d.auteur,
+               'is_checked_out', d.is_checked_out,
+               'checked_out_by', d.checked_out_by${avecFichiers ? `,
+               'stored_name', f.stored_name,
+               'secure_url', f.secure_url,
+               'cloudinary_public_id', f.cloudinary_public_id,
+               'mime_type', f.mime_type,
+               'original_name', f.original_name,
+               'file_version', f.version` : ''}
+             ) ORDER BY d.created_at DESC) as documents
+      FROM documents d
+      ${avecFichiers ? 'LEFT JOIN dernier_fichier f ON f.document_id = d.id' : ''}
       WHERE ${conds.join(' AND ')}
-      GROUP BY ${groupField}
+      GROUP BY d.${groupField}
       ORDER BY count DESC
     `;
-    const result = await db.query(query, vals);
+
+    let result;
+    try {
+      result = await db.query(construireRequete(true), vals);
+    } catch (err) {
+      // `document_files` absente (base antérieure à la migration 004) : la vue
+      // doit perdre l'aperçu, pas les documents. Sans ce repli, le catch 42P01
+      // plus bas renverrait zéro groupe et l'archiviste verrait une
+      // bibliothèque vide alors que ses documents sont bien là.
+      if (err.code !== '42P01') throw err;
+      result = await db.query(construireRequete(false), vals);
+    }
+    // L'URL est calculée ici, jamais côté interface : elle est relative en mode
+    // bureau (le port change à chaque lancement) et absolue en mode hébergé.
+    // Voir helpers/publicUrl.js — la règle n'a qu'un seul domicile.
+    //
+    // Le garde-fou couvre les trois sources que fileUrl sait exploiter. Sans
+    // lui, un document non numérisé (LEFT JOIN sans correspondance) produirait
+    // une URL vers /uploads/files/null : la vignette tenterait un chargement
+    // voué à l'échec au lieu d'afficher « Non numérisé ».
+    const groups = result.rows.map((groupe) => ({
+      ...groupe,
+      documents: (groupe.documents || []).map((doc) => ({
+        ...doc,
+        apercu_url: (doc.secure_url || doc.cloudinary_public_id || doc.stored_name)
+          ? storage.fileUrl(req, doc)
+          : null,
+      })),
+    }));
     // Le champ de regroupement est renvoyé avec les groupes : en mode `view_id`,
     // c'est la seule façon pour l'interface de savoir sur quelle métadonnée un
     // glisser-déposer doit agir.
-    res.json({ group_by_field: groupField, groups: result.rows });
+    res.json({ group_by_field: groupField, groups });
   } catch (err) {
     if (err.code === '42P01') return res.json({ group_by_field: 'type_document', groups: [] });
     console.error(err);
@@ -977,7 +1307,7 @@ exports.getDynamicViewData = async (req, res) => {
   }
 };
 
-/* ===== M-Files Feature: Document Assembly & Relations ===== */
+/* ===== Assemblage de dossier et relations ===== */
 
 exports.getAssemblyTemplates = async (req, res) => {
   const { DEFAULT_TEMPLATES } = require('../services/documentAssemblyService');

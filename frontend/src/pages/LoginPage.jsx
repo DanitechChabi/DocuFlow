@@ -5,6 +5,7 @@ import { googleAuthService } from '../services/googleAuthService';
 import { useSettings } from '../contexts/SettingsContext';
 import { LogIn, User, Lock, AlertCircle, Eye, EyeOff, Building2, Loader2 } from 'lucide-react';
 import { toast } from '../components/Toast';
+import { useTitrePage } from '../hooks/useTitrePage';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -85,6 +86,19 @@ const LoginPage = () => {
   const displayDesc = company?.settings?.site_description || settings.site_description || 'Plateforme de gestion documentaire';
   const displayLogo = company?.settings?.site_logo_url || settings.site_logo_url || defaultLogoSrc;
   const suspended = company?.status === 'suspended';
+
+  // Titre d'onglet. Sur /:slug/login il nomme l'entreprise : un prestataire qui
+  // travaille pour plusieurs clients garde autant d'onglets de connexion
+  // ouverts, et « Connexion · DocuFlow » répété n'en distingue aucun.
+  //
+  // Rien n'est annoncé tant que l'entreprise se charge (`null`) : le nom
+  // n'arrive qu'après la réponse du serveur, et afficher « Connexion » puis le
+  // remplacer ferait clignoter la barre de tâches pour rien.
+  useTitrePage(
+    slug
+      ? (companyLoading ? null : (company ? `Connexion — ${displayName}` : 'Entreprise introuvable'))
+      : 'Connexion'
+  );
 
   const handleLogin = async (e) => {
     e.preventDefault();

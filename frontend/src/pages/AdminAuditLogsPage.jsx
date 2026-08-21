@@ -5,6 +5,7 @@ import {
   Activity, RefreshCcw, AlertCircle
 } from 'lucide-react';
 import { toast } from '../components/Toast';
+import PageHeader from '../components/PageHeader';
 
 /**
  * AdminAuditLogsPage — Vue en lecture seule du journal d'audit (Append-Only).
@@ -74,27 +75,24 @@ const AdminAuditLogsPage = () => {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
-          <div className="flex items-center gap-3 md:gap-5">
-            <div className="p-2 md:p-2.5 bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl shadow-lg">
-              <ShieldAlert size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Journal d'Audit</h1>
-              <p className="text-xs md:text-sm text-slate-500 font-medium md:ml-1">
-                Tracé immuable des activités de l'organisation
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={fetchLogs}
-            disabled={loading}
-            className="btn-secondary flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:bg-slate-100"
-          >
-            <RefreshCcw size={15} className={loading ? 'animate-spin' : ''} /> Actualiser
-          </button>
-        </div>
+        <PageHeader
+          title="Journal d'audit"
+          subtitle="Tracé immuable des actions menées dans l'organisation"
+          icon={ShieldAlert}
+          breadcrumb={[
+            { label: 'Tableau de bord', to: '/dashboard' },
+            { label: "Journal d'audit" },
+          ]}
+          actions={
+            <button
+              onClick={fetchLogs}
+              disabled={loading}
+              className="btn btn-secondary"
+            >
+              <RefreshCcw size={15} className={loading ? 'animate-spin' : undefined} /> Actualiser
+            </button>
+          }
+        />
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -9,14 +9,17 @@ import { useSettings } from '../contexts/SettingsContext';
 import {
   Users, Layers, Palette, Building2,
   X, Plus, Trash2, Search, UserCog, Upload, Pencil,
-  Users2, Database, SlidersHorizontal, FolderTree
+  Users2, Database, SlidersHorizontal, FolderTree, ListChecks
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ThemeManager from '../components/ThemeManager';
 import GroupManager from '../components/admin/GroupManager';
 import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
+import RequestFieldsPanel from '../components/admin/RequestFieldsPanel';
 import ConfigurationConsole from '../components/admin/ConfigurationConsole';
 import FolderManager from '../components/admin/FolderManager';
+import PageHeader from '../components/PageHeader';
+import { useOngletUrl } from '../hooks/useOngletUrl';
 import { toast } from '../components/Toast';
 
 const roleColor = (role) => ({
@@ -32,6 +35,25 @@ const ROLE_OPTIONS = [
   { key: 'admin', label: 'Admin' },
 ];
 
+// Déclaré hors du composant : `useOngletUrl` mémorise sur ce tableau, et un
+// littéral reconstruit à chaque rendu invaliderait le calcul en permanence.
+// L'ordre fixe le premier élément comme onglet par défaut.
+const PANNEAUX = ['users', 'sections', 'groups', 'metadata', 'request-fields', 'folders', 'branding', 'configuration'];
+
+// Libellé lisible de chaque panneau, pour le fil d'Ariane et le titre d'onglet du
+// navigateur. Sans lui, dix onglets « Administration » resteraient indiscernables
+// et le fil s'arrêterait au niveau de la page, sans dire où l'on est dedans.
+const NOMS_PANNEAUX = {
+  users: 'Utilisateurs',
+  sections: 'Sections',
+  groups: 'Groupes',
+  metadata: 'Métadonnées',
+  'request-fields': 'Champs de demande',
+  folders: 'Dossiers',
+  branding: 'Branding',
+  configuration: 'Configuration',
+};
+
 /**
  * CompanyAdminPage — Espace d'administration SCOPÉ à l'entreprise connectée.
  * Le superadmin d'entreprise gère UNIQUEMENT les utilisateurs, sections et
@@ -42,7 +64,10 @@ const CompanyAdminPage = () => {
   const user = authService.getCurrentUser();
   const settings = useSettings();
 
-  const [activePanel, setActivePanel] = useState('users');
+  // L'onglet vit dans l'URL : il survit à F5, se partage par lien et se traverse
+  // au bouton Retour. Voir useOngletUrl pour le détail de ce que l'état local
+  // faisait perdre.
+  const [activePanel, setActivePanel] = useOngletUrl(PANNEAUX);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -222,6 +247,7 @@ const CompanyAdminPage = () => {
     { id: 'sections', label: 'Sections', icon: Layers, badge: sections.length },
     { id: 'groups', label: 'Groupes', icon: Users2 },
     { id: 'metadata', label: 'Métadonnées', icon: Database },
+    { id: 'request-fields', label: 'Champs de demande', icon: ListChecks },
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
@@ -238,26 +264,36 @@ const CompanyAdminPage = () => {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-down">
-          <div className="flex items-center gap-3 md:gap-5">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="p-2 md:p-2.5 bg-gradient-to-br from-docuflow-primary to-slate-800 text-white rounded-2xl shadow-lg">
-                <Building2 size={22} />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Administration</h1>
-                <p className="text-xs md:text-sm text-slate-500 font-medium md:ml-1">Espace de votre entreprise — {settings.site_name || 'DocuFlow'}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Le fil d'Ariane descend jusqu'au panneau : sans son dernier segment, un
+            administrateur à trois niveaux de profondeur ne lisait nulle part dans
+            quelle rubrique il se trouvait — seul le bouton d'onglet le disait, et
+            il faut le chercher. Le titre d'onglet du navigateur porte lui aussi le
+            panneau, pour distinguer plusieurs fenêtres d'administration. */}
+        <PageHeader
+          title="Administration"
+          subtitle={`Espace de votre entreprise — ${settings.site_name || 'DocuFlow'}`}
+          icon={Building2}
+          documentTitle={`${NOMS_PANNEAUX[activePanel]} — Administration`}
+          breadcrumb={[
+            { label: 'Tableau de bord', to: '/dashboard' },
+            { label: 'Administration' },
+            { label: NOMS_PANNEAUX[activePanel] },
+          ]}
+        />
 
-        {/* Tabs */}
-        <div className="flex gap-1.5 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 overflow-x-auto scrollbar-none">
+        {/* Onglets. `role="tablist"` et `aria-selected` remplacent la mise en
+            forme seule : un lecteur d'écran annonçait auparavant sept boutons
+            identiques, sans dire lequel était actif ni combien il y en avait. */}
+        <div
+          role="tablist"
+          aria-label="Rubriques d'administration"
+          className="flex gap-1.5 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 overflow-x-auto scrollbar-none"
+        >
           {tabs.map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={activePanel === id}
               onClick={() => setActivePanel(id)}
               className={`px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
                 activePanel === id ? 'bg-docuflow-primary text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
@@ -367,6 +403,13 @@ const CompanyAdminPage = () => {
         {activePanel === 'metadata' && (
           <div className="animate-fade-in-up">
             <MetadataSchemaPanel />
+          </div>
+        )}
+
+        {/* ============ CHAMPS DE DEMANDE ============ */}
+        {activePanel === 'request-fields' && (
+          <div className="animate-fade-in-up">
+            <RequestFieldsPanel />
           </div>
         )}
 

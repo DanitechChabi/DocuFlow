@@ -6,6 +6,7 @@ import {
   User, Building2, Shield, Calendar, Lock, Save,
   KeyRound, CheckCircle, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 
 const ProfilePage = () => {
 
@@ -108,28 +109,24 @@ const ProfilePage = () => {
     );
   }
 
-  const initial = profile?.full_name?.charAt(0)?.toUpperCase() || '?';
-
   return (
     <div className="relative p-4 md:p-8">
       <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-blue-500/[0.03] rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="max-w-3xl mx-auto relative z-10 space-y-6 md:space-y-8">
-        {/* Header */}
-        <div className="flex items-center gap-3 md:gap-4 animate-fade-in-down">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="relative">
-              <div className="w-11 h-11 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-md">
-                {initial}
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 md:w-4 md:h-4 bg-green-500 rounded-full border-2 border-white"></div>
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Mon Profil</h1>
-              <p className="text-xs md:text-sm text-slate-500 font-medium">Personnalisez vos informations personnelles</p>
-            </div>
-          </div>
-        </div>
+        {/* L'avatar et la pastille de présence qui ornaient cet en-tête ont été
+            retirés : la topbar les affiche déjà en permanence, à trois
+            centimètres au-dessus. Ils occupaient la place la plus visible de la
+            page pour répéter une information acquise. */}
+        <PageHeader
+          title="Mon profil"
+          subtitle="Vos coordonnées, votre section et votre mot de passe"
+          icon={User}
+          breadcrumb={[
+            { label: 'Tableau de bord', to: '/dashboard' },
+            { label: 'Mon profil' },
+          ]}
+        />
 
         {/* Messages */}
         {successMsg && (

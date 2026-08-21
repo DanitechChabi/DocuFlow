@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 /**
- * retentionService — Politiques de rétention et de conservation (M-Files feature #18).
+ * retentionService — Politiques de rétention et de conservation.
  * Schéma de référence : docs/migrations/010_metadata_typed.sql
  *   retention_policies (tenant_id, name, description, applies_to_schema_id,
  *                       retention_years, action_on_expiry, notify_before_days)

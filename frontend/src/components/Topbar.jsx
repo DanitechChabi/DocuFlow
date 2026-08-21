@@ -3,11 +3,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileSearch, FolderOpen, History, Building2,
   ShieldCheck, Info, ClipboardList, Menu, X, Search, LogOut,
-  User as UserIcon, MessageCircle, ChevronDown,
+  User as UserIcon, MessageCircle, ChevronDown, Compass,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import NotificationBell from './NotificationBell';
+import { RESTART_TOUR_EVENT } from './OnboardingTour';
 
 // Monogramme officiel, deux encres : la topbar prend la couleur primaire du
 // tenant, qui peut être claire comme sombre. Généré par make-brand.js.
@@ -114,6 +115,14 @@ const Topbar = () => {
   };
 
   const toggleMessaging = () => window.dispatchEvent(new CustomEvent('docuflow:toggle-messaging'));
+
+  // Le tour guidé est monté par le tableau de bord : depuis une autre page, il
+  // faut y revenir avant de le déclencher, sinon l'événement tombe dans le vide.
+  const restartTour = () => {
+    setUserMenuOpen(false);
+    navigate('/dashboard');
+    setTimeout(() => window.dispatchEvent(new CustomEvent(RESTART_TOUR_EVENT)), 400);
+  };
 
   const initial = user?.full_name?.charAt(0)?.toUpperCase() || '?';
 
@@ -292,6 +301,13 @@ const Topbar = () => {
                       <ClipboardList size={16} /> Journal d'audit
                     </button>
                   )}
+
+                  <button
+                    onClick={restartTour}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Compass size={16} /> Revoir le tour guidé
+                  </button>
 
                   <button
                     onClick={() => { navigate('/about'); setUserMenuOpen(false); }}

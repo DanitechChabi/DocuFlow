@@ -75,6 +75,14 @@ exports.updateTenantStatus = async (req, res) => {
     return res.status(400).json({ message: 'Statut invalide' });
   }
 
+  // Suspendre le tenant 1 couperait l'accès au propriétaire de la plateforme —
+  // donc à la seule console permettant de le réactiver. Verrou définitif.
+  if (Number(id) === 1 && status === 'suspended') {
+    return res.status(400).json({
+      message: 'L\'entreprise propriétaire de la plateforme ne peut pas être suspendue',
+    });
+  }
+
   try {
     const result = await db.query(
       'UPDATE tenants SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, slug, status',
@@ -93,17 +101,16 @@ exports.updateTenantStatus = async (req, res) => {
   }
 };
 
-exports.deleteTenant = async (req, res) => {
-  const { id } = req.params;
-  try {
-    // Supprimer en cascade (les contraintes FK gèrent)
-    await db.query('DELETE FROM tenants WHERE id = $1', [id]);
-    res.json({ message: 'Entreprise supprimée' });
-  } catch (err) {
-    if (isMissingTable(err)) {
-      return res.status(404).json({ message: 'Entreprise non trouvée' });
-    }
-    console.error(err);
-    res.status(500).json({ message: 'Erreur lors de la suppression' });
-  }
-};
+/**
+ * DELETE /:id — délègue à superadminController.deleteTenant.
+ *
+ * L'implémentation d'origine était un `DELETE FROM tenants` nu, commenté
+ * « les contraintes FK gèrent » — ce qui était faux : dix colonnes `tenant_id`
+ * étaient en NO ACTION avant la migration 014, et la requête échouait en 500.
+ * Elle ne protégeait pas non plus le tenant 1 et n'exigeait aucune confirmation.
+ *
+ * Plutôt que de dupliquer les garde-fous ici, on délègue : une suppression
+ * d'entreprise, quel que soit le chemin d'appel, passe par le même code vérifié
+ * (protection du tenant 1, confirmation par le nom, journalisation).
+ */
+exports.deleteTenant = (req, res) => require('./superadminController').deleteTenant(req, res);

@@ -132,6 +132,47 @@ CREATE TABLE IF NOT EXISTS settings (
     PRIMARY KEY (tenant_id, key)
 );
 
+-- 10. Licences de bureau et paiements
+-- Miroir de docs/migrations/015_licensing.sql. Dupliqué ici parce que le
+-- bootstrap de l'app de bureau (backend/src/desktop/bootstrap.js) exécute
+-- setup_db.sql AVANT les migrations : sans ces tables, une installation neuve
+-- démarrerait sans support de licence et divergerait des bases migrées.
+-- Voir 015 pour le détail des choix (tenant_id nullable, unicité des webhooks).
+CREATE TABLE IF NOT EXISTS licenses (
+    id SERIAL PRIMARY KEY,
+    tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+    license_key VARCHAR(64) UNIQUE NOT NULL,
+    machine_id VARCHAR(128),
+    machine_label VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'active', 'expired', 'revoked')),
+    valid_until TIMESTAMPTZ,
+    activated_at TIMESTAMPTZ,
+    customer_email VARCHAR(255),
+    customer_company VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id SERIAL PRIMARY KEY,
+    license_id INTEGER REFERENCES licenses(id) ON DELETE SET NULL,
+    provider VARCHAR(20) NOT NULL
+        CHECK (provider IN ('kkiapay', 'paypal', 'manual')),
+    provider_ref VARCHAR(255),
+    amount NUMERIC(12, 2) NOT NULL,
+    currency VARCHAR(3) NOT NULL CHECK (currency IN ('XOF', 'EUR')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'paid', 'failed', 'refunded')),
+    months INTEGER NOT NULL DEFAULT 1 CHECK (months >= 1 AND months <= 36),
+    customer_email VARCHAR(255),
+    raw_payload JSONB,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    paid_at TIMESTAMPTZ,
+    CONSTRAINT payments_provider_ref_uniq UNIQUE (provider, provider_ref)
+);
+
 -- ============================================================================
 -- Index
 -- ============================================================================
@@ -148,6 +189,11 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(tenant_id, id
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
+CREATE INDEX IF NOT EXISTS idx_licenses_tenant ON licenses(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_licenses_machine ON licenses(machine_id);
+CREATE INDEX IF NOT EXISTS idx_payments_license ON payments(license_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 
 -- ============================================================================
 -- Tenant par défaut

@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
+  Lock, Unlock, Link2,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
+import { authService } from '../services/authService';
 import DocumentFormModal from './DocumentFormModal';
 import ConfirmDialog from './ConfirmDialog';
 import { toast } from './Toast';
@@ -157,6 +159,15 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const isPdf = selectedFile?.mime_type === 'application/pdf';
   const isImage = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'].includes(selectedFile?.mime_type);
 
+  // Qui peut libérer le verrou : le backend n'accepte que le détenteur ou un
+  // administrateur (403 sinon). La comparaison se fait en nombres, parce que
+  // `checked_out_by` remonte de PostgreSQL en entier alors que l'identifiant
+  // stocké en session a pu transiter par une chaîne JSON.
+  const utilisateur = authService.getCurrentUser();
+  const estDetenteur = doc?.checked_out_by != null
+    && Number(doc.checked_out_by) === Number(utilisateur?.id);
+  const peutLiberer = estDetenteur || isAdmin;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-3xl shadow-elevated w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
@@ -190,9 +201,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                     <span className={`status-badge ${STATUS_CLASSES[doc.statut] || ''}`}>{STATUS_LABELS[doc.statut] || doc.statut}</span>
                     <div className="flex items-center gap-1.5">
                       {doc.is_checked_out ? (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold flex items-center gap-1">🔒 Verrouillé</span>
+                        <span className="badge badge-warn"><Lock size={11} /> Verrouillé</span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-bold">🔓 Libre</span>
+                        <span className="badge badge-ok"><Unlock size={11} /> Libre</span>
                       )}
                       <span className="text-xs text-slate-400 font-medium">v{doc.version}</span>
                     </div>
@@ -215,11 +226,11 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   {doc.description && <p className="text-sm text-slate-600 leading-relaxed">{doc.description}</p>}
                 </div>
 
-                {/* M-Files Relations & Dépendances */}
+                {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (
                   <div className="glass-card-premium p-5 space-y-3">
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
-                      <span>🔗 Documents liés ({relations.length})</span>
+                      <span className="flex items-center gap-1.5"><Link2 size={14} /> Documents liés ({relations.length})</span>
                     </h3>
                     <div className="space-y-2">
                       {relations.map(rel => (
@@ -234,6 +245,61 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                     </div>
                   </div>
                 )}
+
+                {/*
+                  Verrouillage pour édition. Cette carte appartient à la colonne
+                  des métadonnées, et non à la liste des fichiers : le verrou
+                  porte sur LE DOCUMENT, pas sur une version. Placée dans la
+                  rangée d'actions de chaque fichier, elle se répétait autant de
+                  fois qu'il y avait de versions.
+                */}
+                <div className="glass-card-premium p-5 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5">
+                      {doc.is_checked_out ? <Lock size={14} /> : <Unlock size={14} />} Verrouillage pour édition
+                    </span>
+                    <span className={doc.is_checked_out ? 'badge badge-warn' : 'badge badge-ok'}>
+                      {doc.is_checked_out ? 'Verrouillé' : 'Disponible'}
+                    </span>
+                  </h3>
+
+                  {doc.is_checked_out ? (
+                    <>
+                      {/*
+                        Le backend n'autorise le déverrouillage qu'au détenteur du
+                        verrou ou à un administrateur. Proposer le bouton à tous
+                        garantissait un 403 : l'utilisateur cliquait pour
+                        n'obtenir qu'un refus. On explique plutôt l'attente.
+                      */}
+                      {peutLiberer ? (
+                        <>
+                          <button onClick={handleCheckin} className="btn btn-primary w-full">
+                            <Unlock size={15} /> Libérer le document
+                          </button>
+                          {!estDetenteur && (
+                            <p className="text-[11px] text-[var(--df-warn)]">
+                              Verrouillé par un autre utilisateur : vous le libérez en tant qu'administrateur.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Un autre utilisateur a verrouillé ce document pour le modifier.
+                          Lui seul, ou un administrateur, peut le libérer.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={handleCheckout} className="btn btn-secondary w-full">
+                        <Lock size={15} /> Verrouiller pour modification
+                      </button>
+                      <p className="text-[11px] text-slate-400">
+                        Signale aux autres utilisateurs que vous travaillez sur ce document.
+                      </p>
+                    </>
+                  )}
+                </div>
 
                 {isAdmin && (
                   <div className="glass-card-premium p-5 space-y-3">
@@ -308,24 +374,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <a href={f.url} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500" title="Télécharger"><Download size={15} /></a>
-                {/* Verrouillage M-Files (Check-in / Check-out) */}
-                <div className="glass-card-premium p-5 space-y-3">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between">
-                    <span>Verrouillage M-Files</span>
-                    {doc.is_checked_out ? <span className="text-amber-600 font-bold">🔒 Verrouillé</span> : <span className="text-emerald-600 font-bold">🔓 Disponible</span>}
-                  </h3>
-                  {doc.is_checked_out ? (
-                    <button onClick={handleCheckin} className="btn-primary w-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2">
-                      🔓 Effectuer le Check-in (Libérer)
-                    </button>
-                  ) : (
-                    <button onClick={handleCheckout} className="btn-secondary w-full border-amber-300 text-amber-800 hover:bg-amber-50 flex items-center justify-center gap-2">
-                      🔒 Effectuer le Check-out (Verrouiller)
-                    </button>
-                  )}
-                </div>
-
-                {isAdmin && (
+                          {isAdmin && (
                             <button onClick={() => handleDeleteFile(f.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600" title="Supprimer"><Trash2 size={15} /></button>
                           )}
                         </div>

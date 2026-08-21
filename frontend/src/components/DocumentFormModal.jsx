@@ -165,7 +165,10 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
               <FolderOpen size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
               <select name="dossier_id" className="input-premium pl-12" value={formData.dossier_id} onChange={handleChange}>
                 <option value="">Aucun dossier</option>
-                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {/* Le chemin complet, pas le seul nom : deux sous-dossiers
+                    « 2025 » rangés sous deux parents distincts seraient
+                    autrement impossibles à distinguer au moment du classement. */}
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.path || f.name}</option>)}
               </select>
             </div>
           </div>
