@@ -18,6 +18,7 @@ import ThemeManager from '../components/ThemeManager';
 import ConfigurationConsole from '../components/admin/ConfigurationConsole';
 import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
 import FolderManager from '../components/admin/FolderManager';
+import LicensePanel from '../components/admin/LicensePanel';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { toast } from '../components/Toast';
@@ -35,7 +36,7 @@ const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-
 // mémorise sur cette référence. Le premier élément est l'onglet par défaut.
 const PANNEAUX = [
   'dashboard', 'requests', 'users', 'superadmins', 'sections', 'metadata',
-  'folders', 'tenants', 'audit', 'branding', 'configuration',
+  'folders', 'tenants', 'licenses', 'audit', 'branding', 'configuration',
 ];
 
 const NOMS_PANNEAUX = {
@@ -47,6 +48,7 @@ const NOMS_PANNEAUX = {
   metadata: 'Métadonnées',
   folders: 'Dossiers',
   tenants: 'Entreprises',
+  licenses: 'Licences',
   audit: 'Journal',
   branding: 'Branding',
   configuration: 'Configuration',
@@ -529,6 +531,7 @@ const SuperAdminPage = () => {
     { id: 'metadata', label: 'Métadonnées', icon: Database },
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'tenants', label: 'Entreprises', icon: Building2, badge: stats.totalTenants },
+    { id: 'licenses', label: 'Licences', icon: KeyRound },
     { id: 'audit', label: 'Journal', icon: ScrollText },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
@@ -541,7 +544,7 @@ const SuperAdminPage = () => {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Onze panneaux : sans le dernier segment du fil d'Ariane, savoir où l'on
+        {/* Douze panneaux : sans le dernier segment du fil d'Ariane, savoir où l'on
             se trouve supposait de relire la rangée d'onglets et d'y repérer le
             fond sombre. Le titre de l'onglet du navigateur le porte aussi — un
             propriétaire de plateforme travaille couramment avec plusieurs fenêtres
@@ -1029,6 +1032,16 @@ const SuperAdminPage = () => {
         {activePanel === 'folders' && (
           <div className="animate-fade-in-up">
             <FolderManager />
+          </div>
+        )}
+
+        {/* ============ LICENCES ============ */}
+        {/* Licences de bureau : émission, prolongation, révocation et transfert
+            de poste. Distinct de LicensePage, qui est l'écran d'activation vu
+            par le client sur sa machine. */}
+        {activePanel === 'licenses' && (
+          <div className="animate-fade-in-up">
+            <LicensePanel />
           </div>
         )}
 

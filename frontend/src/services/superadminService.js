@@ -80,4 +80,44 @@ export const superadminService = {
     const res = await api.delete('/superadmin/audit', { data: { confirm, tenant_id, before } });
     return res.data;
   },
+
+  // Licences de bureau — inventaire et administration.
+  //
+  // Réservé au propriétaire de la plateforme (platformOwnerMiddleware). Ne pas
+  // confondre avec services/licenseService.js, qui parle au poste local via
+  // /license au singulier : ces routes-là n'existent qu'en mode bureau.
+  //
+  // La table renvoyée n'accepte ni pagination, ni tri, ni filtre côté serveur —
+  // ne pas passer de `params`, ils seraient ignorés en silence et donneraient
+  // l'illusion d'un filtrage.
+  getLicenses: async () => {
+    const res = await api.get('/superadmin/licenses');
+    return res.data;
+  },
+
+  // { months, customer_email, customer_company, notes, tenant_id }.
+  // `months` est borné à [0, 36] par le backend ; 0 émet une clé sans échéance
+  // (statut « pending »), ce qui est le cas d'une clé d'essai à prolonger plus tard.
+  createLicense: async (data) => {
+    const res = await api.post('/superadmin/licenses', data);
+    return res.data;
+  },
+
+  // { status, notes, months }. `months` CUMULE sur le reliquat (extend_license
+  // part de GREATEST(now(), valid_until)) au lieu de l'écraser. `status`
+  // n'accepte que active | revoked | pending : « expired » est calculé à partir
+  // de la date et le poser à la main créerait une licence expirée à échéance
+  // future, que la péremption automatique ne corrigerait jamais.
+  updateLicense: async (id, data) => {
+    const res = await api.patch(`/superadmin/licenses/${id}`, data);
+    return res.data;
+  },
+
+  // Délie le poste : machine_id et machine_label repassent à NULL. Aucun corps.
+  // La réponse porte un `warning` à afficher — l'ancien poste reste utilisable
+  // jusqu'à la péremption de son artefact hors ligne.
+  resetLicenseMachine: async (id) => {
+    const res = await api.post(`/superadmin/licenses/${id}/reset-machine`);
+    return res.data;
+  },
 };
