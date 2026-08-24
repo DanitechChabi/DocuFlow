@@ -68,8 +68,26 @@ const paypalConfigured = () => Boolean(PAYPAL.clientId && PAYPAL.clientSecret);
 // déclarées (prévisualisations Vercel) — la première fait foi. Sans valeur, les
 // adresses de retour sont omises plutôt qu'inventées : une URL fausse enverrait
 // le client sur une page morte après avoir payé.
-const LANDING_URL = String(process.env.LANDING_URL || process.env.APP_URL || '')
+//
+// PAS DE REPLI SUR APP_URL — c'était un piège. APP_URL désigne l'application
+// (docuflow-afgc/frontend), qui ne déclare AUCUNE route /paiement/succes : son
+// catch-all rendait NotFoundPage. Or c'est cette page qui appelle
+// /paypal/capture. L'acheteur approuvait donc son paiement, atterrissait sur une
+// page introuvable, la capture n'avait jamais lieu : commande approuvée mais non
+// encaissée, aucune licence émise, vente perdue en silence. Mieux vaut laisser
+// PayPal utiliser l'URL du compte marchand que de désigner une page qui n'existe
+// pas. La seule variable qui fait foi est donc LANDING_URL.
+const LANDING_URL = String(process.env.LANDING_URL || '')
   .split(',')[0].trim().replace(/\/+$/, '');
+
+// Trace au chargement, et non au moment de créer la commande : sans elle,
+// l'absence d'adresse de retour ne se remarque qu'après une vente perdue.
+if (!LANDING_URL && (process.env.PAYPAL_CLIENT_ID || '')) {
+  console.warn(
+    '[paiement] LANDING_URL absente : PayPal ramènera l\'acheteur vers l\'URL du '
+    + 'compte marchand, et la capture pourrait ne jamais être déclenchée.'
+  );
+}
 
 /** État des moyens de paiement, pour la page publique de tarifs. */
 function providersStatus() {

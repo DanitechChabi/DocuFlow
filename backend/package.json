@@ -5,7 +5,9 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "test": "node src/config/catalog.test.js && node src/desktop/licenseGuard.test.js",
+    "test:license": "node src/desktop/licenseGuard.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",

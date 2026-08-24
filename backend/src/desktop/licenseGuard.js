@@ -28,12 +28,21 @@
 //   unlicensed       — aucune licence (première installation)
 //   invalid          — cache illisible ou signature fausse
 //
+// DEUX MODES DE DÉMARRAGE, UN SEUL CACHE
+// Sous Electron, desktop/main.js appelle `configure()` avec le profil de
+// l'application. L'installateur Windows, lui, lance `node src/app.js` sans
+// Electron : personne n'appelle `configure()`, et le module se rabat alors sur
+// %LOCALAPPDATA%\DocuFlow\license.dat (voir defaultCacheDir). Sans ce repli, ce
+// second mode ne pouvait NI lire NI écrire de licence, donc ne pouvait pas être
+// activé du tout.
+//
 // CE QUE CE DISPOSITIF NE PROTÈGE PAS : le code est livré en JavaScript lisible.
 // Quelqu'un de motivé peut supprimer l'appel qui invoque ce module. C'est le
 // plafond de toute protection logicielle non obfusquée ; l'objectif ici est de
 // décourager le partage de clé entre postes, pas de résister à un cracker.
 // ============================================================================
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const https = require('https');
 const http = require('http');
@@ -58,6 +67,48 @@ const REFRESH_MARGIN_MS = 24 * 3600 * 1000;
 let cacheFile = null;
 let lastState = null;
 
+/**
+ * Emplacement du cache quand personne n'a appelé `configure()`.
+ *
+ * POURQUOI CE REPLI EXISTE — il répare une panne totale, pas un confort.
+ * `configure()` n'est appelé qu'à un seul endroit du dépôt : desktop/main.js.
+ * Or l'installateur Windows (installer/) démarre le backend SANS Electron
+ * (install-service.bat, start.bat lancent `node src\app.js`) tout en écrivant
+ * SERVE_FRONTEND=true dans le .env — ce qui ACTIVE licenseMiddleware. Sans ce
+ * repli, `cacheFile` restait null : readCache() rendait la main aussitôt, l'état
+ * était 'unlicensed', et toute l'API répondait 402. Pire, writeCache() sortait
+ * aussi en silence, donc une activation pourtant acceptée et signée par le
+ * serveur n'était JAMAIS écrite : le client saisissait une clé valide et
+ * retombait indéfiniment sur l'écran d'activation. Le seul chemin de vente
+ * hors Electron était donc mort, sans message et sans issue.
+ *
+ * LOCALVEDATA ET NON LE DOSSIER D'INSTALLATION : la tâche planifiée tourne en
+ * SYSTEM et le service peut être lancé par un compte sans droits d'écriture dans
+ * « C:\Program Files ». On garde le même nom de fichier que sous Electron
+ * (license.dat) pour que le support n'ait qu'un seul chemin à connaître par mode.
+ */
+function defaultCacheDir() {
+  const base = process.env.LOCALAPPDATA || process.env.APPDATA || os.homedir() || os.tmpdir();
+  return path.join(base, 'DocuFlow');
+}
+
+/**
+ * Chemin du cache, en initialisant le repli au premier besoin.
+ *
+ * Résolu paresseusement et non au chargement du module : `configure()` doit
+ * garder la priorité, et il est appelé après le require côté Electron.
+ */
+function resolveCacheFile() {
+  if (!cacheFile) {
+    cacheFile = path.join(defaultCacheDir(), 'license.dat');
+    console.warn(
+      '[license] configure() non appelé — cache de licence par défaut : '
+      + `${cacheFile} (mode hors Electron).`
+    );
+  }
+  return cacheFile;
+}
+
 /** Le cache vit dans le profil utilisateur : pas de droits admin requis. */
 function configure({ userDataDir }) {
   cacheFile = path.join(userDataDir, 'license.dat');
@@ -68,9 +119,8 @@ function configure({ userDataDir }) {
 // ---------------------------------------------------------------------------
 
 function readCache() {
-  if (!cacheFile) return null;
   try {
-    return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    return JSON.parse(fs.readFileSync(resolveCacheFile(), 'utf8'));
   } catch {
     // Fichier absent au premier lancement, ou corrompu (coupure pendant une
     // écriture). Dans les deux cas : pas de licence utilisable.
@@ -79,21 +129,25 @@ function readCache() {
 }
 
 function writeCache(data) {
-  if (!cacheFile) return;
+  const cible = resolveCacheFile();
   try {
+    // Le dossier de repli n'existe pas à la première activation, et un
+    // writeFileSync dans un dossier absent échoue — ce qui reproduirait
+    // exactement la perte d'activation que ce repli corrige.
+    fs.mkdirSync(path.dirname(cible), { recursive: true });
     // Écriture par fichier temporaire puis renommage : une coupure de courant en
     // pleine écriture laisserait sinon un license.dat tronqué, et le client
     // verrait son logiciel redemander une activation sans raison.
-    const tmp = `${cacheFile}.tmp`;
+    const tmp = `${cible}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tmp, cacheFile);
+    fs.renameSync(tmp, cible);
   } catch (err) {
     console.error('[license] Cache non enregistré :', err.message);
   }
 }
 
 function clearCache() {
-  try { fs.rmSync(cacheFile, { force: true }); } catch { /* déjà absent */ }
+  try { fs.rmSync(resolveCacheFile(), { force: true }); } catch { /* déjà absent */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +449,7 @@ module.exports = {
   isAllowed,
   deactivate,
   evaluate,          // exporté pour les tests
+  getCacheFile: resolveCacheFile, // exporté pour les tests (et le support)
   getMachineId,
   LICENSE_SERVER,
 };
