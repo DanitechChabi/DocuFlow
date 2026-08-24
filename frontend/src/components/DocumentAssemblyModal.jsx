@@ -18,6 +18,12 @@ const DocumentAssemblyModal = ({ onClose, onSuccess }) => {
   });
 
   useEffect(() => {
+    const surTouche = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', surTouche);
+    return () => window.removeEventListener('keydown', surTouche);
+  }, [onClose]);
+
+  useEffect(() => {
     documentService.getAssemblyTemplates()
       .then(res => {
         setTemplates(res);

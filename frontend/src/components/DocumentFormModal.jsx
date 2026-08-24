@@ -24,6 +24,15 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Échap ferme la fenêtre, comme l'aperçu de document le fait déjà. Sans cela
+  // les seules sorties sont la croix, « Annuler » et le clic sur le fond — et un
+  // clic sur le fond est vite lâché à côté d'un formulaire à demi rempli.
+  useEffect(() => {
+    const surTouche = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', surTouche);
+    return () => window.removeEventListener('keydown', surTouche);
+  }, [onClose]);
+
   // Mode édition : préremplir
   useEffect(() => {
     if (editing) {
