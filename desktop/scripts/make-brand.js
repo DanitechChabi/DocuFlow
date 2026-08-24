@@ -27,7 +27,6 @@ const root = path.resolve(__dirname, '..', '..');
 const MASTER = path.join(root, 'assets', 'brand', 'docuflow-logo.png');
 const publicBrand = path.join(root, 'frontend', 'public', 'brand');
 const desktopBuild = path.join(root, 'desktop', 'build');
-
 // Boîte du glyphe « D » dans le master, mesurée sur le profil d'encre du tracé.
 // La coupe tombe au point le plus fin du délié reliant le « D » au « o » ; le
 // résidu du « o » est ensuite retiré par keepLargestComponent().
@@ -201,6 +200,88 @@ async function emit(buf, dir, name, size) {
   return target;
 }
 
+/**
+ * Encode une image RGB en BMP 24 bits (BITMAPINFOHEADER, non compressé).
+ *
+ * Écrit à la main parce que sharp ne sait pas produire de BMP (`sharp.format`
+ * n'expose pas ce format en sortie) et que NSIS n'accepte QUE du BMP pour
+ * l'artwork de l'assistant : un PNG renommé en .bmp est refusé, et
+ * `warningsAsErrors` étant activé par défaut, le build entier échoue.
+ *
+ * Deux particularités du format, sources d'images inversées ou décalées :
+ *   - les lignes sont stockées de bas en haut (hauteur positive) ;
+ *   - l'ordre des octets est BGR, et chaque ligne est complétée à un multiple
+ *     de 4 octets.
+ *
+ * L'alpha est aplati en amont (l'assistant n'a pas de transparence) : les BMP
+ * 32 bits sont diversement interprétés selon les versions de NSIS, on reste donc
+ * en 24 bits, qui est le cas universellement supporté.
+ *
+ * @param {Buffer} rgb - pixels bruts, 3 canaux, sans alpha
+ * @param {number} width
+ * @param {number} height
+ * @returns {Buffer} fichier BMP complet
+ */
+function encodeBmp24(rgb, width, height) {
+  const rowSize = Math.ceil((width * 3) / 4) * 4;
+  const pixelsSize = rowSize * height;
+  const HEADER = 14 + 40;
+  const out = Buffer.alloc(HEADER + pixelsSize);
+
+  out.write('BM', 0, 'ascii');
+  out.writeUInt32LE(HEADER + pixelsSize, 2); // taille totale
+  out.writeUInt32LE(HEADER, 10);             // décalage des pixels
+  out.writeUInt32LE(40, 14);                 // taille de BITMAPINFOHEADER
+  out.writeInt32LE(width, 18);
+  out.writeInt32LE(height, 22);              // positif => lignes de bas en haut
+  out.writeUInt16LE(1, 26);                  // plans
+  out.writeUInt16LE(24, 28);                 // bits par pixel
+  out.writeUInt32LE(0, 30);                  // BI_RGB, non compressé
+  out.writeUInt32LE(pixelsSize, 34);
+
+  for (let y = 0; y < height; y++) {
+    // Ligne 0 du BMP = dernière ligne de l'image.
+    const src = (height - 1 - y) * width * 3;
+    let dst = HEADER + y * rowSize;
+    for (let x = 0; x < width; x++) {
+      out[dst++] = rgb[src + x * 3 + 2]; // B
+      out[dst++] = rgb[src + x * 3 + 1]; // G
+      out[dst++] = rgb[src + x * 3];     // R
+    }
+    // Le reste de la ligne (remplissage) est déjà à zéro grâce à Buffer.alloc.
+  }
+
+  return out;
+}
+
+/**
+ * Compose le monogramme clair sur le bleu nuit de la marque et écrit un BMP.
+ *
+ * @param {Buffer} glyph - monogramme à encre claire
+ * @param {string} target - chemin du .bmp à écrire
+ * @param {number} width
+ * @param {number} height
+ * @param {number} ratio - part de la plus petite dimension occupée par le glyphe
+ * @param {'center'|'centre'} [gravity]
+ */
+async function emitBmp(glyph, target, width, height, ratio, gravity = 'center') {
+  const cote = Math.round(Math.min(width, height) * ratio);
+  const fond = sharp({
+    create: { width, height, channels: 3, background: { r: 15, g: 23, b: 42 } },
+  }).composite([{
+    input: await sharp(glyph)
+      .resize(cote, cote, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer(),
+    gravity,
+  }]);
+
+  // removeAlpha : l'aplatissement sur le fond est déjà fait par le composite,
+  // mais sharp conserve un canal alpha que l'encodeur 24 bits n'attend pas.
+  const { data } = await fond.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  fs.writeFileSync(target, encodeBmp24(data, width, height));
+}
+
 (async () => {
   if (!fs.existsSync(MASTER)) {
     throw new Error(`logo officiel introuvable : ${MASTER}`);
@@ -257,10 +338,40 @@ async function emit(buf, dir, name, size) {
   fs.writeFileSync(path.join(desktopBuild, 'icon.png'), await desktopIcon(512));
   const icoSizes = [16, 24, 32, 48, 64, 128, 256];
   const icoPngs = await Promise.all(icoSizes.map((s) => desktopIcon(s)));
-  fs.writeFileSync(path.join(desktopBuild, 'icon.ico'), await pngToIco(icoPngs));
+  const ico = await pngToIco(icoPngs);
+  fs.writeFileSync(path.join(desktopBuild, 'icon.ico'), ico);
+
+  // --- Artwork de l'assistant NSIS -------------------------------------------
+  //
+  // Sans ces trois fichiers, electron-builder se rabat sur nsis3-metro.bmp :
+  // l'installateur d'un logiciel vendu afficherait le visuel générique de NSIS,
+  // reconnaissable et sans rapport avec la marque.
+  //
+  // Les dimensions ne sont pas indicatives : NSIS ne redimensionne pas l'artwork
+  // de l'assistant. Un bitmap plus grand est rogné, un plus petit laisse du gris.
+  //   - bandeau (header)  : 150×57, image cadrée à droite ;
+  //   - panneau latéral   : 164×314, colonne de gauche des pages d'accueil et de
+  //                         fin (installateur ET désinstallateur).
+  await emitBmp(monoLight, path.join(desktopBuild, 'installerHeader.bmp'), 150, 57, 0.82);
+  await emitBmp(monoLight, path.join(desktopBuild, 'installerSidebar.bmp'), 164, 314, 0.62);
+  // Le désinstallateur reçoit le même panneau : un visuel différent au moment de
+  // désinstaller laisse croire qu'on a lancé le programme d'un autre éditeur.
+  fs.copyFileSync(
+    path.join(desktopBuild, 'installerSidebar.bmp'),
+    path.join(desktopBuild, 'uninstallerSidebar.bmp')
+  );
+
+  // --- Icônes de l'installateur et du désinstallateur ------------------------
+  //
+  // electron-builder ne déduit PAS ces deux icônes de win.icon : sans elles,
+  // DocuFlow-Setup.exe et l'entrée « Ajout/Suppression de programmes » portent
+  // l'icône NSIS par défaut, alors que l'application installée porte la nôtre.
+  fs.writeFileSync(path.join(desktopBuild, 'installerIcon.ico'), ico);
+  fs.writeFileSync(path.join(desktopBuild, 'uninstallerIcon.ico'), ico);
 
   console.log('[brand] frontend/public/brand/ : wordmark ×2, mark ×2, favicon ×5, apple-touch-icon');
   console.log('[brand] desktop/build/ : icon.png (512×512), icon.ico (7 tailles)');
+  console.log('[brand] desktop/build/ : artwork NSIS (header 150×57, sidebar 164×314 ×2) + icônes installateur/désinstallateur');
 })().catch((err) => {
   console.error('[brand] Échec de génération :', err.message);
   process.exit(1);

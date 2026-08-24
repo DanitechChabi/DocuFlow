@@ -11,7 +11,7 @@
     "build:frontend": "cd ../frontend && npm run build -- --mode desktop",
     "icon": "node scripts/make-icon.js",
     "brand": "node scripts/make-brand.js",
-    "dist": "npm run build:frontend && electron-builder --win",
+    "dist": "npm run brand && npm run build:frontend && electron-builder --win",
     "dist:only": "electron-builder --win"
   },
   "devDependencies": {
@@ -43,7 +43,7 @@
     ],
     "win": {
       "target": ["nsis"],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -52,7 +52,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DocuFlow",
-      "artifactName": "DocuFlow-Setup-${version}.exe"
+      "artifactName": "DocuFlow-Setup-${version}.exe",
+      "installerLanguages": ["fr_FR"],
+      "language": "1036",
+      "deleteAppDataOnUninstall": false,
+      "license": "legal/CGU.txt"
     }
   }
 }

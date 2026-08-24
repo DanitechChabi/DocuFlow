@@ -1,0 +1,100 @@
+CONDITIONS D'UTILISATION DE DOCUFLOW
+
+Éditeur : CHABI BOUKO Daniel
+Version du logiciel : 1.0.0
+
+
+1. OBJET
+
+DocuFlow est un logiciel de gestion électronique de documents installé sur
+l'ordinateur de l'utilisateur. En installant ce logiciel, vous acceptez les
+conditions ci-dessous.
+
+
+2. ABONNEMENT ET ACTIVATION
+
+L'utilisation de DocuFlow requiert un abonnement de 75 000 FCFA par mois
+(115 € pour un règlement par carte via PayPal, le franc CFA n'étant pas
+accepté par ce moyen de paiement — le taux appliqué est le peg fixe de
+655,957 FCFA pour 1 €).
+
+Après paiement, une clé d'activation est délivrée. Elle est saisie au premier
+démarrage du logiciel.
+
+
+3. UNE LICENCE, UN ORDINATEUR
+
+Chaque licence n'est valable que sur UN SEUL ordinateur. Elle s'y attache
+définitivement lors de la première activation, au moyen d'une empreinte
+technique de la machine.
+
+En cas de changement de matériel ou de panne, l'éditeur peut détacher la
+licence de l'ancien ordinateur pour permettre son activation sur un nouveau.
+Cette opération se fait sur demande auprès de l'éditeur.
+
+
+4. FONCTIONNEMENT HORS CONNEXION
+
+DocuFlow fonctionne sans connexion Internet permanente. Le logiciel vérifie
+périodiquement la validité de l'abonnement auprès du serveur de l'éditeur.
+
+Si aucune vérification n'est possible (absence de réseau), le logiciel
+continue de fonctionner normalement pendant 7 jours. Passé ce délai sans
+connexion, l'accès aux documents est suspendu jusqu'à la prochaine
+vérification réussie. Aucune donnée n'est perdue : elle redevient accessible
+dès que la vérification aboutit.
+
+
+5. FIN D'ABONNEMENT
+
+À l'échéance de l'abonnement non renouvelé, l'accès aux documents est
+suspendu. Les données restent intégralement sur l'ordinateur et redeviennent
+accessibles dès le renouvellement.
+
+L'éditeur peut révoquer une licence en cas de défaut de paiement ou
+d'utilisation non conforme aux présentes conditions.
+
+
+6. VOS DONNÉES RESTENT CHEZ VOUS
+
+Les documents, les métadonnées et la base de données sont stockés
+exclusivement sur l'ordinateur où DocuFlow est installé. Ils ne sont transmis
+à aucun serveur de l'éditeur ni à aucun service tiers.
+
+Les seuls échanges avec l'éditeur concernent la validité de l'abonnement :
+identifiant de licence, empreinte de la machine et date. Aucun contenu
+documentaire n'y figure.
+
+La sauvegarde de ces données incombe à l'utilisateur. L'éditeur, n'en
+détenant aucune copie, ne peut restaurer des documents perdus.
+
+
+7. CE QUE VOUS NE POUVEZ PAS FAIRE
+
+Il est interdit de revendre, louer ou redistribuer le logiciel, de le
+décompiler en vue d'en contourner le dispositif de licence, ou de partager
+une clé d'activation avec un tiers.
+
+
+8. GARANTIE ET RESPONSABILITÉ
+
+Le logiciel est fourni tel quel. L'éditeur ne garantit pas qu'il soit exempt
+de tout défaut ni qu'il réponde à un usage particulier.
+
+Dans la limite permise par la loi, la responsabilité de l'éditeur ne peut
+excéder le montant des sommes versées au titre de l'abonnement sur les douze
+derniers mois.
+
+
+9. LOGICIELS TIERS
+
+DocuFlow intègre PostgreSQL (licence PostgreSQL), Electron et Node.js
+(licence MIT), ainsi que d'autres composants libres. Leurs licences
+respectives s'appliquent à ces composants et sont consultables dans le
+dossier d'installation.
+
+
+10. CONTACT
+
+Toute question relative à ces conditions, au transfert d'une licence ou au
+renouvellement d'un abonnement est à adresser à l'éditeur.

@@ -3,7 +3,8 @@ setlocal
 REM ============================================================
 REM Build complet de l'application de bureau DocuFlow (Windows)
 REM   0. Binaires PostgreSQL portables (vendor\pgsql) — ~330 Mo au 1er passage
-REM   1. Déclinaisons de la marque (frontend\public\brand + build\icon.*)
+REM   1. Déclinaisons de la marque (frontend\public\brand + build\icon.* +
+REM      artwork de l'assistant NSIS)
 REM   2. Build du frontend (mode desktop, VITE_API_URL=/api)
 REM   3. Installeur NSIS (electron-builder --win)
 REM Sortie : desktop\release\DocuFlow-Setup-<version>.exe
@@ -18,7 +19,8 @@ REM script est idempotent — au deuxième build il ne retélécharge rien.
 REM
 REM L'étape 1 précède le build du frontend : Vite recopie public\ au moment du
 REM build, donc des déclinaisons régénérées après coup n'atteindraient dist\
-REM qu'au build suivant.
+REM qu'au build suivant. Elle produit aussi l'artwork de l'assistant NSIS, sans
+REM lequel l'installateur afficherait le visuel générique de NSIS.
 REM ============================================================
 
 echo [0/3] Binaires PostgreSQL portables...
@@ -29,6 +31,10 @@ if errorlevel 1 goto :error
 echo [1/3] Génération des déclinaisons de la marque...
 cd /d "%~dp0.."
 node scripts\make-brand.js
+REM Contrôlé, contrairement aux versions antérieures : la marque n'est plus
+REM seulement cosmétique, elle fournit build\icon.ico que win.icon exige et
+REM l'artwork que NSIS refuse de remplacer silencieusement.
+if errorlevel 1 goto :error
 
 echo [2/3] Build frontend (mode desktop)...
 cd /d "%~dp0..\..\frontend"

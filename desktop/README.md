@@ -51,16 +51,37 @@ Le script enchaîne les quatre étapes dans l'ordre imposé par leurs dépendanc
 | Étape | Action | Pourquoi cet ordre |
 |-------|--------|--------------------|
 | 0 | `fetch-postgres.js` | `vendor\pgsql` est déclaré en `extraResources` : electron-builder échoue si le dossier est absent. ~330 Mo au premier passage, idempotent ensuite. |
-| 1 | `make-brand.js` | Vite recopie `public\` **pendant** le build : des déclinaisons régénérées après coup n'atteindraient `dist\` qu'au build suivant. |
+| 1 | `make-brand.js` | Vite recopie `public\` **pendant** le build : des déclinaisons régénérées après coup n'atteindraient `dist\` qu'au build suivant. Produit aussi `build\icon.ico` (exigé par `win.icon`) et l'artwork de l'assistant NSIS. |
 | 2 | Build frontend `--mode desktop` | Fixe `VITE_API_URL=/api`. Un build d'un autre mode grave l'URL de Render dans le bundle. |
 | 3 | `electron-builder --win` | Produit l'installateur. |
 
 Sortie : `desktop\release\DocuFlow-Setup-1.0.0.exe` (NSIS, cible unique).
 
+### Ce que la marque fournit à l'installateur
+
+`make-brand.js` n'est pas cosmétique : trois de ses sorties sont exigées par la
+chaîne d'empaquetage, et leur absence ne fait pas échouer le build — elle produit
+un installateur qui *paraît* venir d'un autre éditeur.
+
+| Fichier (`build\`) | Rôle | Sans lui |
+|---|---|---|
+| `icon.ico` | `win.icon` | ICO multi-tailles : Windows choisit la bonne définition selon le contexte (16 px dans la barre des tâches, 256 px dans l'explorateur). Un PNG unique force un redimensionnement flou. |
+| `installerIcon.ico` / `uninstallerIcon.ico` | icône de `DocuFlow-Setup.exe` et de l'entrée « Ajout/Suppression de programmes » | electron-builder **ne les déduit pas** de `win.icon` : l'installateur porterait l'icône NSIS par défaut alors que l'application installée porte la nôtre. |
+| `installerHeader.bmp` (150×57)<br>`installerSidebar.bmp` (164×314)<br>`uninstallerSidebar.bmp` | artwork de l'assistant | Repli sur `nsis3-metro.bmp`, le visuel générique de NSIS — reconnaissable, et sans rapport avec le produit. |
+
+Les dimensions ne sont pas indicatives : NSIS ne redimensionne pas cet artwork
+(bitmap trop grand → rogné, trop petit → bordure grise). Le format doit être du
+**BMP 24 bits** ; `sharp` ne sachant pas en produire, `make-brand.js` embarque son
+propre encodeur.
+
+Le texte affiché à l'écran d'acceptation vit dans `legal\CGU.txt` — **hors de
+`build\`, qui est ignoré par git**. Un document contractuel placé dans `build\`
+disparaîtrait au premier clone, et l'installateur se construirait sans lui.
+
 Pour reconstruire sans repasser par les binaires ni la marque :
 
 ```bat
-npm run dist        REM rebuild du frontend en mode desktop + electron-builder
+npm run dist        REM marque + rebuild du frontend en mode desktop + electron-builder
 npm run dist:only   REM electron-builder seul — n'utiliser qu'après un dist réussi
 ```
 
@@ -70,6 +91,12 @@ npm run dist:only   REM electron-builder seul — n'utiliser qu'après un dist r
 > Render — donc aucune donnée locale, sans le moindre message d'erreur.
 > `dist:only` saute cette reconstruction : à réserver aux itérations sur le
 > packaging lui-même.
+
+> `npm run dist` régénère aussi la marque, et dans cet ordre : `build\` est ignoré
+> par git, donc sur un clone frais l'artwork de l'assistant n'existe pas. Sans
+> cette étape, la commande sortait un installateur au visuel NSIS par défaut —
+> sans erreur, ce qui est précisément ce qui rend le défaut coûteux. `brand` passe
+> avant le build du frontend parce que Vite recopie `public\` pendant celui-ci.
 
 Deux garde-fous couvrent le même défaut, à la compilation et à l'exécution :
 `main.js` inspecte le bundle au démarrage (`detecterBuildDistant`) et **refuse de
