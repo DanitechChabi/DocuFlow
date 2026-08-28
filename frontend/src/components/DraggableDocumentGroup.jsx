@@ -22,6 +22,7 @@ const DraggableDocumentGroup = ({
   isPending = false,
   onOpenDocument,
   onApercuDocument,
+  onSupprimerDocument,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: `group-${groupName}`,
@@ -54,6 +55,7 @@ const DraggableDocumentGroup = ({
             canDrag={canDrag}
             onOpen={onOpenDocument}
             onApercu={onApercuDocument}
+            onSupprimer={onSupprimerDocument}
           />
         ))}
       </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Lock } from 'lucide-react';
+import { GripVertical, Lock, Trash2 } from 'lucide-react';
 import { DocumentThumbnail } from './DocumentPreview';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
@@ -22,7 +22,7 @@ import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
  *   vue appartient au parent : une seule est ouverte à la fois, alors qu'un
  *   groupe compte des centaines de fiches.
  */
-const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onApercu }) => {
+const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onApercu, onSupprimer }) => {
   const locked = !!doc.is_checked_out;
   const draggable = canDrag && !locked;
 
@@ -74,6 +74,16 @@ const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onAperc
           <span className={`status-badge text-[10px] shrink-0 ${STATUS_CLASSES[doc.statut] || ''}`}>
             {STATUS_LABELS[doc.statut] || doc.statut}
           </span>
+        )}
+        {onSupprimer && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSupprimer(doc); }}
+            className="ml-auto w-6 h-6 rounded-md flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+            title="Mettre à la corbeille"
+          >
+            <Trash2 size={13} />
+          </button>
         )}
       </div>
       <button

@@ -586,6 +586,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                         isPending={pendingDropGroup === grp.group_name}
                         onOpenDocument={setDetailDoc}
                         onApercuDocument={setApercuDoc}
+                        onSupprimerDocument={isAdmin ? setSupprimerDoc : undefined}
                       />
                     </div>
                   ))}
