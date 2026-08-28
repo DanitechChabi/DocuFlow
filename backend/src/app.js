@@ -51,30 +51,47 @@ const ALLOWED_ORIGINS = isDev
       'https://www.docuflow-afgc.com',
     ].filter(Boolean).flatMap((o) => o.includes(',') ? o.split(',').map((s) => s.trim()) : [o]);
 
+// Délégué CORS (cors > 2.8) : la fonction reçoit la REQUÊTE, contrairement au
+// simple callback `origin` qui ne voit que la valeur d'en-tête. C'est ce qui
+// permet le contrôle de même-origine ci-dessous.
+const corsOrigines = (req, cb) => {
+  const origin = req.headers.origin;
+  // Une origine refusée n'est PAS une erreur du serveur : rendre la main avec
+  // `false` laisse la requête continuer sans l'en-tête d'autorisation, et c'est
+  // le navigateur qui bloque la lecture de la réponse — le comportement attendu.
+  //
+  // Passer un Error ici, en revanche, le propulse jusqu'au gestionnaire global :
+  // 500 et pile d'appels dans les journaux, à chaque visiteur d'une origine
+  // inconnue. Le vrai incident (un déploiement dont l'URL n'est pas dans la
+  // liste) devient alors indiscernable d'une panne, et les journaux de Render se
+  // remplissent de bruit.
+  const accepter = () => cb(null, { origin: true, credentials: true });
+  const refuser = () => {
+    console.warn(`[cors] Origine refusée : ${origin}`);
+    cb(null, { origin: false });
+  };
+
+  if (!origin || ALLOWED_ORIGINS.includes(origin)) return accepter();
+
+  // MÊME ORIGINE — le mode bureau (NODE_ENV production depuis que l'application
+  // packagée n'est plus en « development ») serviait SA PROPRE origine : le
+  // port y est attribué par l'OS à chaque lancement, donc invérifiable par
+  // liste. Les requêtes same-origin passent sans en-tête CORS, mais chaque
+  // chargement de page écrivait une ligne « Origine refusée » dans les journaux
+  // du client. Réfléchir l'origine quand elle DÉSIGNE CE SERVEUR
+  // (origin == protocole://hôte de la requête) n'ouvre rien : c'est la
+  // définition même du same-origin.
+  const protocole = req.headers['x-forwarded-proto'] || 'http';
+  if (req.headers.host && origin === `${protocole}://${req.headers.host}`) {
+    return accepter();
+  }
+  return refuser();
+};
+
 app.use(cors(
   isDev
     ? { origin: true, credentials: true }
-    : {
-        origin: (origin, cb) => {
-          // Une origine refusée n'est PAS une erreur du serveur : rendre la main
-          // avec `false` laisse la requête continuer sans l'en-tête
-          // d'autorisation, et c'est le navigateur qui bloque la lecture de la
-          // réponse — le comportement attendu.
-          //
-          // Passer un Error ici, en revanche, le propulse jusqu'au gestionnaire
-          // global : 500 et pile d'appels dans les journaux, à chaque visiteur
-          // d'une origine inconnue. Le vrai incident (un déploiement dont
-          // l'URL n'est pas dans la liste) devient alors indiscernable d'une
-          // panne, et les journaux de Render se remplissent de bruit.
-          if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-            cb(null, true);
-          } else {
-            console.warn(`[cors] Origine refusée : ${origin}`);
-            cb(null, false);
-          }
-        },
-        credentials: true,
-      }
+    : corsOrigines
 ));
 // --- Facturation ----------------------------------------------------------
 // Monté AVANT express.json, et cet ordre est OBLIGATOIRE : les webhooks de
