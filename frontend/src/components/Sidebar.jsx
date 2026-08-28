@@ -48,16 +48,6 @@ const STOCKAGE_REPLIE = 'docuflow:sidebar-repliee';
 // colonne) — il lui faut l'état du drawer sans dupliquer la mécanique.
 const DrawerContext = React.createContext({ ouvrir: () => {} });
 
-/** Bouton d'ouverture du menu mobile — à rendre dans la barre supérieure. */
-Sidebar.MobileButton = () => {
-  const { ouvrir, tText } = React.useContext(DrawerContext);
-  return (
-    <button onClick={ouvrir} className="lg:hidden p-2 rounded-md text-white" aria-label="Menu">
-      <Menu size={20} />
-    </button>
-  );
-};
-
 const Sidebar = ({ unreadCount = 0 }) => {
   const navigate = useNavigate();
   const user = authService.getCurrentUser();
@@ -395,6 +385,19 @@ const Sidebar = ({ unreadCount = 0 }) => {
         </div>
       )}
     </DrawerContext.Provider>
+  );
+};
+
+/** Bouton d'ouverture du menu mobile — à rendre dans la barre supérieure.
+ *  Posé APRÈS la déclaration : l'assignation s'exécute au chargement du
+ *  module, avant elle tombait dans la zone morte de `const Sidebar` et
+ *  l'ReferenceError emportait tout l'écran (page blanche). */
+Sidebar.MobileButton = () => {
+  const { ouvrir } = React.useContext(DrawerContext);
+  return (
+    <button onClick={ouvrir} className="lg:hidden p-2 rounded-md text-white" aria-label="Menu">
+      <Menu size={20} />
+    </button>
   );
 };
 
