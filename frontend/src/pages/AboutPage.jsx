@@ -128,7 +128,7 @@ const AboutPage = () => {
   // Le tour est monté par le tableau de bord : il faut y revenir avant de le
   // déclencher, sinon l'événement n'a aucun destinataire.
   const restartTour = () => {
-    navigate('/dashboard');
+    navigate('/');
     setTimeout(() => window.dispatchEvent(new CustomEvent(RESTART_TOUR_EVENT)), 400);
   };
 

@@ -36,6 +36,7 @@ const SkeletonCard = ({ delay = 0 }) => (
 // une constante recréée à chaque rendu déclencherait l'effet de redirection en
 // boucle si elle figurait dans ses dépendances.
 const STAFF_TABS = ['my_tasks', 'history', 'all_requests'];
+const TAB_AVEC_OVERVIEW = ['dashboard', 'overview'];
 
 // Étapes du tour guidé, calculées une fois pour toutes hors du composant. Un
 // littéral construit dans le corps du rendu produisait un tableau d'identité
@@ -61,7 +62,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
   // Onglets réservés au staff : rediriger les demandeurs
   useEffect(() => {
     if (!isAdmin && STAFF_TABS.includes(tab)) {
-      navigate('/dashboard', { replace: true });
+      navigate('/demandes', { replace: true });
     }
   }, [isAdmin, tab, navigate]);
 
@@ -168,6 +169,21 @@ const Dashboard = ({ tab = 'dashboard' }) => {
 
   const totalRequests = requests.length;
 
+  // Délai moyen de traitement : création → livraison. Calculé sur la liste
+  // chargée (les demandes livrées portent date_livraison) : aucune requête
+  // supplémentaire, et la carte reste à jour avec les données affichées.
+  const livreesAvecDelai = requests.filter((r) => r.date_livraison && r.created_at);
+  const delaiMoyenJours = livreesAvecDelai.length
+    ? (livreesAvecDelai.reduce((somme, r) =>
+        somme + (new Date(r.date_livraison) - new Date(r.created_at)), 0)
+      / livreesAvecDelai.length / 86400000)
+    : null;
+  const delaiMoyenLibelle = delaiMoyenJours === null
+    ? '—'
+    : delaiMoyenJours < 1
+      ? `${Math.max(1, Math.round(delaiMoyenJours * 24))} h`
+      : `${Math.round(delaiMoyenJours)} j`;
+
   // Nombre de lignes réellement présentées par l'onglet courant. Le tableau du
   // bas ne montre pas les mêmes données selon l'onglet : afficher `requests`
   // partout donnerait un décompte faux sur « Mes tâches », qui lit `tasks`.
@@ -186,38 +202,40 @@ const Dashboard = ({ tab = 'dashboard' }) => {
   // plus visible de l'écran, sous le titre, servait donc à répéter ce qu'on savait
   // déjà. Elle décrit maintenant ce que l'onglet contient et à quoi il sert.
   const PAGES = {
-    dashboard: {
-      titre: 'Tableau de bord',
-      sousTitre: "Vue d'ensemble de l'activité documentaire",
+    overview: {
+      titre: "Demandes — vue d'ensemble",
+      sousTitre: "Reçues, en attente, à traiter, livrées : le pouls du module demandes",
       icone: LayoutDashboard,
-      fil: [{ label: 'Tableau de bord' }],
+      fil: [{ label: 'Accueil', to: '/' }, { label: 'Demandes' }, { label: "Vue d'ensemble" }],
     },
     requests: {
       titre: 'Mes demandes',
       sousTitre: 'Les demandes que vous avez déposées, et leur avancement',
       icone: FileText,
-      fil: [{ label: 'Tableau de bord', to: '/dashboard' }, { label: 'Mes demandes' }],
+      fil: [{ label: 'Accueil', to: '/' }, { label: 'Demandes' }, { label: 'Mes demandes' }],
     },
     my_tasks: {
       titre: 'Mes tâches',
       sousTitre: 'Les demandes qui vous sont assignées et attendent votre action',
       icone: ClipboardList,
-      fil: [{ label: 'Tableau de bord', to: '/dashboard' }, { label: 'Mes tâches' }],
+      fil: [{ label: 'Accueil', to: '/' }, { label: 'Demandes' }, { label: 'Mes tâches' }],
     },
     history: {
       titre: 'Historique des flux',
       sousTitre: 'Journal chronologique des actions sur les demandes',
       icone: History,
-      fil: [{ label: 'Tableau de bord', to: '/dashboard' }, { label: 'Historique' }],
+      fil: [{ label: 'Accueil', to: '/' }, { label: 'Demandes' }, { label: 'Historique' }],
     },
     all_requests: {
       titre: 'Gestion des archives',
       sousTitre: "Toutes les demandes de l'organisation, tous statuts confondus",
       icone: Package,
-      fil: [{ label: 'Tableau de bord', to: '/dashboard' }, { label: 'Toutes les demandes' }],
+      fil: [{ label: 'Accueil', to: '/' }, { label: 'Demandes' }, { label: 'Toutes les demandes' }],
     },
   };
-  const page = PAGES[tab] || PAGES.dashboard;
+  // 'dashboard' est l'ancien nom de l'overview (les liens profonds survivent
+  // aux redirections de routes, mais une session ouverte peut encore le porter).
+  const page = PAGES[tab === 'dashboard' ? 'overview' : tab] || PAGES.overview;
 
   return (
     <div className="relative p-4 md:p-8 max-w-7xl mx-auto">
@@ -255,10 +273,10 @@ const Dashboard = ({ tab = 'dashboard' }) => {
       />
 
       {/* Dashboard Tab */}
-      {tab === 'dashboard' && (
+      {TAB_AVEC_OVERVIEW.includes(tab) && (
         <>
         <div className="animate-fade-in-up">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mb-8 md:mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5 mb-8 md:mb-10">
             {loading ? (
               <>
                 <SkeletonCard delay={0} />
@@ -295,13 +313,23 @@ const Dashboard = ({ tab = 'dashboard' }) => {
                     </div>
                   );
                 })}
+                <div className="stat-card animate-fade-in-up" style={{ animationDelay: '360ms' }}>
+                  <div className="min-w-0">
+                    <p className="stat-card-label">Délai moyen</p>
+                    <p className="stat-card-value">{delaiMoyenLibelle}</p>
+                    <p className="stat-card-sublabel">{livreesAvecDelai.length} demande(s) livrée(s)</p>
+                  </div>
+                  <div className="stat-card-icon" style={tons.ok} aria-hidden="true">
+                    <Clock size={18} />
+                  </div>
+                </div>
               </>
             )}
           </div>
         </div>
 
           {/* Analytics — admin seulement */}
-          {isAdmin && tab === 'dashboard' && <DashboardAnalytics />}
+          {isAdmin && TAB_AVEC_OVERVIEW.includes(tab) && <DashboardAnalytics />}
       </>
       )}
 
@@ -316,7 +344,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
                     répéter n'ajoutait rien — pire, « Mes demandes » en titre et
                     « Mes requêtes » en sous-titre désignaient la même chose avec
                     deux mots différents, ce qui laisse croire à deux listes. */}
-                {tab === 'dashboard' && (
+                {TAB_AVEC_OVERVIEW.includes(tab) && (
                   <h2 className="flex items-center gap-2 truncate">
                     {isAdmin
                       ? <><Package size={18} className="text-docuflow-secondary flex-shrink-0" aria-hidden="true" /> <span>File d'attente</span></>

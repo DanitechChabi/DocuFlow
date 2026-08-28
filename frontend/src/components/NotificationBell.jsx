@@ -45,6 +45,17 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
     setIsOpen(!isOpen);
   };
 
+  // La sidebar peut demander l'ouverture du panneau (entrée « Notifications ») :
+  // même geste que le clic sur la cloche, sans dupliquer sa logique.
+  useEffect(() => {
+    const handler = () => {
+      computeCoords();
+      setIsOpen(true);
+    };
+    window.addEventListener('docuflow:open-notifications', handler);
+    return () => window.removeEventListener('docuflow:open-notifications', handler);
+  }, []);
+
   // Recompute position on resize/orientation change while dropdown is open
   useEffect(() => {
     if (!isOpen) return;

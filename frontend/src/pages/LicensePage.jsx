@@ -365,7 +365,7 @@ const LicensePage = () => {
           {allowed && (
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/')}
               className="w-full mt-3 text-sm font-bold text-docuflow-secondary hover:underline py-2"
             >
               Retour à DocuFlow

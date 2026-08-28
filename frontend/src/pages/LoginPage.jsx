@@ -38,7 +38,7 @@ const LoginPage = () => {
                 const data = await googleAuthService.loginWithCredential(response.credential);
                 if (data.token) {
                   await settings.refresh();
-                  navigate('/dashboard');
+                  navigate('/');
                 }
               } catch (err) {
                 setError(err.response?.data?.message || 'Erreur de connexion Google');
@@ -109,7 +109,7 @@ const LoginPage = () => {
       if (data.token) {
         // Recharge les réglages du tenant de l'utilisateur (branding du tableau de bord)
         await settings.refresh();
-        navigate('/dashboard');
+        navigate('/');
       } else {
         setError(data.message || 'Identifiants invalides');
         setLoading(false);

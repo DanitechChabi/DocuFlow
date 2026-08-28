@@ -80,8 +80,8 @@ const GlobalSearch = () => {
   const gedLisible = isStaff || (settings.ged_access_role || 'archiviste') === 'all';
 
   const quickPages = [
-    { type: 'page', title: 'Tableau de bord', subtitle: '/dashboard', icon: ArrowRight, action: () => { navigate('/dashboard'); setIsOpen(false); } },
-    { type: 'page', title: 'Mes demandes', subtitle: '/dashboard/requests', icon: ArrowRight, action: () => { navigate('/dashboard/requests'); setIsOpen(false); } },
+    { type: 'page', title: 'Accueil', subtitle: '/', icon: ArrowRight, action: () => { navigate('/'); setIsOpen(false); } },
+    { type: 'page', title: 'Mes demandes', subtitle: '/demandes/mes-demandes', icon: ArrowRight, action: () => { navigate('/demandes/mes-demandes'); setIsOpen(false); } },
     ...(gedLisible
       ? [{ type: 'page', title: 'Documents', subtitle: '/documents', icon: FolderOpen, action: () => { navigate('/documents'); setIsOpen(false); } }]
       : []),

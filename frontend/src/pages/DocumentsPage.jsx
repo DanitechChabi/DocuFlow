@@ -17,6 +17,7 @@ import DraggableDocumentGroup from '../components/DraggableDocumentGroup';
 import { DocumentPreviewLightbox } from '../components/DocumentPreview';
 import FolderTree from '../components/FolderTree';
 import PageHeader from '../components/PageHeader';
+import GEDOverview from '../components/GEDOverview';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { STATUS_CLASSES, STATUS_LABELS, STATUS_VALUES } from '../utils/documentStatuses';
 
@@ -30,7 +31,7 @@ const UNCLASSIFIED_GROUP = 'Non classé';
 // chaque rendu invaliderait en permanence.
 const MODES_AFFICHAGE = ['list', 'dynamic'];
 
-const DocumentsPage = () => {
+const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   const user = authService.getCurrentUser();
   const isAdmin = ['superadmin', 'admin', 'archiviste'].includes(user?.role);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +39,12 @@ const DocumentsPage = () => {
   // Recherche globale depuis la topbar → pré-remplir ?q=
   const [q, setQ] = useState(searchParams.get('q') || '');
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ statut: '', type_document: '', annee: '', dossier_id: '' });
+  const [filters, setFilters] = useState({
+    statut: statutFiltre || '',
+    type_document: '',
+    annee: '',
+    dossier_id: '',
+  });
   const [folders, setFolders] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -193,12 +199,23 @@ const DocumentsPage = () => {
     return () => clearTimeout(t);
   }, [q]);
 
-  // Suivre les changements de ?q= (nouvelle recherche depuis la topbar)
+  // Suivre les changements de ?q= (nouvelle recherche depuis la barre supérieure).
+  //
+  // La comparaison se fait sur la VALEUR, pas sur l'objet searchParams : tout
+  // changement d'un autre paramètre (?doc=, ?vue=) re-déclenche l'effet, et
+  // réécraser q ramenait la saisie locale en arrière sans action de
+  // l'utilisateur (le champ et les résultats « sautaient » au retour de fiche).
+  // La page est RÉINITIALISÉE : rester en page 3 sur une recherche qui n'a
+  // qu'une page de résultats affichait « aucun document trouvé » — compteur
+  // juste, pagination masquée, aucune issue visible.
+  const urlQ = searchParams.get('q') ?? '';
   useEffect(() => {
-    const urlQ = searchParams.get('q');
-    if (urlQ !== null && urlQ !== q) setQ(urlQ);
+    if (urlQ !== q) {
+      setQ(urlQ);
+      setPage(1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [urlQ]);
 
   // Fiche ouverte depuis l'extérieur de la page : `?doc=<id>`.
   //
@@ -299,16 +316,27 @@ const DocumentsPage = () => {
   const total = data?.pagination?.total || 0;
   const totalPages = data?.pagination?.total_pages || 1;
 
+  // /documents sans ?vue= : la vue d'ensemble du module (cartes, accès
+  // rapides, récents) — la liste détaillée reste à /documents/liste.
+  if (vue === 'ensemble') {
+    return <GEDOverview data={data} folders={folders} loading={loading} />;
+  }
+
   return (
     <div className="px-4 sm:px-6 md:px-8 py-6 md:py-8">
       <div className="max-w-6xl mx-auto">
         <PageHeader
-          title="Documents"
-          subtitle="Référentiel documentaire — recherche, classement et versions"
+          title={statutFiltre === 'à indexer' ? 'À indexer' : statutFiltre === 'archivé' ? 'Archives' : 'Documents'}
+          subtitle={statutFiltre === 'à indexer'
+            ? 'Documents versés en masse qui attendent leurs métadonnées'
+            : statutFiltre === 'archivé'
+              ? 'Documents archivés du référentiel'
+              : 'Référentiel documentaire — recherche, classement et versions'}
           icon={FolderOpen}
           breadcrumb={[
-            { label: 'Tableau de bord', to: '/dashboard' },
-            { label: 'Documents' },
+            { label: 'Accueil', to: '/' },
+            { label: 'Documents', to: '/documents' },
+            ...(statutFiltre ? [{ label: statutFiltre === 'à indexer' ? 'À indexer' : 'Archives' }] : []),
           ]}
           actions={
             <>
