@@ -7,6 +7,7 @@ import {
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { documentService } from '../services/documentService';
+import { requestDetailsService } from '../services/requestDetailsService';
 import { toast } from './Toast';
 
 // Machine à états côté client (miroir du backend requestStateMachine)
@@ -42,6 +43,8 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const [assigning, setAssigning] = useState(false);
   const fileInputRef = useRef(null);
   const [gedDoc, setGedDoc] = useState(null);
+  // Tous les documents liés (jointure N↔N) : le livrable ET les références.
+  const [documentsLies, setDocumentsLies] = useState([]);
   const [gedBusy, setGedBusy] = useState(false);
   const [gedError, setGedError] = useState('');
   const [linkOpen, setLinkOpen] = useState(false);
@@ -77,7 +80,8 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
     }
   }, [request, loadFiles, isAdmin]);
 
-  // Document lié dans le référentiel GED
+  // Document lié dans le référentiel GED — livrable principal (document_id),
+  // et la liste complète des liens (migration 021) fournie par les détails.
   useEffect(() => {
     if (request?.document_id) {
       documentService.getDocument(request.document_id)
@@ -87,6 +91,16 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       setGedDoc(null);
     }
   }, [request?.id, request?.document_id]);
+
+  // Les documents liés viennent des DÉTAILS servis par le backend (champ
+  // linkedDocuments, migration 021) — la modal reçoit `request` en prop mais
+  // la relation N↔N ne vit pas sur l'objet demande.
+  useEffect(() => {
+    if (!request?.id) { setDocumentsLies([]); return; }
+    requestDetailsService.getDetails(request.id)
+      .then((d) => setDocumentsLies(d?.linkedDocuments || []))
+      .catch(() => setDocumentsLies([]));
+  }, [request?.id]);
 
   // Recherche débouncée pour "lier un document"
   useEffect(() => {
@@ -486,16 +500,33 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                   <label className="text-xs font-bold text-slate-500 ml-1 flex items-center gap-1.5"><FolderOpen size={13} /> Référentiel documentaire</label>
                   {gedError && <p className="text-xs font-bold text-red-500">{gedError}</p>}
                   {gedDoc ? (
-                    <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-docuflow-secondary">{gedDoc.reference_mfile}</p>
-                          <p className="text-xs text-slate-500 truncate">{gedDoc.nom_entreprise} · {gedDoc.num_dossier}/{gedDoc.num_acte} · {gedDoc.statut}</p>
+                    <div className="space-y-2">
+                      <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-docuflow-secondary">{gedDoc.reference_mfile}</p>
+                            <p className="text-xs text-slate-500 truncate">{gedDoc.nom_entreprise} · {gedDoc.num_dossier}/{gedDoc.num_acte} · {gedDoc.statut}</p>
+                          </div>
+                          <button onClick={handleUnlinkDocument} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 flex-shrink-0" title="Retirer le lien">
+                            <Unlink size={15} />
+                          </button>
                         </div>
-                        <button onClick={handleUnlinkDocument} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 flex-shrink-0" title="Retirer le lien">
-                          <Unlink size={15} />
-                        </button>
                       </div>
+                      {/* Autres documents liés (références, pièces) — la relation
+                          N↔N : le livrable est ci-dessus, le reste ici. */}
+                      {documentsLies.filter((l) => l.id !== request?.document_id).map((l) => (
+                        <div key={l.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700">{l.reference_mfile}</p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {l.nom_entreprise}{l.dossier_name && ` · ${l.dossier_name}`} · {l.files_count} fichier(s)
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-bold flex-shrink-0">
+                            {l.link_type === 'piece' ? 'Pièce' : l.link_type === 'produit' ? 'Produit' : 'Référence'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2">

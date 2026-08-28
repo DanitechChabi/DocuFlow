@@ -173,6 +173,11 @@ export const documentService = {
     const response = await api.get(`/documents/${id}/relations`);
     return response.data;
   },
+  // Demandes liées à ce document (réciproque du lien, migration 021).
+  getDocumentRequests: async (id) => {
+    const response = await api.get(`/documents/${id}/requests`);
+    return response.data;
+  },
   createRelation: async (id, targetDocId, relationType) => {
     const response = await api.post(`/documents/${id}/relations`, { target_document_id: targetDocId, relation_type: relationType });
     return response.data;

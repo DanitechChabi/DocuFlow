@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
+import { FileSearch,
+
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
   Lock, Unlock, Link2, Wand2,
@@ -57,6 +58,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [shareMessage, setShareMessage] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
   const [relations, setRelations] = useState([]);
+  // Demandes liées (réciproque du lien, migration 021) : celle qui a produit
+  // ce document, ou celles qui s'y réfèrent.
+  const [demandesLiees, setDemandesLiees] = useState([]);
   // Indexation (champs du schéma de métadonnées de l'organisation) : c'est
   // l'écran qui donne un sens au statut « à indexer » posé par le téléversement
   // en masse — sans lui, la file d'attente n'avait AUCUNE entrée d'interface
@@ -75,6 +79,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
         const rels = await documentService.getRelations(documentId);
         setRelations(rels);
       } catch { /* silencieux */ }
+      try {
+        setDemandesLiees(await documentService.getDocumentRequests(documentId));
+      } catch { /* silencieux : la fiche reste consultable sans la réciproque */ }
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors du chargement du document');
     } finally {
