@@ -264,6 +264,7 @@ async function verifyPaypalSignature(headers, rawBody) {
  *
  * @param {number} months
  * @param {string} [customId] contexte à retrouver au retour (voir webhook)
+ * @throws si le contexte ne tient pas dans la limite PayPal (voir plus bas)
  */
 async function createPaypalOrder(months, customId = null) {
   const mois = Math.max(1, Math.min(36, parseInt(months, 10) || 1));
@@ -271,6 +272,18 @@ async function createPaypalOrder(months, customId = null) {
   // toFixed(2) : PayPal refuse une commande dont la valeur n'a pas exactement
   // deux décimales pour l'EUR ("115" est rejeté, "115.00" accepté).
   const total = (tarif.amount * mois).toFixed(2);
+
+  // LE CONTEXTE NE DOIT JAMAIS ÊTRE TRONQUÉ SILENCIEUSEMENT. custom_id est
+  // limité à 127 caractères chez PayPal : l'ancien code y découpait le JSON
+  // contexte sans le dire, et le JSON devenait illisible — le lecteur du retour
+  // retombait alors, sans erreur ni journal, sur « 1 mois, sans e-mail, sans
+  // clé » (voir lireCustomId). Un acheteur qui réglait 12 mois recevait une
+  // licence d'un mois, et un renouvellement devenait une nouvelle licence :
+  // l'ancienne expirait à sa date, le reliquat était détruit. Mieux vaut
+  // refuser la commande AVANT paiement que livrer le faux après encaissement.
+  if (customId && customId.length > 127) {
+    throw new Error(`CONTEXTE_TROP_LONG:${customId.length}`);
+  }
 
   const token = await paypalAccessToken();
   const { data } = await axios.post(
@@ -282,8 +295,9 @@ async function createPaypalOrder(months, customId = null) {
         description: `DocuFlow — abonnement ${mois} mois`,
         // custom_id nous est rendu tel quel dans le webhook et dans le détail de
         // la commande : c'est ainsi qu'on retrouve l'acheteur et la durée sans
-        // tenir d'état intermédiaire à recoller ensuite.
-        ...(customId ? { custom_id: customId.slice(0, 127) } : {}),
+        // tenir d'état intermédiaire à recoller ensuite. Jamais découpé : voir
+        // le contrôle de longueur ci-dessus.
+        ...(customId ? { custom_id: customId } : {}),
       }],
       application_context: {
         brand_name: 'DocuFlow',
@@ -429,20 +443,50 @@ async function recordPayment({
     [provider, providerRef, amount, currency, mois, customerEmail, raw ? JSON.stringify(raw) : null]
   );
 
-  if (inseres.length === 0) {
-    // Notification déjà traitée. Réponse en succès délibérée : le fournisseur
-    // doit cesser de réémettre, et de son point de vue tout s'est bien passé.
+  let paymentId;
+
+  if (inseres.length > 0) {
+    paymentId = inseres[0].id;
+  } else {
+    // Notification déjà vue. Deux cas se présentent, et seul le premier est un
+    // vrai doublon.
     const { rows } = await db.query(
-      `SELECT p.id, l.license_key
+      `SELECT p.id, p.status, p.months, p.customer_email, p.customer_company, l.license_key
          FROM payments p LEFT JOIN licenses l ON l.id = p.license_id
         WHERE p.provider = $1 AND p.provider_ref = $2`,
       [provider, providerRef]
     );
-    console.log(`[payment] Notification déjà traitée (${provider} ${providerRef}) — ignorée.`);
-    return { ok: true, duplicate: true, license_key: rows[0]?.license_key || null };
-  }
 
-  const paymentId = inseres[0].id;
+    if (!rows[0]) {
+      // Insertion ignorée puis ligne introuvable : état incohérent qu'on ne sait
+      // pas traiter. Succès au fournisseur pour arrêter les réémissions, et
+      // trace pour le vendeur.
+      console.error(`[payment] Règlement ${providerRef} introuvable après insertion ignorée.`);
+      return { ok: true, duplicate: true, license_key: null };
+    }
+
+    if (rows[0].license_key) {
+      console.log(`[payment] Notification déjà traitée (${provider} ${providerRef}) — ignorée.`);
+      return { ok: true, duplicate: true, license_key: rows[0].license_key };
+    }
+
+    if (rows[0].status !== 'paid') {
+      // Trace d'un règlement insuffisant ou remboursé : elle n'a jamais vocation
+      // à produire une licence, et la reprise ci-dessous ne la concerne pas.
+      console.log(`[payment] Notification répétée sur règlement ${rows[0].status} (${providerRef}) — ignorée.`);
+      return { ok: true, duplicate: true, license_key: null };
+    }
+
+    // REPRISE : le règlement est ENCAISSÉ mais aucune licence n'existe — c'est
+    // l'état laissé par un échec d'émission (base indisponible au moment de
+    // créer la licence). Le fournisseur réémettant sa notification, ce passage
+    // est le chemin de guérison : sans lui, un règlement définitivement
+    // encaissé ne produirait JAMAIS sa licence, quelle que soit la patience du
+    // client. Les paramètres de l'appel courante font foi (la réémission porte
+    // le même événement), avec repli sur ce qui est stocké.
+    paymentId = rows[0].id;
+    console.warn(`[payment] Reprise du règlement ${providerRef} — encaissé sans licence à ce jour.`);
+  }
 
   // --- Licence : prolongation d'un abonnement existant, ou émission ---
   let license = null;
@@ -453,29 +497,50 @@ async function recordPayment({
     if (existante) {
       // Une licence révoquée ne se réhabilite PAS par un paiement : la révocation
       // est une décision commerciale (fraude, litige) que le vendeur seul lève.
+      // Le règlement reste tracé (l'argent est encaissé), mais AUCUNE licence
+      // n'est émise — ni prolongation, ni nouvelle clé qui contournerait la
+      // sanction. Le vendeur voit le paiement orphelin dans sa console.
       if (existante.status === 'revoked') {
-        console.warn(`[payment] Paiement sur licence révoquée ${existante.license_key} — non prolongée.`);
-      } else {
-        // extendLicense renvoie la nouvelle ÉCHÉANCE, pas la ligne : la licence
-        // est donc relue. S'en dispenser laisserait ici une date là où le reste
-        // du code attend un objet (license.id à l'UPDATE, license.license_key
-        // dans l'e-mail).
-        const echeance = await licenseService.extendLicense(existante.id, mois);
-        license = { ...existante, valid_until: echeance, status: 'active' };
-        renouvellement = true;
+        console.warn(`[payment] Paiement sur licence révoquée ${existante.license_key} — refusé, contactez le vendeur.`);
+        return {
+          ok: false,
+          code: 'LICENSE_REVOKED',
+          message: 'Cette licence a été révoquée. Contactez-nous pour régulariser votre situation.',
+        };
       }
+      // extendLicense renvoie la nouvelle ÉCHÉANCE, pas la ligne : la licence
+      // est donc relue. S'en dispenser laisserait ici une date là où le reste
+      // du code attend un objet (license.id à l'UPDATE, license.license_key
+      // dans l'e-mail).
+      const echeance = await licenseService.extendLicense(existante.id, mois);
+      license = { ...existante, valid_until: echeance, status: 'active' };
+      renouvellement = true;
     } else {
       console.warn(`[payment] Clé ${licenseKey} inconnue — une nouvelle licence est émise.`);
     }
   }
 
   if (!license) {
-    license = await licenseService.createLicense({
-      customer_email: customerEmail,
-      customer_company: customerCompany,
-      months: mois,
-      notes: `Paiement ${provider} ${providerRef}`,
-    });
+    try {
+      license = await licenseService.createLicense({
+        customer_email: customerEmail,
+        customer_company: customerCompany,
+        months: mois,
+        notes: `Paiement ${provider} ${providerRef}`,
+      });
+    } catch (err) {
+      // Le règlement est ENCAISSÉ : la ligne 'payments' doit lui survire comme
+      // trace comptable, quand bien même la licence n'a pas pu être créée. On ne
+      // fait donc ni DELETE ni rollback silencieux — on rend un échec explicite
+      // pour que le fournisseur réémette, et le passage de REPRISE ci-dessus
+      // retentera l'émission à la notification suivante.
+      console.error(`[payment] Licence non émise pour ${providerRef} :`, err.message);
+      return {
+        ok: false,
+        code: 'LICENSE_ERROR',
+        message: 'Règlement enregistré — la licence n\'a pas pu être émise. Nous réessayons automatiquement.',
+      };
+    }
   }
 
   await db.query('UPDATE payments SET license_id = $1 WHERE id = $2', [license.id, paymentId]);
