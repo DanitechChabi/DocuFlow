@@ -169,8 +169,10 @@ exports.login = async (req, res) => {
     // Fallback à 1 (DocuFlow) si la colonne n'existe pas encore (pré-migration)
     const tenantId = user.tenant_id || 1;
     // Durée configurable par le superadministrateur (réglage session_duration_days)
+    // tv : version de jeton — incrémentée à chaque changement de rôle ou de
+    // permissions du compte, ce qui invalide les jetons encore en circulation.
     const token = jwt.sign(
-      { id: user.id, role: user.role, tenant_id: tenantId },
+      { id: user.id, role: user.role, tenant_id: tenantId, tv: user.token_version || 0 },
       process.env.JWT_SECRET,
       { expiresIn: await settingsService.getSessionDuration(tenantId) }
     );
@@ -432,7 +434,7 @@ exports.googleLogin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, tenant_id: tenantId },
+      { id: user.id, role: user.role, tenant_id: tenantId, tv: user.token_version || 0 },
       process.env.JWT_SECRET,
       { expiresIn: await settingsService.getSessionDuration(tenantId) }
     );

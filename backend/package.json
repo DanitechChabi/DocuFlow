@@ -6,8 +6,9 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "node src/config/catalog.test.js && node src/desktop/licenseGuard.test.js",
-    "test:license": "node src/desktop/licenseGuard.test.js"
+    "test": "npm run test:license && npm run test:rbac",
+    "test:license": "node src/desktop/licenseGuard.test.js",
+    "test:rbac": "node src/rbac.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",
