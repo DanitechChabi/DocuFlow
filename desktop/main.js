@@ -4,7 +4,7 @@
 // frontend compilé en même-origine via SERVE_FRONTEND) et ouvre une fenêtre
 // sur http://127.0.0.1:<port>.
 // ============================================================================
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -86,6 +86,13 @@ ipcMain.handle('desktop:open-external', async (_event, url) => {
 
 ipcMain.handle('desktop:version', () => app.getVersion());
 
+ipcMain.handle('desktop:set-title', async (_event, title) => {
+  if (mainWindow) {
+    mainWindow.setTitle(title);
+  }
+  return true;
+});
+
 // ----------------------------------------------------------------------------
 // Écran d'attente
 //
@@ -122,8 +129,32 @@ function splashStatus(message) {
 }
 
 function closeSplash() {
-  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+  const fenetre = splashWindow;
+  // On détache la référence TOUT DE SUITE : un second appel (le démarrage passe
+  // par plusieurs chemins de sortie) ne doit pas relancer un fondu sur une
+  // fenêtre déjà en cours de fermeture.
   splashWindow = null;
+  if (!fenetre || fenetre.isDestroyed()) return;
+
+  // …mais la fermeture s'opère sur la référence LOCALE. L'ancienne version
+  // testait `splashWindow` dans le setTimeout, après l'avoir mis à null juste
+  // au-dessus : la condition était donc toujours fausse et l'écran d'attente
+  // restait affiché par-dessus l'application, pour toute la session.
+  const fermer = () => {
+    if (!fenetre.isDestroyed()) fenetre.close();
+  };
+
+  // Filet de sécurité : si le fondu ne rend jamais la main (page bloquée, rendu
+  // non prêt), on ferme quand même. Sans lui, une promesse en attente suffirait
+  // à laisser la fenêtre à l'écran.
+  const secours = setTimeout(fermer, 2000);
+
+  fenetre.webContents
+    .executeJavaScript('window.fadeOut && window.fadeOut()')
+    .then(() => {
+      setTimeout(() => { clearTimeout(secours); fermer(); }, 600); // durée de la transition CSS
+    })
+    .catch(() => { clearTimeout(secours); fermer(); });
 }
 
 /**
@@ -165,15 +196,77 @@ function detecterBuildDistant() {
   }
 }
 
+/**
+ * Système de mise à jour automatique (electron-updater / GitHub).
+ *
+ * DÉSACTIVÉ EN ATTENTE DU DÉPÔT DE DISTRIBUTION : la configuration `publish`
+ * vise `DanitechChabi/docuflow-desktop`, qui n'existe pas encore — chaque
+ * démarrage produisait une erreur 404 dans les journaux, sans jamais proposer
+ * aucune mise à jour. Pour réactiver : créer le dépôt (public, avec des
+ * releases auxquelles electron-builder publie les installeurs), puis
+ * réintroduire l'appel ci-dessous.
+ */
+function setupAutoUpdater() {
+  if (!app.isPackaged) return; // Pas de mise à jour en mode développement
+  console.log('[desktop] Mise à jour automatique inactive — dépôt de distribution non créé.');
+  // autoUpdater.checkForUpdatesAndNotify();
+}
+
+/**
+ * Secret de signature des jetons : UN PAR INSTALLATION, généré au premier
+ * lancement et conservé dans le profil utilisateur.
+ *
+ * L'ancien repli était une constante en clair dans un dépôt PUBLIC : quiconque
+ * a lu le dépôt pouvait forger un jeton `{role:'superadmin', tenant_id:1}`
+ * valable sur TOUTES les installations bureau (le serveur local écoute en
+ * loopback, mais tout processus de la session Windows de l'utilisateur peut
+ * le joindre). Le secret est désormais aléatoire — la lecture du dépôt ne
+ * suffit plus. Il vit hors de `pgdata` et des uploads : la sauvegarde des
+ * documents n'a pas à le contenir, et sa perte ne détruit aucune donnée (elle
+ * déconnecte seulement les sessions en cours).
+ *
+ * Un éventuel `JWT_SECRET` posé manuellement dans l'environnement garde la
+ * priorité (cas d'un test ou d'une restauration).
+ */
+function chargerOuCreerSecret() {
+  const crypto = require('crypto');
+  const fichier = path.join(app.getPath('userData'), 'jwt-secret.key');
+  try {
+    if (fs.existsSync(fichier)) {
+      const existant = fs.readFileSync(fichier, 'utf8').trim();
+      if (existant.length >= 32) return existant;
+    }
+    const secret = crypto.randomBytes(48).toString('hex');
+    fs.writeFileSync(fichier, secret, { mode: 0o600 });
+    console.log('[desktop] Secret de signature des jetons généré pour cette installation.');
+    return secret;
+  } catch (err) {
+    // Impossible de persister (disque plein, permissions) : un secret
+    // éphémère vaut mieux que la constante publique — les sessions dureront
+    // simplement moins longtemps.
+    console.warn('[desktop] Secret de jetons non persistable, secret éphémère :', err.message);
+    return crypto.randomBytes(48).toString('hex');
+  }
+}
+
 async function bootstrap() {
   // --- Variables d'environnement du backend (posées AVANT require() — dotenv
   // ne surcharge jamais un process.env déjà défini). ---
-  process.env.NODE_ENV = process.env.NODE_ENV || 'development'; // CORS ouvert (même-origine)
+  //
+  // PRODUCTION dès que l'application est packagée. L'ancien défaut
+  // « development » laissait le CORS de app.js en `origin: true` : TOUTE page
+  // web visitée par le client pouvait interroger l'API locale (et lire /uploads,
+  // servi sans authentification) dès lors qu'elle trouvait le port — le
+  // commentaire d'alors (« CORS ouvert, même-origine ») était faux : `origin:
+  // true` reflète n'importe quelle origine, pas seulement la nôtre. En mode
+  // bureau le frontend est servi PAR CE SERVEUR (même origine), donc le CORS
+  // restreint de production ne gêne aucune requête légitime.
+  process.env.NODE_ENV = process.env.NODE_ENV || (app.isPackaged ? 'production' : 'development');
   process.env.SERVE_FRONTEND = 'true';
   process.env.UPLOADS_DIR = path.join(app.getPath('userData'), 'uploads');
   process.env.HOST = '127.0.0.1';        // loopback uniquement, pas exposé sur le LAN
   process.env.PORT = '0';                // port libre attribué par l'OS
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'DOCUFLOW_SUPER_SECRET_KEY_2024_Daniel_Chabi';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || chargerOuCreerSecret();
 
   // --- Frontend compilé : présent, ET compilé pour le bureau ---
   //
@@ -270,14 +363,19 @@ async function bootstrap() {
   process.env.DB_PASSWORD = process.env.DB_PASSWORD || '';
   process.env.DB_NAME = process.env.DB_NAME || 'docuflow';
 
-  // --- Base de données : création + migrations + compte superadmin ---
+  // --- Base de données : création + migrations ---
+  //
+  // Ces deux étapes SONT bloquantes : sans schéma à jour, l'application n'a rien
+  // à afficher et toute requête échouerait. Le compte par défaut, lui, est traité
+  // séparément plus bas — voir la raison là-bas.
+  let seedAdmin;
   try {
     splashStatus('Préparation des données…');
-    const { ensureDatabase, runMigrations, seedAdmin } = require(path.join(BACKEND_DIR, 'src', 'desktop', 'bootstrap.js'));
-    await ensureDatabase();
+    const bootstrapDb = require(path.join(BACKEND_DIR, 'src', 'desktop', 'bootstrap.js'));
+    seedAdmin = bootstrapDb.seedAdmin;
+    await bootstrapDb.ensureDatabase();
     splashStatus('Mise à jour du schéma…');
-    await runMigrations();
-    await seedAdmin();
+    await bootstrapDb.runMigrations();
   } catch (err) {
     // Avec l'instance embarquée, « démarrez PostgreSQL » n'a aucun sens : le
     // serveur tourne, c'est autre chose qui a échoué (migration, disque). Deux
@@ -305,6 +403,27 @@ async function bootstrap() {
     });
     if (retry === 0) return bootstrap();
     return app.quit();
+  }
+
+  // --- Compte administrateur par défaut ---
+  //
+  // DÉLIBÉRÉMENT HORS DU BLOC BLOQUANT CI-DESSUS. C'est la correction d'une
+  // panne totale : une collision d'identifiant dans ce seed remontait dans le
+  // try des migrations, affichait « La préparation des données a échoué » et
+  // fermait l'application — alors que la base était saine, migrée, et contenait
+  // déjà le compte en question.
+  //
+  // La cause est structurelle et non un cas particulier : ce seed est une
+  // COMMODITÉ de premier lancement, sur une base qui vit ensuite sa propre vie
+  // (comptes renommés, rôles changés, mot de passe modifié). Il ne peut donc pas
+  // partager le sort des migrations, dont l'échec empêche réellement de
+  // travailler. Le journal suffit ici : si aucun compte n'existe, le client le
+  // constate à l'écran de connexion, ce qui est un problème incomparablement
+  // moins grave qu'un logiciel qui refuse de s'ouvrir.
+  try {
+    await seedAdmin();
+  } catch (err) {
+    console.error('[desktop] Compte administrateur par défaut non créé :', err.message);
   }
 
   // --- Licence ---
@@ -348,17 +467,106 @@ async function bootstrap() {
   }
   const port = server.address().port;
   console.log(`[desktop] Backend prêt sur http://127.0.0.1:${port}`);
+  setupAutoUpdater();
   createWindow(port);
 }
 
+function loadWindowState() {
+  try {
+    const statePath = path.join(app.getPath('userData'), 'window-state.json');
+    if (fs.existsSync(statePath)) {
+      return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    }
+  } catch (e) {
+    console.error('[desktop] Erreur chargement état fenêtre :', e);
+  }
+  return { width: 1400, height: 900 };
+}
+
+function saveWindowState(window) {
+  try {
+    const state = {
+      width: window.getBounds().width,
+      height: window.getBounds().height,
+      x: window.getBounds().x,
+      y: window.getBounds().y,
+    };
+    const statePath = path.join(app.getPath('userData'), 'window-state.json');
+    fs.writeFileSync(statePath, JSON.stringify(state));
+  } catch (e) {
+    console.error('[desktop] Erreur sauvegarde état fenêtre :', e);
+  }
+}
+
+function createCustomMenu() {
+  const template = [
+    {
+      label: 'Fichier',
+      submenu: [
+        {
+          label: 'Quitter',
+          accelerator: 'CmdOrCtrl+Q',
+          click: () => { app.quit(); }
+        }
+      ]
+    },
+    {
+      label: 'Édition',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'Aide',
+      submenu: [
+        {
+          label: 'À propos',
+          click: () => {
+            if (mainWindow) {
+              dialog.showMessageBox({
+                type: 'info',
+                title: 'À propos de DocuFlow',
+                message: 'DocuFlow — Plateforme de gestion documentaire',
+                detail: `Version ${app.getVersion()}\nDéveloppé par CHABI BOUKO Daniel\n\nUne solution sécurisée pour la gestion de vos documents en local.`
+              });
+            }
+          }
+        },
+        {
+          label: 'Licence',
+          click: () => {
+            dialog.showMessageBox({
+              type: 'info',
+              title: 'Licence DocuFlow',
+              message: 'Informations sur la licence',
+              detail: 'Veuillez consulter les conditions générales d\'utilisation pour plus de détails.'
+            });
+          }
+        }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 function createWindow(port) {
+  const state = loadWindowState();
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: state.width,
+    height: state.height,
+    x: state.x,
+    y: state.y,
     minWidth: 1024,
     minHeight: 700,
     title: 'DocuFlow',
-    autoHideMenuBar: true,
     backgroundColor: '#f8fafc',
     // Masquée jusqu'à ce que l'interface soit peinte : l'écran d'attente reste
     // visible jusque-là. Sans cela, on verrait une fenêtre blanche vide le temps
@@ -371,6 +579,11 @@ function createWindow(port) {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  mainWindow.on('resize', () => saveWindowState(mainWindow));
+  mainWindow.on('move', () => saveWindowState(mainWindow));
+
+  createCustomMenu();
 
   mainWindow.loadURL(`http://127.0.0.1:${port}/`);
 

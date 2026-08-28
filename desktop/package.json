@@ -32,17 +32,45 @@
       "main.js",
       "preload.js",
       "splash.html",
-      { "from": "../backend/src", "to": "backend/src" },
-      { "from": "../backend/package.json", "to": "backend/package.json" },
-      { "from": "../backend/node_modules", "to": "backend/node_modules", "filter": ["**/*", "!nodemon/**", "!**/.bin/**"] },
-      { "from": "../frontend/dist", "to": "frontend/dist" },
-      { "from": "../docs", "to": "docs", "filter": ["**/*.sql"] }
+      {
+        "from": "../backend/src",
+        "to": "backend/src"
+      },
+      {
+        "from": "../backend/package.json",
+        "to": "backend/package.json"
+      },
+      {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules",
+        "filter": [
+          "**/*",
+          "!nodemon/**",
+          "!**/.bin/**"
+        ]
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend/dist"
+      },
+      {
+        "from": "../docs",
+        "to": "docs",
+        "filter": [
+          "**/*.sql"
+        ]
+      }
     ],
     "extraResources": [
-      { "from": "vendor/pgsql", "to": "pgsql" }
+      {
+        "from": "vendor/pgsql",
+        "to": "pgsql"
+      }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -53,7 +81,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "DocuFlow",
       "artifactName": "DocuFlow-Setup-${version}.exe",
-      "installerLanguages": ["fr_FR"],
+      "installerLanguages": [
+        "fr_FR"
+      ],
       "language": "1036",
       "deleteAppDataOnUninstall": false,
       "license": "legal/CGU.txt"
