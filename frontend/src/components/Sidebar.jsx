@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileSearch, PlusCircle, ClipboardList, History, Building2,
-  FolderOpen, Wand2, Archive, Bell,
+  FolderOpen, Wand2, Archive, Trash2, Bell,
   User as UserIcon, ChevronLeft, ChevronRight, Menu, X,
   LogOut, ShieldCheck, Info, Compass,
 } from 'lucide-react';
@@ -116,6 +116,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
+    entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view' }),
   ];
 
   // Le changement de module : l'autre monde reste UN clic de distance.

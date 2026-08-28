@@ -6,6 +6,7 @@ import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import DocumentsPage from './pages/DocumentsPage';
+import CorbeillePage from './pages/CorbeillePage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
@@ -94,6 +95,7 @@ function App() {
           <Route path="/documents/liste" element={<DocumentsPage />} />
           <Route path="/documents/a-indexer" element={<DocumentsPage statutFiltre="à indexer" />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
+          <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/super-admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminPage /></ProtectedRoute>} />
           <Route path="/admin-portal" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><CompanyAdminPage /></ProtectedRoute>} />

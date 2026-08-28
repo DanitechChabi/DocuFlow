@@ -32,6 +32,25 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [statusBusy, setStatusBusy] = useState(false);
   const fileInputRef = useRef(null);
   const [deleteFileTarget, setDeleteFileTarget] = useState(null);
+  // Suppression du document (douce → corbeille, restaurable).
+  const [supprimerOuvert, setSupprimerOuvert] = useState(false);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false);
+
+  const handleSupprimerDocument = async () => {
+    setSuppressionEnCours(true);
+    try {
+      await documentService.deleteDocument(documentId);
+      toast.success('Document mis à la corbeille — restaurable depuis Documents › Corbeille.');
+      setSupprimerOuvert(false);
+      onClose();
+      if (onChanged) onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Suppression impossible.');
+      setSupprimerOuvert(false);
+    } finally {
+      setSuppressionEnCours(false);
+    }
+  };
   // Partage & Relations
   const [showShare, setShowShare] = useState(false);
   const [shareEmails, setShareEmails] = useState('');
@@ -339,6 +358,22 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                     />
                   </div>
                 )}
+
+                {isAdmin && (
+                  <div className="glass-card-premium p-5 space-y-3">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Suppression</h3>
+                    <button
+                      onClick={() => setSupprimerOuvert(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-600 font-semibold hover:bg-red-50 transition-colors text-sm"
+                    >
+                      <Trash2 size={15} /> Mettre à la corbeille
+                    </button>
+                    <p className="text-[11px] text-slate-400">
+                      Le document part en corbeille : il reste restaurable, ses fichiers
+                      et son historique sont conservés.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Colonne droite : fichiers + aperçu */}
@@ -464,6 +499,17 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
         type="danger"
         onConfirm={confirmDeleteFile}
         onClose={() => setDeleteFileTarget(null)}
+      />
+
+      {/* Suppression du document — douce : la corbeille reste restaurable. */}
+      <ConfirmDialog
+        isOpen={supprimerOuvert}
+        title={`Mettre « ${doc?.reference_mfile || 'ce document'} » à la corbeille ?`}
+        message="Le document disparaît du référentiel mais reste restaurable depuis la corbeille, avec ses fichiers, ses métadonnées et son historique."
+        confirmLabel="Mettre à la corbeille"
+        type="danger"
+        onConfirm={handleSupprimerDocument}
+        onClose={() => setSupprimerOuvert(false)}
       />
 
       {/* Modal de partage */}

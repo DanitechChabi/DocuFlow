@@ -18,8 +18,23 @@ export const documentService = {
     const response = await api.patch(`/documents/${id}`, data);
     return response.data;
   },
+  // Suppression DOUCE : le document part en corbeille (restaurable).
   deleteDocument: async (id) => {
     const response = await api.delete(`/documents/${id}`);
+    return response.data;
+  },
+  // Corbeille du tenant.
+  getCorbeille: async () => {
+    const response = await api.get('/documents/corbeille');
+    return response.data;
+  },
+  restoreDocument: async (id) => {
+    const response = await api.post(`/documents/${id}/restore`);
+    return response.data;
+  },
+  // Destruction physique — permission documents.purge, ne vise que la corbeille.
+  purgeDocument: async (id) => {
+    const response = await api.delete(`/documents/${id}/purge`);
     return response.data;
   },
   addFiles: async (id, files) => {
