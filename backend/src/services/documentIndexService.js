@@ -61,14 +61,47 @@ async function setCanonicalReference(tenantId, documentId, client) {
  * et copie request_files → document_files. Retourne null si demande absente.
  *
  * Transactionnel : toute la séquence (verrou de la demande, création du document,
- * copie des fichiers, liaison request.document_id, historique) est atomique.
+ * copie des fichiers, liaisons, historique) est atomique.
  * Le verrou SELECT ... FOR UPDATE sur la demande sérialise deux indexations
  * concurrentes de la même demande (évite doublons et course sur MAX(version)).
+ *
+ * TROIS CORRECTIONS STRUCTURELLES (J4) :
+ *   • VERSIONS : les fichiers Cloudinary étaient insérés avec version = 1 EN
+ *     DUR — trois pièces jointes donnaient trois « versions 1 », et le fichier
+ *     courant (ORDER BY version DESC) était arbitraire. Chaque fichier reçoit
+ *     désormais son numéro séquentiel, quel que soit le support.
+ *   • DOSSIER CIBLE : le document produit atterrissait HORS arborescence
+ *     (dossier_id NULL) — l'archiviste devait le reclasser à la main. Le dossier
+ *     peut être fourni (paramètre dossierId, proposé par l'interface).
+ *   • Lien N↔N : la relation vit dans request_documents (link_type 'produit')
+ *     avec la réciproque documents.request_id — l'ancienne colonne
+ *     requests.document_id reste tenue pour compatibilité ascendante.
+ *
+ * Le statut du document produit est « à indexer » : un livrable issu d'une
+ * demande attend ses métadonnées documentaires, exactement comme un versement
+ * en masse — c'est la même file de travail.
+ *
+ * @param {number} [dossierId] dossier de classement du document produit.
  */
-async function indexRequestToDocuments(tenantId, requestId, userId) {
+async function indexRequestToDocuments(tenantId, requestId, userId, { dossierId = null } = {}) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Le dossier cible doit appartenir au tenant — sinon la référence croisée
+    // ferait vivre le document sous une arborescence étrangère.
+    if (dossierId != null) {
+      const dossierRes = await client.query(
+        'SELECT id FROM document_folders WHERE id = $1 AND tenant_id = $2',
+        [dossierId, tenantId]
+      );
+      if (!dossierRes.rows[0]) {
+        await client.query('ROLLBACK');
+        const err = new Error('Dossier de classement introuvable dans votre organisation.');
+        err.status = 400;
+        throw err;
+      }
+    }
 
     // 1. Lire la demande en la verrouillant (FOR UPDATE) pour sérialiser l'indexation
     const reqRes = await client.query(
@@ -93,33 +126,43 @@ async function indexRequestToDocuments(tenantId, requestId, userId) {
       }
     }
 
-    // 3. Créer le document (référence temporaire puis canonique après l'INSERT)
+    // 3. Créer le document — statut « à indexer » (le livrable attend ses
+    //    métadonnées), dossier cible si fourni.
     const tempRef = `DOC-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const insertRes = await client.query(
-      `INSERT INTO documents (reference_mfile, num_dossier, num_acte, nom_entreprise, annee, type_document, statut, version, created_by, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 'disponible', 1, $7, $8)
+      `INSERT INTO documents (reference_mfile, num_dossier, num_acte, nom_entreprise, annee, type_document, statut, version, created_by, tenant_id, dossier_id, request_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'à indexer', 1, $7, $8, $9, $10)
        RETURNING *`,
-      [tempRef, request.num_dossier, request.num_acte, request.nom_entreprise, request.annee, request.type_document || null, userId, tenantId]
+      [tempRef, request.num_dossier, request.num_acte, request.nom_entreprise, request.annee, request.type_document || null, userId, tenantId, dossierId, requestId]
     );
     const doc = insertRes.rows[0];
     const reference_mfile = await setCanonicalReference(tenantId, doc.id, client);
 
-    // 4. Copier les fichiers de la demande dans le référentiel
-    const filesRes = await client.query('SELECT * FROM request_files WHERE request_id = $1', [requestId]);
+    // 4. Copier les fichiers — chaque pièce reçoit SON numéro de version.
+    const filesRes = await client.query('SELECT * FROM request_files WHERE request_id = $1 ORDER BY id ASC', [requestId]);
     let filesCount = 0;
     for (const rf of filesRes.rows) {
-      // Fichier stocké sur Cloudinary → réutiliser la référence telle quelle (pas de copie physique)
+      // Numéro séquentiel réel — le calcul centralisé ici couvre les DEUX
+      // supports (Cloudinary et disque), là où l'ancien code dupliquait
+      // l'insertion avec version = 1 en dur côté Cloudinary.
+      const verRes = await client.query(
+        'SELECT COALESCE(MAX(version), 0) + 1 AS v FROM document_files WHERE document_id = $1',
+        [doc.id]
+      );
+      const version = verRes.rows[0].v;
+
       if (rf.cloudinary_public_id) {
+        // Fichier stocké sur Cloudinary → réutiliser la référence telle quelle (pas de copie physique)
         await client.query(
           `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [doc.id, 1, rf.original_name, rf.stored_name, rf.cloudinary_public_id, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
+          [doc.id, version, rf.original_name, rf.stored_name, rf.cloudinary_public_id, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
         );
         filesCount++;
         continue;
       }
 
-      // Fichier présent sur le disque local → copier (avec version + upload Cloudinary éventuel)
+      // Fichier présent sur le disque local → copier (avec upload Cloudinary éventuel)
       const localPath = path.join(FILES_DIR, rf.stored_name);
       if (rf.stored_name && fs.existsSync(localPath)) {
         const fileObj = { path: localPath, filename: rf.stored_name, originalname: rf.original_name, mimetype: rf.mime_type, size: rf.file_size };
@@ -131,18 +174,25 @@ async function indexRequestToDocuments(tenantId, requestId, userId) {
         await client.query(
           `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [doc.id, 1, rf.original_name, rf.stored_name, rf.cloudinary_public_id || null, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
+          [doc.id, version, rf.original_name, rf.stored_name, rf.cloudinary_public_id || null, rf.mime_type, rf.file_size, rf.uploaded_by || userId, rf.secure_url || null]
         );
         filesCount++;
       }
     }
 
-    // 5. Lier la demande au document + historique
+    // 5. Lier la demande au document — dans la jointure typée ET par l'ancienne
+    //    colonne (compatibilité ascendante du code qui la lit encore).
     await client.query(
       'UPDATE requests SET document_id = $1 WHERE id = $2 AND tenant_id = $3',
       [doc.id, requestId, tenantId]
     );
-    await logHistory(tenantId, doc.id, userId, 'Indexation depuis une demande', null, 'disponible', null, client);
+    await client.query(
+      `INSERT INTO request_documents (request_id, document_id, link_type, created_by)
+       VALUES ($1, $2, 'produit', $3)
+       ON CONFLICT (request_id, document_id, link_type) DO NOTHING`,
+      [requestId, doc.id, userId]
+    );
+    await logHistory(tenantId, doc.id, userId, 'Indexation depuis une demande', null, 'à indexer', null, client);
 
     await client.query('COMMIT');
     return { document: { ...doc, reference_mfile }, filesCount };

@@ -331,23 +331,52 @@ exports.findMatchingDocument = async (req, res) => {
 exports.linkDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
-  const { document_id } = req.body;
+  const { document_id, link_type = 'reference' } = req.body;
+
+  // Types de lien reconnus — le domaine de la table (migration 021).
+  const TYPES = ['produit', 'piece', 'reference'];
+  if (!TYPES.includes(link_type)) {
+    return res.status(400).json({ message: `Type de lien invalide : ${link_type} (attendu : ${TYPES.join(', ')})` });
+  }
 
   try {
+    // Retrait du lien « produit » principal (l'ancienne colonne) : la jointure
+    // N↔N porte désormais la relation complète, l'ancienne colonne ne garde
+    // que le livrable principal — pour compatibilité du code qui la lit.
     if (document_id == null) {
       await tenantDb.query(tenantId, 'UPDATE requests SET document_id = NULL WHERE id = $1', [id]);
+      await tenantDb.query(tenantId, "DELETE FROM request_documents WHERE request_id = $1 AND link_type = 'produit'", [id]);
       return res.json({ message: 'Lien retiré' });
     }
-    const docRes = await tenantDb.query(tenantId, 'SELECT * FROM documents WHERE id = $1', [document_id]);
+
+    // Le document ET la demande appartiennent au tenant — une liaison croisée
+    // ferait vivre le lien hors périmètre (les deux tables portent tenant_id).
+    const docRes = await db.query(
+      'SELECT id FROM documents WHERE id = $1 AND tenant_id = $2',
+      [document_id, tenantId]
+    );
     if (!docRes.rows[0]) return res.status(404).json({ message: 'Document non trouvé' });
 
-    const result = await tenantDb.query(
-      tenantId,
-      'UPDATE requests SET document_id = $1 WHERE id = $2',
-      [document_id, id]
+    const result = await db.query(
+      'SELECT id FROM requests WHERE id = $1 AND tenant_id = $2',
+      [id, tenantId]
     );
-    if (!result.rowCount) return res.status(404).json({ message: 'Demande non trouvée' });
-    res.json({ message: 'Demande liée au document', document_id });
+    if (!result.rows[0]) return res.status(404).json({ message: 'Demande non trouvée' });
+
+    // La jointure typée — un lien 'produit' tient aussi l'ancienne colonne
+    // (le livrable principal) et la réciproque documents.request_id.
+    await db.query(
+      `INSERT INTO request_documents (request_id, document_id, link_type, created_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (request_id, document_id, link_type) DO NOTHING`,
+      [id, document_id, link_type, req.user.id]
+    );
+    if (link_type === 'produit') {
+      await db.query('UPDATE requests SET document_id = $1 WHERE id = $2 AND tenant_id = $3', [document_id, id, tenantId]);
+      await db.query('UPDATE documents SET request_id = $2 WHERE id = $1 AND tenant_id = $3', [document_id, id, tenantId]);
+    }
+
+    res.json({ message: 'Demande liée au document', document_id, link_type });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la liaison' });
@@ -525,12 +554,27 @@ exports.updateRequestStatus = async (req, res) => {
       }
     }
 
-    // 3bis. À la livraison, indexer les fichiers dans le référentiel documentaire
+    // 3bis. À la livraison, indexer les fichiers dans le référentiel documentaire.
+    //
+    // L'ÉCHEC D'INDEXATION BLOQUE LA LIVRAISON. L'ancien comportement avalait
+    // l'erreur d'une ligne de console : la demande passait « livré », le
+    // demandeur recevait l'e-mail « votre document est disponible »… et aucun
+    // document n'existait dans la GED. Le demandeur appellerait le service pour
+    // un document introuvable, et l'archiviste ne verrait rien. La transition
+    // est refusée (500 explicite) : la demande reste « transmis », l'erreur
+    // est devant les yeux de qui peut la corriger, et la transition pourra être
+    // rejouée. Toute la séquence d'indexation est transactionnelle — rien n'est
+    // à demi-écrit.
     if (status === 'livré') {
       try {
         await indexRequestToDocuments(tenantId, id, userId);
       } catch (err) {
-        console.error('[request] indexation automatique échouée :', err.message);
+        console.error('[request] indexation automatique échouée — livraison refusée :', err.message);
+        return res.status(500).json({
+          message: 'La livraison a été refusée : l\'indexation du document dans le référentiel a échoué '
+            + `(${err.message}). La demande reste « Transmis » — réessayez, ou indexez manuellement depuis sa fiche.`,
+          code: 'INDEXATION_IMPOSSIBLE',
+        });
       }
     }
 

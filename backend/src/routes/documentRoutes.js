@@ -56,6 +56,9 @@ router.post('/assembly/generate', requirePermission('documents.edit'), documentC
 router.get('/:id/relations', lireDocuments, documentController.getDocumentRelations);
 router.post('/:id/relations', requirePermission('documents.edit'), documentController.createDocumentRelation);
 
+// Demandes liées — la réciproque du lien demandes ↔ documents (migration 021)
+router.get('/:id/requests', lireDocuments, documentController.getDocumentRequests);
+
 // Métadonnées et journal d'audit
 router.get('/:id/metadata', lireDocuments, documentController.getDocumentMetadata);
 // L'écriture des métadonnées est l'INDEXATION (statut « à indexer ») comme la

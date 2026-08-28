@@ -1697,6 +1697,34 @@ exports.getDocumentAudit = async (req, res) => {
   }
 };
 
+// Réciproque du lien demandes ↔ documents : la fiche document SAIT quelles
+// demandes lui ont donné naissance ou s'appuient sur lui — impossible avant la
+// migration 021 (le lien ne remontait que demande → document).
+exports.getDocumentRequests = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const { id } = req.params;
+  try {
+    const { rows } = await db.query(
+      `SELECT r.id, r.statut, r.type_document, r.nom_entreprise, r.num_dossier, r.num_acte,
+              r.created_at, u.full_name AS demandeur_name,
+              rd.link_type, rd.created_at AS lie_le
+         FROM request_documents rd
+         JOIN requests r ON r.id = rd.request_id AND r.tenant_id = $1
+         LEFT JOIN users u ON u.id = r.id_user
+        WHERE rd.document_id = $2
+        ORDER BY rd.created_at DESC`,
+      [tenantId, id]
+    );
+    res.json(rows);
+  } catch (err) {
+    // Pré-migration 021 : la jointure n'existe pas — vide plutôt qu'erreur,
+    // pour une donnée qui complète la fiche sans la constituer.
+    if (err.code === '42P01') return res.json([]);
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la récupération des demandes liées' });
+  }
+};
+
 exports.getDocumentRelations = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;

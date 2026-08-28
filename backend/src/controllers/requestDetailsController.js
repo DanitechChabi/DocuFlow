@@ -112,11 +112,36 @@ exports.getRequestDetails = async (req, res) => {
       }
     }
 
+    // Documents liés à la demande — la relation N↔N (migration 021) : le
+    // livrable principal ET les références, chaque ligne avec son type.
+    // Échec non bloquant : pré-migration, la fiche reste consultable.
+    let linkedDocuments = [];
+    try {
+      const docs = await db.query(
+        `SELECT d.id, d.reference_mfile, d.statut, d.type_document, d.dossier_id,
+                f.name AS dossier_name,
+                (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id)::int AS files_count,
+                rd.link_type
+           FROM request_documents rd
+           JOIN documents d ON d.id = rd.document_id AND d.tenant_id = $1
+           LEFT JOIN document_folders f ON f.id = d.dossier_id AND f.tenant_id = d.tenant_id
+          WHERE rd.request_id = $2
+          ORDER BY rd.created_at ASC`,
+        [tenantId, id]
+      );
+      linkedDocuments = docs.rows;
+    } catch (linkErr) {
+      if (linkErr.code !== '42P01') {
+        console.error('[requestDetails] documents liés illisibles :', linkErr.message);
+      }
+    }
+
     res.json({
       request,
       history: logsResult.rows,
       stateHistory: stateResult.rows,
-      customFields
+      customFields,
+      linkedDocuments
     });
   } catch (err) {
     console.error(err);
