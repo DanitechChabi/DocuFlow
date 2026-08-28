@@ -241,11 +241,14 @@ const DocumentChatbot = () => {
 
   return (
     <>
-      {/* Bouton flottant — style robot, position bas-gauche */}
+      {/* Bouton flottant — empilé AU-DESSUS du bouton messagerie, même bord
+          droit : deux boutons de 56 px alignés verticalement (messagerie au
+          coin, DocuBot 8 px au-dessus). L'ancien côte-à-côte laissait le halo
+          du robot déborder sur la messagerie. */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-20 z-30 group"
+          className="fixed bottom-[88px] right-6 z-30 group"
           title="DocuBot — Assistant documentaire"
           aria-label="Ouvrir DocuBot, l'assistant documentaire"
         >

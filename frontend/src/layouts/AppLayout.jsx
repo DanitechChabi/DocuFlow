@@ -45,18 +45,25 @@ const AppLayout = () => {
       <Sidebar unreadCount={unreadCount} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Barre supérieure — outils transverses, plus de navigation */}
+        {/* Barre supérieure — outils transverses, plus de navigation.
+            TROIS ZONES équilibrées : gauche (menu mobile), centre (recherche,
+            centrée quel que soit le contenu des zones latérales), droite
+            (messagerie, notifications). */}
         <header
-          className="flex-shrink-0 h-14 flex items-center gap-3 px-4 border-b"
+          className="relative flex-shrink-0 h-14 flex items-center gap-3 px-4 border-b"
           style={{
             backgroundColor: settings.primary_color || '#0f172a',
             borderColor: 'rgba(255,255,255,0.1)',
           }}
         >
-          {/* Bouton d'ouverture du drawer mobile (rendu par la Sidebar) */}
-          <Sidebar.MobileButton />
+          {/* Zone gauche — même largeur que la droite : c'est ce qui maintient
+              la recherche au centre exact. */}
+          <div className="flex-1 flex items-center">
+            <Sidebar.MobileButton />
+          </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-md flex items-center relative">
+          {/* Zone centrale — la recherche, centrée */}
+          <form onSubmit={handleSearch} className="w-full max-w-md flex items-center relative">
             <Search size={15} className="absolute left-3 pointer-events-none text-white/50" />
             <input
               value={search}
@@ -66,7 +73,8 @@ const AppLayout = () => {
             />
           </form>
 
-          <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+          {/* Zone droite — équilibre la gauche, porte les outils */}
+          <div className="flex-1 flex items-center justify-end gap-1">
             <button
               onClick={toggleMessaging}
               className="relative p-2 rounded-lg transition-colors hover:bg-white/10 text-white"
