@@ -256,6 +256,23 @@ async function provisionTenant(tenantId, { client = null, companyName = null, ow
     );
   });
 
+  // -------------------------------------------------------- 8bis. Rôles RBAC
+  // Les 7 rôles système, dont les ensembles de permissions (config/permissions.js
+  // fait foi — la migration 019 livre la même liste). Idempotent : les clés
+  // existantes ne sont pas touchées, donc le rattrapage des organisations
+  // existantes ne modifie rien.
+  await step('roles', async () => {
+    const { ROLES_SYSTEME } = require('../config/permissions');
+    for (const role of ROLES_SYSTEME) {
+      await query(
+        `INSERT INTO roles (tenant_id, key, name, description, is_system, permissions)
+         VALUES ($1, $2, $3, $4, TRUE, $5)
+         ON CONFLICT (tenant_id, key) DO NOTHING`,
+        [tenantId, role.key, role.name, role.description, role.permissions]
+      );
+    }
+  });
+
   // --------------------------------------------------------------- 9. Sections
   // Seulement si l'organisation n'en a aucune. `users.section` stocke le NOM de
   // la section en texte et non une clé étrangère : compléter la liste d'une

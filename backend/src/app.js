@@ -147,6 +147,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/metadata', metadataRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/audit', auditRoutes);
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
