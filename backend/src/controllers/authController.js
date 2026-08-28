@@ -456,3 +456,38 @@ exports.googleLogin = async (req, res) => {
     res.status(401).json({ message: 'Token Google invalide' });
   }
 };
+
+/**
+ * GET /api/auth/me — profil + rôle EFFECTIF de l'utilisateur courant.
+ *
+ * Le frontend pilote sa navigation sur les permissions (sidebar, boutons) :
+ * cette route est la seule façon pour un compte sans roles.view — un demandeur,
+ * par exemple — de connaître SES permissions. Le rôle vient de la base via
+ * roleService (cache 30 s) : un changement de rôle s'y reflète sans
+ * reconnexion, en cohérence avec authMiddleware.
+ */
+exports.me = async (req, res) => {
+  try {
+    const roleService = require('../services/roleService');
+    const role = await roleService.getRole(req.user.tenant_id, req.user.role);
+    res.json({
+      user: {
+        id: req.user.id,
+        role: req.user.role,
+        tenant_id: req.user.tenant_id,
+      },
+      role: role
+        ? {
+          key: role.key,
+          name: role.name,
+          description: role.description,
+          is_system: role.is_system,
+          permissions: role.permissions,
+        }
+        : null,
+    });
+  } catch (err) {
+    console.error('[auth/me]', err.message);
+    res.status(500).json({ message: 'Erreur lors de la récupération du profil.' });
+  }
+};

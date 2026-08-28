@@ -360,10 +360,27 @@ exports.listDocuments = async (req, res) => {
       };
     } catch { /* silencieux */ }
 
+    // Espace documentaire utilisé (somme des fichiers) : une seule requête
+    // agrégée, servie avec la liste — l'accueil et la vue d'ensemble GED
+    // l'affichent sans route dédiée. Échec non bloquant : la valeur manque,
+    // jamais la liste.
+    let storageUsed = null;
+    try {
+      const stRes = await db.query(
+        `SELECT COALESCE(SUM(df.file_size), 0)::bigint AS total
+           FROM document_files df
+           JOIN documents d ON d.id = df.document_id
+          WHERE d.tenant_id = $1`,
+        [tenantId]
+      );
+      storageUsed = Number(stRes.rows[0]?.total) || 0;
+    } catch { /* silencieux */ }
+
     res.json({
       documents: listRes.rows,
       pagination: { page: Number(page), page_size: limit, total, total_pages: Math.ceil(total / limit) },
       facets,
+      storage_used: storageUsed,
     });
   } catch (err) {
     console.error(err);
