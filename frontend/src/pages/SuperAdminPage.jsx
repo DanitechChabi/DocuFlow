@@ -19,6 +19,7 @@ import ConfigurationConsole from '../components/admin/ConfigurationConsole';
 import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
 import FolderManager from '../components/admin/FolderManager';
 import LicensePanel from '../components/admin/LicensePanel';
+import RolesPanel from '../components/admin/RolesPanel';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { estBureau } from '../utils/plateforme';
@@ -42,7 +43,7 @@ const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-
 // Évalué une seule fois au chargement du module, comme la référence l'exige —
 // le mode d'exécution ne change pas en cours de session.
 const PANNEAUX = [
-  'dashboard', 'requests', 'users', 'superadmins', 'sections', 'metadata',
+  'dashboard', 'requests', 'users', 'roles', 'superadmins', 'sections', 'metadata',
   'folders', 'tenants', ...(estBureau() ? [] : ['licenses']), 'audit',
   'branding', 'configuration',
 ];
@@ -51,6 +52,7 @@ const NOMS_PANNEAUX = {
   dashboard: 'Tableau de bord',
   requests: 'Demandes',
   users: 'Utilisateurs',
+  roles: 'Rôles & permissions',
   superadmins: 'Super Admins',
   sections: 'Sections',
   metadata: 'Métadonnées',
@@ -678,6 +680,13 @@ const SuperAdminPage = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ============ RÔLES & PERMISSIONS ============ */}
+        {activePanel === 'roles' && (
+          <div className="animate-fade-in-up">
+            <RolesPanel />
           </div>
         )}
 
