@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
-  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2,
+  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
 import { toast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DocumentFormModal from '../components/DocumentFormModal';
 import DocumentDetailsModal from '../components/DocumentDetailsModal';
 import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
@@ -53,6 +54,21 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   const [pageSize] = useState(15);
 
   const [showForm, setShowForm] = useState(false);
+  // Suppression douce depuis la liste : cible en attente de confirmation.
+  const [supprimerDoc, setSupprimerDoc] = useState(null);
+
+  const confirmerSuppression = async () => {
+    if (!supprimerDoc) return;
+    try {
+      await documentService.deleteDocument(supprimerDoc.id);
+      toast.success(`« ${supprimerDoc.reference_mfile} » mis à la corbeille — restaurable depuis Documents › Corbeille.`);
+      setSupprimerDoc(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Suppression impossible.');
+      setSupprimerDoc(null);
+    }
+  };
   // Le mode d'affichage vit dans l'URL (?vue=dynamic) et non dans un état local :
   // « regarde les documents groupés par type » se transmet alors par un lien, et
   // F5 ne renvoie plus l'archiviste à la liste plate qu'il venait de quitter.
@@ -594,6 +610,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                   <th className="px-4 py-3 text-left">Dossier</th>
                   <th className="px-4 py-3 text-left">Statut</th>
                   <th className="px-4 py-3 text-center">Fichiers</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -609,6 +626,17 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                       <span className={`status-badge ${STATUS_CLASSES[d.statut] || ''}`}>{STATUS_LABELS[d.statut] || d.statut}</span>
                     </td>
                     <td className="px-4 py-3 text-center"><FileText size={14} className="inline mr-1 text-slate-400" />{d.files_count || 0}</td>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setSupprimerDoc(d)}
+                          className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 mx-auto transition-colors"
+                          title="Mettre à la corbeille"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -654,6 +682,17 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
           onSuccess={() => { setShowForm(false); load(); loadFolders(); }}
         />
       )}
+
+      {/* Suppression douce depuis la liste — confirmée, puis corbeille. */}
+      <ConfirmDialog
+        isOpen={!!supprimerDoc}
+        title={`Mettre « ${supprimerDoc?.reference_mfile || 'ce document'} » à la corbeille ?`}
+        message="Le document disparaît du référentiel mais reste restaurable depuis la corbeille, avec ses fichiers, ses métadonnées et son historique."
+        confirmLabel="Mettre à la corbeille"
+        type="danger"
+        onConfirm={confirmerSuppression}
+        onClose={() => setSupprimerDoc(null)}
+      />
       {showAssembly && (
         <DocumentAssemblyModal
           onClose={() => setShowAssembly(false)}
