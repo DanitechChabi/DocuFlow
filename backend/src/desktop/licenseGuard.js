@@ -429,6 +429,55 @@ function getState() {
   return lastState;
 }
 
+// ---------------------------------------------------------------------------
+// Ré-évaluation à coût maîtrisé — le correctif de la licence « figée ».
+//
+// licenseMiddleware servait l'état calculé au DÉMARRAGE pendant toute la
+// session : une expiration ou une révocation survenant pendant que
+// l'application restait ouverte (mise en veille, session de plusieurs jours —
+// usage courant d'une application de bureau) ne prenait effet qu'au
+// redémarrage du processus, alors même que l'artefact à 7 jours existe
+// précisément pour rendre ces décisions effectives.
+//
+// revalidate() relit le cache disque et réévalue l'artefact SANS réseau :
+// l'échéance et la révocation contenues dans le jeton signé sont ainsi
+// réappliquées à chaque requête, pour un coût d'une lecture fichier. Le
+// rafraîchissement réseau (check) reste déclenché par l'écran de licence et le
+// démarrage ; ce n'est pas son rôle ici.
+// ---------------------------------------------------------------------------
+
+let revalidateBusy = false;
+
+/**
+ * Ré-évalue l'état depuis le cache disque, sans réseau.
+ *
+ * Retourne le verdict rafraîchi et le met en cache (lastState) — sauf si la
+ * lecture échoue, auquel cas l'état précédent est conservé : un incident de
+ * lecture ne doit pas débloquer un poste ni bloquer un poste à jour.
+ */
+function revalidate() {
+  if (revalidateBusy) return lastState; // appel concurrent : le premier tranche
+  revalidateBusy = true;
+  try {
+    const cache = readCache();
+    if (!cache?.token) {
+      lastState = {
+        state: 'unlicensed',
+        message: 'Cette installation n\'est pas encore activée.',
+        machine_id: getMachineId(),
+      };
+      return lastState;
+    }
+    lastState = evaluate(cache.token, getMachineId(), cache.last_verified_at);
+    return lastState;
+  } catch (err) {
+    console.warn('[license] Ré-évaluation impossible — état précédent conservé :', err.message);
+    return lastState;
+  } finally {
+    revalidateBusy = false;
+  }
+}
+
 /** L'application doit-elle fonctionner ? 'grace' est autorisé, c'est son objet. */
 function isAllowed(state = lastState) {
   return state?.state === 'active' || state?.state === 'grace';
@@ -445,6 +494,7 @@ module.exports = {
   configure,
   activate,
   check,
+  revalidate,
   getState,
   isAllowed,
   deactivate,

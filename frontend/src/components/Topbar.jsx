@@ -62,10 +62,22 @@ const Topbar = () => {
   const isOwner = isSuperadmin && user?.tenant_id === 1;
 
   // Navigation principale — style GitHub inline compact
+  //
+  // L'entrée « Documents » suit le réglage « Rôle d'accès à la GED » de la
+  // console de configuration : le personnel y accède toujours, un demandeur
+  // seulement si l'administrateur a ouvert la GED à tous. Afficher l'onglet à
+  // un rôle que l'API refuserait (403 sur GET /documents) présenterait un
+  // écran d'erreur au lieu d'une bibliothèque — la même règle côté serveur
+  // (gedAccessMiddleware dans documentRoutes) et côté navigation.
+  const gedOuverteATous = (settings.ged_access_role || 'archiviste') === 'all';
+  const gedLisible = isStaff || gedOuverteATous;
+
   const navItems = [
     { to: '/dashboard', label: 'Tableau de bord', icon: <LayoutDashboard size={16} />, end: true },
     { to: '/dashboard/requests', label: 'Mes demandes', icon: <FileSearch size={16} /> },
-    { to: '/documents', label: 'Documents', icon: <FolderOpen size={16} />, tourId: 'documents' },
+    ...(gedLisible
+      ? [{ to: '/documents', label: 'Documents', icon: <FolderOpen size={16} />, tourId: 'documents' }]
+      : []),
   ];
 
   if (isStaff) {

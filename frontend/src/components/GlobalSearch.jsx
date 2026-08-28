@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, FileText, FolderOpen, User, Command, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { documentService } from '../services/documentService';
+import { useSettings } from '../contexts/SettingsContext';
+import { authService } from '../services/authService';
 
 /**
  * Recherche globale style Cmd+K (Notion, Linear, Vercel).
@@ -69,11 +71,20 @@ const GlobalSearch = () => {
     return () => clearTimeout(timer);
   }, [query, navigate]);
 
-  // Pages de navigation rapides
+  // Pages de navigation rapides. « Documents » suit le même réglage d'accès à
+  // la GED que la topbar : l'ouvrir depuis Ctrl+K ne doit pas contourner ce que
+  // l'onglet masque volontairement (gedAccessMiddleware côté serveur).
+  const settings = useSettings();
+  const user = authService.getCurrentUser();
+  const isStaff = ['archiviste', 'admin', 'superadmin'].includes(user?.role);
+  const gedLisible = isStaff || (settings.ged_access_role || 'archiviste') === 'all';
+
   const quickPages = [
     { type: 'page', title: 'Tableau de bord', subtitle: '/dashboard', icon: ArrowRight, action: () => { navigate('/dashboard'); setIsOpen(false); } },
     { type: 'page', title: 'Mes demandes', subtitle: '/dashboard/requests', icon: ArrowRight, action: () => { navigate('/dashboard/requests'); setIsOpen(false); } },
-    { type: 'page', title: 'Documents', subtitle: '/documents', icon: FolderOpen, action: () => { navigate('/documents'); setIsOpen(false); } },
+    ...(gedLisible
+      ? [{ type: 'page', title: 'Documents', subtitle: '/documents', icon: FolderOpen, action: () => { navigate('/documents'); setIsOpen(false); } }]
+      : []),
     { type: 'page', title: 'Mon profil', subtitle: '/profile', icon: User, action: () => { navigate('/profile'); setIsOpen(false); } },
   ];
 

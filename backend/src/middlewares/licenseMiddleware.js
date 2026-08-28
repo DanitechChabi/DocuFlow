@@ -121,10 +121,17 @@ module.exports = async function licenseMiddleware(req, res, next) {
   if (isOpen(req)) return next();
 
   try {
-    // État déjà calculé au démarrage par main.js. On ne relit pas le disque à
-    // chaque requête : ce serait des dizaines de lectures par écran affiché,
-    // pour une valeur qui ne change qu'à l'activation ou au renouvellement.
-    let state = licenseGuard.getState();
+    // RÉ-ÉVALUATION À CHAQUE REQUÊTE, SANS RÉSEAU — correctif de la licence
+    // « figée ». L'ancien code servait l'état calculé au démarrage pendant
+    // toute la session : une expiration ou une révocation survenant pendant
+    // que l'application restait ouverte (mise en veille, sessions de plusieurs
+    // jours — usage courant d'une application de bureau) ne prenait effet
+    // qu'au redémarrage. revalidate() relit le cache disque et réévalue
+    // l'artefact signé : échéance et révocation contenues dans le jeton sont
+    // réappliquées immédiatement, pour le coût d'une lecture fichier. Le
+    // rafraîchissement réseau reste le rôle de check() (démarrage, écran de
+    // licence) — ce n'est pas celui d'une requête d'API.
+    let state = licenseGuard.revalidate();
     if (!state) state = await licenseGuard.check();
 
     if (!licenseGuard.isAllowed(state)) {
