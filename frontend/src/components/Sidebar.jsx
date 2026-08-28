@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileSearch, PlusCircle, ClipboardList, History, Building2,
-  FolderOpen, Wand2, Archive, Search as SearchIcon, Bell,
-  Settings, User as UserIcon, ChevronLeft, ChevronRight, Menu, X,
-  LogOut, ShieldCheck, Info, Compass, MessageCircle,
+  FolderOpen, Wand2, Archive, Bell,
+  User as UserIcon, ChevronLeft, ChevronRight, Menu, X,
+  LogOut, ShieldCheck, Info, Compass,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -50,9 +50,23 @@ const DrawerContext = React.createContext({ ouvrir: () => {} });
 
 const Sidebar = ({ unreadCount = 0 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = authService.getCurrentUser();
   const settings = useSettings();
-  const { can, charge } = usePermissions();
+  const { can } = usePermissions();
+
+  // --- Contexte de module : la navigation CHANGE quand on entre dans un module ---
+  //
+  // La séparation Demandes/Documents ne s'arrête pas au contenu : la sidebar
+  // EST le contexte. Dans le module Demandes, elle porte les vues de demande
+  // uniquement ; dans Documents, les vues documentaires uniquement. L'autre
+  // module reste joignable par une entrée « Changer de module » en bas — un
+  // changement de contexte doit rester possible, pas être un labyrinthe.
+  // Sur l'accueil (vestibule), les DEUX groupes sont proposés.
+  const pathname = location.pathname;
+  const moduleDemandes = pathname.startsWith('/demandes') || pathname.startsWith('/dashboard');
+  const moduleDocuments = pathname.startsWith('/documents');
+  const dansUnModule = moduleDemandes || moduleDocuments;
 
   // Le repli est une préférence persistée ; en mobile (< lg) la sidebar est un
   // drawer, toujours « ouverte » en papier mais masquée à l'écran.
@@ -88,48 +102,71 @@ const Sidebar = ({ unreadCount = 0 }) => {
     visible: opts.permission ? can(opts.permission) : true,
   });
 
-  const sections = [
-    {
-      titre: null,
-      items: [entree('/', 'Accueil', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
-    },
-    {
-      titre: 'Demandes',
-      items: [
-        entree('/demandes', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'requests.view' }),
-        entree('/demandes/mes-demandes', 'Mes demandes', <FileSearch size={18} />, { permission: 'requests.view' }),
-        entree('/demandes/nouvelle', 'Nouvelle demande', <PlusCircle size={18} />, { permission: 'requests.create' }),
-        entree('/demandes/a-traiter', 'À traiter', <ClipboardList size={18} />, { permission: 'requests.process' }),
-        entree('/demandes/historique', 'Historique', <History size={18} />, { permission: 'requests.view_history' }),
-        entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process' }),
-      ],
-    },
-    {
-      titre: 'Documents',
-      items: [
-        entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view' }),
-        entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
-        entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index' }),
-        entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
-      ],
-    },
-    {
-      titre: null,
-      items: [
-        // La recherche globale (Ctrl+K) reste dans la barre supérieure ; cette
-        // entrée mène à la recherche approfondie de la GED.
-        entree('/documents/liste', 'Recherche', <SearchIcon size={18} />, { permission: 'search.documents', doublon: true }),
-        {
-          to: '#notifications',
-          label: 'Notifications',
-          icon: <Bell size={18} />,
-          visible: true,
-          bouton: true,
-          onClick: () => window.dispatchEvent(new CustomEvent('docuflow:open-notifications')),
-        },
-      ],
-    },
+  // Les vues propres à chaque module.
+  const vuesDemandes = [
+    entree('/demandes', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'requests.view', end: true }),
+    entree('/demandes/mes-demandes', 'Mes demandes', <FileSearch size={18} />, { permission: 'requests.view' }),
+    entree('/demandes/nouvelle', 'Nouvelle demande', <PlusCircle size={18} />, { permission: 'requests.create' }),
+    entree('/demandes/a-traiter', 'À traiter', <ClipboardList size={18} />, { permission: 'requests.process' }),
+    entree('/demandes/historique', 'Historique', <History size={18} />, { permission: 'requests.view_history' }),
+    entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process' }),
   ];
+  const vuesDocuments = [
+    entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view', end: true }),
+    entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
+    entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index' }),
+    entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
+  ];
+
+  // Le changement de module : l'autre monde reste UN clic de distance.
+  const autresModules = [
+    ...(moduleDemandes ? vuesDocuments.filter((v) => v.visible).slice(0, 1) : []),
+    ...(moduleDocuments ? vuesDemandes.filter((v) => v.visible).slice(0, 1) : []),
+  ].map((v) => ({ ...v, label: v.to.startsWith('/documents') ? 'Aller aux Documents' : 'Aller aux Demandes' }));
+
+  const sections = dansUnModule
+    ? [
+        {
+          titre: null,
+          items: [entree('/', 'Quitter le module', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
+        },
+        {
+          titre: moduleDemandes ? 'Demandes' : 'Documents',
+          items: moduleDemandes ? vuesDemandes : vuesDocuments,
+        },
+        ...(autresModules.length ? [{
+          titre: 'Autre module',
+          items: autresModules,
+        }] : []),
+      ]
+    : [
+        // Vestibule (accueil, administration, profil…) : les deux modules proposés.
+        {
+          titre: null,
+          items: [entree('/', 'Accueil', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
+        },
+        {
+          titre: 'Demandes',
+          items: vuesDemandes,
+        },
+        {
+          titre: 'Documents',
+          items: vuesDocuments,
+        },
+        {
+          titre: null,
+          items: [
+            {
+              to: '#notifications',
+              label: 'Notifications',
+              icon: <Bell size={18} />,
+              visible: true,
+              bouton: true,
+              onClick: () => window.dispatchEvent(new CustomEvent('docuflow:open-notifications')),
+            },
+          ],
+        },
+      ];
 
   const renduLien = (item, mobile = false) => {
     if (!item.visible) return null;
