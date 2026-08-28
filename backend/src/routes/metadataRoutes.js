@@ -4,14 +4,15 @@ const metadataController = require('../controllers/metadataController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 const gedAccessMiddleware = require('../middlewares/gedAccessMiddleware');
+const { requirePermission } = require('../middlewares/requirePermission');
 
 // Middleware de base pour toutes les routes
 router.use(authMiddleware);
 
-// --- Gestion des schémas et champs (Admin / Archiviste) ---
-// NB : les rôles réels du projet sont superadmin | admin | archiviste | demandeur.
-// `superadmin` est court-circuité en amont par roleMiddleware.
-const adminOrArchivist = roleMiddleware(['admin', 'archiviste']);
+// --- Gestion des schémas et champs : configuration documentaire (documents.edit
+// — administrateur et archiviste la portent ; le réglage ged_access_role devient
+// redondant, le panneau de rôles administre les accès).
+const adminOrArchivist = requirePermission('documents.edit');
 
 router.get('/schemas', adminOrArchivist, metadataController.getSchemas);
 router.post('/schemas', adminOrArchivist, metadataController.createSchema);
@@ -29,11 +30,11 @@ router.delete('/fields/:id', adminOrArchivist, metadataController.deleteField);
 // archiviste seul par défaut, élargissable aux admins ou à tous les utilisateurs
 // sans redéploiement. `admin` reste toujours autorisé sur les métadonnées, dont
 // il administre le schéma.
-const gedAccess = gedAccessMiddleware(['admin']);
+const gedAccess = requirePermission('documents.view');
 
 router.get('/documents/:documentId', gedAccess, metadataController.getDocumentMetadata);
-router.put('/documents/:documentId', gedAccess, metadataController.setDocumentMetadata);
-router.put('/documents/:documentId/values/:fieldId', gedAccess, metadataController.updateMetadataValue);
-router.delete('/documents/:documentId/values/:fieldId', gedAccess, metadataController.deleteMetadataValue);
+router.put('/documents/:documentId', requirePermission('documents.edit'), metadataController.setDocumentMetadata);
+router.put('/documents/:documentId/values/:fieldId', requirePermission('documents.edit'), metadataController.updateMetadataValue);
+router.delete('/documents/:documentId/values/:fieldId', requirePermission('documents.edit'), metadataController.deleteMetadataValue);
 
 module.exports = router;

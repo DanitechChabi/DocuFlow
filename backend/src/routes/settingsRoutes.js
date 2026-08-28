@@ -5,7 +5,7 @@ const path = require('path');
 const settingsController = require('../controllers/settingsController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const optionalAuthMiddleware = require('../middlewares/optionalAuthMiddleware');
-const roleMiddleware = require('../middlewares/roleMiddleware');
+const { requirePermission } = require('../middlewares/requirePermission');
 
 // Config multer — dossier des uploads (surchargeable via UPLOADS_DIR)
 const { UPLOADS_DIR: uploadDir } = require('../config/paths');
@@ -38,13 +38,14 @@ const upload = multer({
 // de SON entreprise au lieu du tenant 1 par défaut.
 router.get('/', optionalAuthMiddleware, settingsController.getSettings);
 
-// Routes protégées (superadmin)
+// Routes protégées — permission settings.manage (l'administrateur d'entreprise
+// gère SA configuration ; le propriétaire de plateforme garde la vue globale).
 // GET /configuration — catalogue typé + valeurs, source de la console de configuration
-router.get('/configuration', authMiddleware, roleMiddleware(['superadmin']), settingsController.getConfiguration);
-router.put('/', authMiddleware, roleMiddleware(['superadmin']), settingsController.updateSettings);
-router.post('/reset', authMiddleware, roleMiddleware(['superadmin']), settingsController.resetSettings);
+router.get('/configuration', authMiddleware, requirePermission('settings.manage'), settingsController.getConfiguration);
+router.put('/', authMiddleware, requirePermission('settings.manage'), settingsController.updateSettings);
+router.post('/reset', authMiddleware, requirePermission('settings.manage'), settingsController.resetSettings);
 // POST /provision — recrée les objets par défaut manquants (idempotent)
-router.post('/provision', authMiddleware, roleMiddleware(['superadmin']), settingsController.provisionDefaults);
-router.post('/logo', authMiddleware, roleMiddleware(['superadmin']), upload.single('logo'), settingsController.uploadLogo);
+router.post('/provision', authMiddleware, requirePermission('settings.manage'), settingsController.provisionDefaults);
+router.post('/logo', authMiddleware, requirePermission('settings.manage'), upload.single('logo'), settingsController.uploadLogo);
 
 module.exports = router;

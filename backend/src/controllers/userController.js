@@ -1,6 +1,41 @@
 const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
 const bcrypt = require('bcryptjs');
+const roleService = require('../services/roleService');
+
+/**
+ * Le rôle demandé est-il attribuable dans ce tenant ?
+ *
+ * La liste vivait en dur (« demandeur, archiviste, admin ») : aucun rôle
+ * personnalisé n'était attribuable. Elle vient désormais de la table roles —
+ * « superadmin » y est refusé : ce rôle reste réservé au propriétaire de
+ * plateforme (routes /api/superadmin), et l'administrateur d'entreprise ne
+ * doit pas pouvoir s'élever.
+ */
+async function validerRole(tenantId, role) {
+  if (!role || typeof role !== 'string') {
+    return { ok: false, message: 'Rôle requis.' };
+  }
+  if (role === 'superadmin') {
+    return { ok: false, message: 'Le rôle super administrateur est géré par le propriétaire de la plateforme.' };
+  }
+  try {
+    const { ok } = await roleService.roleAttribuable(tenantId, role);
+    if (!ok) {
+      return { ok: false, message: `Rôle « ${role} » inconnu ou désactivé dans votre organisation.` };
+    }
+    return { ok: true };
+  } catch (err) {
+    if (err.code === '42P01') {
+      // Pré-RBAC : la table roles n'existe pas — la liste historique fait foi.
+      const legacy = ['demandeur', 'archiviste', 'admin'];
+      return legacy.includes(role)
+        ? { ok: true }
+        : { ok: false, message: 'Rôle invalide. Rôles autorisés : demandeur, archiviste, admin' };
+    }
+    throw err;
+  }
+}
 
 exports.getAllUsers = async (req, res) => {
   const tenantId = req.user.tenant_id;
@@ -49,10 +84,12 @@ exports.createUser = async (req, res) => {
   const { username, password, full_name, email, section, role } = req.body;
   const tenantId = req.user.tenant_id;
 
-  // Validation du rôle
-  const allowedRoles = ['demandeur', 'archiviste', 'admin'];
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ message: 'Rôle invalide. Rôles autorisés : demandeur, archiviste, admin' });
+  // Validation du rôle : n'importe quel rôle ACTIF de l'organisation (table
+  // roles), rôles personnalisés compris — plus de liste en dur. « superadmin »
+  // reste réservé au propriétaire de plateforme (routes /api/superadmin).
+  const roleCheck = await validerRole(tenantId, role);
+  if (!roleCheck.ok) {
+    return res.status(400).json({ message: roleCheck.message });
   }
 
   try {
@@ -107,11 +144,12 @@ exports.updateUserRole = async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
   const tenantId = req.user.tenant_id;
-  const allowedRoles = ['demandeur', 'archiviste', 'admin'];
 
-  // Validation du rôle
-  if (!allowedRoles.includes(role)) {
-    return res.status(400).json({ message: 'Rôle invalide. Rôles autorisés : demandeur, archiviste, admin' });
+  // Validation du rôle : tout rôle actif de l'organisation, personnalisés
+  // compris (voir createUser).
+  const roleCheck = await validerRole(tenantId, role);
+  if (!roleCheck.ok) {
+    return res.status(400).json({ message: roleCheck.message });
   }
 
   // Empêcher de modifier son propre rôle
@@ -143,12 +181,16 @@ exports.updateUserRole = async (req, res) => {
       return res.status(403).json({ message: 'Impossible de modifier le rôle d\'un superadmin' });
     }
 
-    // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant)
+    // Tentative avec tenant_id ; fallback si colonne absente (mode mono-tenant).
+    // token_version est incrémenté : le changement de rôle invalide les jetons
+    // encore en circulation de ce compte — l'ancien jeton portait des droits
+    // que ce compte n'a plus.
     try {
       await db.query(
-        'UPDATE users SET role = $1 WHERE id = $2 AND tenant_id = $3',
+        'UPDATE users SET role = $1, token_version = token_version + 1 WHERE id = $2 AND tenant_id = $3',
         [role, id, tenantId]
       );
+      roleService.invalidateUser(Number(id));
     } catch (err) {
       if (err.code === '42703') {
         await db.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);

@@ -3,7 +3,7 @@ const router = express.Router();
 const sectionController = require('../controllers/sectionController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const optionalAuthMiddleware = require('../middlewares/optionalAuthMiddleware');
-const roleMiddleware = require('../middlewares/roleMiddleware');
+const { requirePermission } = require('../middlewares/requirePermission');
 
 // GET / — route publique : liste des sections, utilisée par le formulaire
 // d'inscription (sans authentification). Ne renvoie que des noms de sections.
@@ -11,9 +11,10 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 // DE SON ENTREPRISE (tenant) au lieu du tenant 1 par défaut.
 router.get('/', optionalAuthMiddleware, sectionController.getSections);
 
-// Routes protégées — nécessitent authentification et rôle SuperAdmin
+// Écriture des sections : configuration de l'organisation (settings.manage —
+// l'administrateur d'entreprise y accède, le superadmin historique aussi).
 router.use(authMiddleware);
-router.use(roleMiddleware(['superadmin']));
+router.use(requirePermission('settings.manage'));
 router.post('/', sectionController.createSection);
 router.delete('/:id', sectionController.deleteSection);
 

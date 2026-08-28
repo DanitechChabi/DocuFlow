@@ -190,12 +190,30 @@ exports.createRequest = async (req, res) => {
       newStatus: 'en attente',
     });
 
-    // 3. Notifier les archivistes et admins du même tenant
-    // tenantDb.query gère le fallback si la colonne tenant_id n'existe pas
-    const admins = await tenantDb.query(
-      tenantId,
-      "SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'archiviste')"
-    );
+    // 3. Notifier le personnel de traitement du même tenant — c'est-à-dire les
+    // rôles détenant la permission requests.process (RBAC), et non plus une
+    // liste de rôles en dur : un rôle personnalisé « agent » détenant la
+    // permission est notifié comme le personnel historique.
+    let admins;
+    try {
+      admins = await db.query(
+        `SELECT u.id FROM users u
+           JOIN roles r ON r.tenant_id = u.tenant_id AND r.key = u.role
+          WHERE u.tenant_id = $1
+            AND r.is_active AND ('*' = ANY(r.permissions) OR 'requests.process' = ANY(r.permissions))`,
+        [tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42P01') {
+        // Pré-RBAC (table roles absente) : liste historique.
+        admins = await tenantDb.query(
+          tenantId,
+          "SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'archiviste')"
+        );
+      } else {
+        throw err;
+      }
+    }
     for (const admin of admins.rows) {
       await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Une nouvelle demande a été créée pour l'entreprise ${nom_entreprise}.`, 'request_created', requestId);
     }
@@ -587,15 +605,34 @@ exports.assignRequest = async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
-    // 2. Vérifier que l'assigné est un membre du personnel du même tenant
-    const assigneeResult = await tenantDb.query(
-      tenantId,
-      "SELECT id, full_name, role FROM users WHERE id = $1 AND role IN ('archiviste', 'admin', 'superadmin')",
-      [assignee_id]
-    );
+    // 2. Vérifier que l'assigné peut TRAITER une demande : la permission
+    // requests.process fait foi (RBAC), pas une liste de rôles en dur — un
+    // rôle personnalisé « agent » est affectable dès qu'il détient la
+    // permission.
+    let assigneeResult;
+    try {
+      assigneeResult = await db.query(
+        `SELECT u.id, u.full_name, u.role FROM users u
+           JOIN roles r ON r.tenant_id = u.tenant_id AND r.key = u.role
+          WHERE u.id = $1 AND u.tenant_id = $2
+            AND r.is_active AND ('*' = ANY(r.permissions) OR 'requests.process' = ANY(r.permissions))`,
+        [assignee_id, tenantId]
+      );
+    } catch (err) {
+      if (err.code === '42P01') {
+        // Pré-RBAC (table roles absente) : liste historique.
+        assigneeResult = await tenantDb.query(
+          tenantId,
+          "SELECT id, full_name, role FROM users WHERE id = $1 AND role IN ('archiviste', 'admin', 'superadmin')",
+          [assignee_id]
+        );
+      } else {
+        throw err;
+      }
+    }
     const assignee = assigneeResult.rows[0];
     if (!assignee) {
-      return res.status(400).json({ message: 'Archiviste introuvable ou invalide' });
+      return res.status(400).json({ message: 'Cet utilisateur ne peut pas traiter de demandes (permission requests.process requise).' });
     }
 
     // 3. Mise à jour
