@@ -107,12 +107,23 @@ function sanitizeTags(rawTags) {
     tags = rawTags ? rawTags.split(',').map(t => t.trim()).filter(t => t) : [];
   }
 
+  // Dernier filet : après tout ce qui précède, `tags` peut encore n'être NI un
+  // tableau NI undefined — un JSON.parse (« 5 » → 5), un nombre, un objet
+  // quelconque du corps multipart. L'ancien code itérait alors `tags` tel quel
+  // et l'exception « tags is not iterable » TUAIT LE PROCESSUS ENTIER (vérifié
+  // en production : trois redémarrage Render pour trois requêtes mal formées) —
+  // un crash serveur sur une donnée d'entrée, au lieu d'un 400 propre. Tout ce
+  // qui n'est pas un tableau est un format invalide : rejet avec message.
+  if (tags !== undefined && !Array.isArray(tags)) {
+    return null;
+  }
+
   // Regex permissive pour tags français : lettres (y compris accents), chiffres, espaces, _ - . '
   // Rejette uniquement les caractères dangereux pour XSS/injection : < > " ' & { } [ ] ( ) ;
   const safeTagRegex = /^[^<>"'&{}()\[\];]*$/;
   const sanitized = [];
 
-  for (const t of tags) {
+  for (const t of tags || []) {
     if (typeof t !== 'string' || !t || !safeTagRegex.test(t)) {
       return null; // whole set rejected on first invalid entry
     }
