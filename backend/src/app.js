@@ -179,7 +179,9 @@ app.use((err, req, res, _next) => {
   // Erreurs multer (upload) → message réel au lieu d'un 500 générique
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({ message: 'Trop de fichiers (5 max par demande) ou champ inattendu' });
+      // 100 = plafond de uploadMultiple (upload.array('files', 100)) ; le
+      // message doit suivre la limite réelle, pas un souvenir de l'ancienne.
+      return res.status(400).json({ message: 'Trop de fichiers (100 max par versement) ou champ inattendu' });
     }
     return res.status(400).json({ message: `Erreur lors de l'upload : ${err.message}` });
   }

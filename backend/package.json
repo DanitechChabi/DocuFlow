@@ -21,7 +21,9 @@
     "express": "^4.19.2",
     "google-auth-library": "^11.0.0",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.12.1",
     "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.11.3",
     "resend": "^6.18.1"
   },

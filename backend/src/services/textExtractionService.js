@@ -9,8 +9,16 @@ const path = require('path');
 let pdfParse;
 let mammoth;
 
+// pdf-parse a été entièrement réécrit en 2.x : l'export est désormais une classe
+// `PDFParse` (new PDFParse({data}).load().getText()) et non plus une fonction
+// `(buffer) => Promise<{text}>`. Les deux formes sont prises en charge pour que
+// l'installation de l'une ou l'autre ne désactive pas silencieusement l'extraction.
 try {
   pdfParse = require('pdf-parse');
+  if (typeof pdfParse !== 'function' && !pdfParse.PDFParse) {
+    console.warn('[text-extraction] pdf-parse présente une API inconnue — extraction PDF désactivée');
+    pdfParse = null;
+  }
 } catch {
   console.warn('[text-extraction] pdf-parse non installé — extraction PDF désactivée');
 }
@@ -19,6 +27,27 @@ try {
   mammoth = require('mammoth');
 } catch {
   console.warn('[text-extraction] mammoth non installé — extraction DOCX désactivée');
+}
+
+/**
+ * Extraire le texte d'un buffer PDF selon l'API de la version de pdf-parse
+ * installée. API 2.x : classe PDFParse (getText() renvoie { text, pages }).
+ * API 1.x : fonction directe renvoyant { text }. Les séparateurs de page que
+ * la 2.x insère (« -- N of M -- ») sont retirés : ils n'ont pas de sens pour
+ * la recherche plein texte ni pour l'auto-tagging.
+ */
+async function extractPdfText(buffer) {
+  if (typeof pdfParse === 'function') {
+    // API 1.x (pdf-parse < 2)
+    const data = await pdfParse(buffer);
+    return data.text || '';
+  }
+
+  const Parser = pdfParse.PDFParse || pdfParse;
+  const parser = new Parser({ data: buffer });
+  await parser.load();
+  const result = await parser.getText();
+  return (result.text || '').replace(/^--\s*\d+\s+of\s+\d+\s*--\s*$/gm, '').trim();
 }
 
 /**
@@ -33,8 +62,8 @@ async function extractText(filePath, mimeType) {
   try {
     if (mimeType === 'application/pdf' && pdfParse) {
       const buffer = fs.readFileSync(filePath);
-      const data = await pdfParse(buffer);
-      return truncate(data.text || '');
+      const text = await extractPdfText(buffer);
+      return truncate(text);
     }
 
     if (

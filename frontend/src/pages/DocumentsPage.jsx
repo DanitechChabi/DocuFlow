@@ -18,23 +18,12 @@ import { DocumentPreviewLightbox } from '../components/DocumentPreview';
 import FolderTree from '../components/FolderTree';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
-
-const STATUS_CLASSES = {
-  'disponible': 'status-badge-delivered',
-  'prêt': 'status-badge-progress',
-  'archivé': 'status-badge-annulled',
-};
-
-const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé': 'Archivé' };
+import { STATUS_CLASSES, STATUS_LABELS, STATUS_VALUES } from '../utils/documentStatuses';
 
 // Étiquette produite par le COALESCE de getDynamicViewData pour les documents
 // sans valeur. Ce n'est pas une valeur stockable : elle doit rester identique de
 // part et d'autre, le backend la retraduisant en NULL à l'écriture.
 const UNCLASSIFIED_GROUP = 'Non classé';
-
-// Seul le statut a un domaine fermé côté backend (setStatus). Un dépôt vers
-// « Non classé » y est donc impossible : on ne peut pas vider un statut.
-const STATUS_VALUES = ['disponible', 'prêt', 'archivé'];
 
 // Modes d'affichage du référentiel, dans l'ordre des boutons. Hissé hors du
 // composant : useOngletUrl mémorise sur ce tableau, qu'un littéral recréé à
@@ -370,9 +359,14 @@ const DocumentsPage = () => {
             </div>
             <select className="input-premium w-auto" value={filters.statut} onChange={(e) => { setFilters((f) => ({ ...f, statut: e.target.value })); setPage(1); }}>
               <option value="">Statut : tous</option>
-              <option value="disponible">Disponible</option>
-              <option value="prêt">Prêt</option>
-              <option value="archivé">Archivé</option>
+              {/* Dérivé du domaine partagé. La liste était écrite à la main et
+                  ignorait « à indexer » : les documents versés en masse
+                  n'étaient atteignables par aucun filtre, donc impossible de
+                  lister le lot qu'on venait de verser pour le compléter — le
+                  seul intérêt de ce statut. */}
+              {Object.entries(STATUS_LABELS).map(([valeur, libelle]) => (
+                <option key={valeur} value={valeur}>{libelle}</option>
+              ))}
             </select>
             <select className="input-premium w-auto" value={filters.type_document} onChange={(e) => { setFilters((f) => ({ ...f, type_document: e.target.value })); setPage(1); }}>
               <option value="">Type : tous</option>

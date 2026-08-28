@@ -55,9 +55,9 @@ const upload = multer({
 });
 
 /**
- * Middleware pour upload de plusieurs fichiers (max 5)
+ * Middleware pour upload de plusieurs fichiers (max 100)
  */
-const uploadMultiple = upload.array('files', 5);
+const uploadMultiple = upload.array('files', 100);
 
 /**
  * Middleware pour upload d'un seul fichier

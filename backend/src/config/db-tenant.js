@@ -98,4 +98,55 @@ async function insert(tenantId, table, columns, values, returning = '*') {
   }
 }
 
-module.exports = { query, insert, db };
+/**
+ * Met à jour une ligne, TOUJOURS bornée au tenant.
+ *
+ * Cette fonction manquait alors que deux appels `tenantDb.update(...)` existaient
+ * déjà dans documentController (auto-étiquetage après extraction de texte) :
+ * `update` étant `undefined`, l'appel lançait « tenantDb.update is not a function ».
+ * En téléversement en masse, l'exception était rattrapée par le try du fichier
+ * courant, qui comptait donc en ÉCHEC un document pourtant créé et son fichier
+ * pourtant enregistré ; en mode simple, elle remontait au catch général et
+ * rendait un 500 « Erreur lors de la création du document » sur une création
+ * réussie. Dans les deux cas le compte rendu contredisait l'état de la base.
+ *
+ * Ne se déclenchait que sur les fichiers dont le texte est réellement extrait —
+ * aujourd'hui les .txt et assimilés, `pdf-parse` et `mammoth` n'étant pas
+ * installés — d'où un défaut intermittent, apparemment lié au type de fichier.
+ *
+ * @param {number} tenantId
+ * @param {string} table
+ * @param {string[]} columns  - Colonnes à écrire
+ * @param {array}  values     - Valeurs correspondantes
+ * @param {string} whereCol   - Colonne de sélection (ex. 'id')
+ * @param {*}      whereVal   - Valeur de sélection
+ * @param {string} returning
+ */
+async function update(tenantId, table, columns, values, whereCol, whereVal, returning = '*') {
+  const safeTenantId = tenantId || 1;
+  const sets = columns.map((col, i) => `${col} = $${i + 1}`);
+  const iWhere = values.length + 1;
+  const iTenant = values.length + 2;
+
+  // Le filtre tenant est dans la clause WHERE, pas ajouté après coup : une mise à
+  // jour qui viserait l'identifiant d'une autre organisation ne doit toucher
+  // aucune ligne, plutôt que de réussir hors de son périmètre.
+  const sql = `UPDATE ${table} SET ${sets.join(', ')}
+               WHERE ${whereCol} = $${iWhere} AND tenant_id = $${iTenant}
+               RETURNING ${returning}`;
+
+  try {
+    return await db.query(sql, [...values, whereVal, safeTenantId]);
+  } catch (err) {
+    if (err.code === '42703') {
+      console.warn(`[db-tenant] Colonne tenant_id absente, fallback mono-tenant pour UPDATE ${table}`);
+      return db.query(
+        `UPDATE ${table} SET ${sets.join(', ')} WHERE ${whereCol} = $${iWhere} RETURNING ${returning}`,
+        [...values, whereVal]
+      );
+    }
+    throw err;
+  }
+}
+
+module.exports = { query, insert, update, db };

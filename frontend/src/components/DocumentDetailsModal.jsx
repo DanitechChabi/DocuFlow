@@ -2,16 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
-  Lock, Unlock, Link2,
+  Lock, Unlock, Link2, Wand2,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
 import DocumentFormModal from './DocumentFormModal';
 import ConfirmDialog from './ConfirmDialog';
 import { toast } from './Toast';
-
-const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé': 'Archivé' };
-const STATUS_CLASSES = { 'disponible': 'status-badge-delivered', 'prêt': 'status-badge-progress', 'archivé': 'status-badge-annulled' };
+import DocumentMetadataEditor from './DocumentMetadataEditor';
+import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
   if (!bytes && bytes !== 0) return '';
@@ -39,6 +38,11 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const [shareMessage, setShareMessage] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
   const [relations, setRelations] = useState([]);
+  // Indexation (champs du schéma de métadonnées de l'organisation) : c'est
+  // l'écran qui donne un sens au statut « à indexer » posé par le téléversement
+  // en masse — sans lui, la file d'attente n'avait AUCUNE entrée d'interface
+  // pour remplir les champs configurés dans le portail d'administration.
+  const [showIndexing, setShowIndexing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,6 +183,17 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowShare(true)} className="btn-secondary flex items-center gap-1.5"><Share2 size={15} /> Partager</button>
+            {/* Indexation : visible pour le personnel (la route /:id/metadata
+                est réservée aux rôles GED côté serveur). Mise en avant quand le
+                document attend son indexation — c'est l'action à faire. */}
+            {isAdmin && (
+              <button
+                onClick={() => setShowIndexing(true)}
+                className={`flex items-center gap-1.5 ${doc?.statut === 'à indexer' ? 'btn-primary' : 'btn-secondary'}`}
+              >
+                <Wand2 size={15} /> Indexer
+              </button>
+            )}
             {isAdmin && <button onClick={() => setShowEdit(true)} className="btn-secondary flex items-center gap-1.5"><Pencil size={15} /> Modifier</button>}
             <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><X size={18} /></button>
           </div>
@@ -430,6 +445,14 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
           folders={folders}
           onClose={() => setShowEdit(false)}
           onSuccess={() => { setShowEdit(false); load(); if (onChanged) onChanged(); }}
+        />
+      )}
+
+      {showIndexing && doc && (
+        <DocumentMetadataEditor
+          documentId={doc.id}
+          onClose={() => setShowIndexing(false)}
+          onSuccess={() => { if (onChanged) onChanged(); }}
         />
       )}
 

@@ -37,6 +37,26 @@ const MAX_FOLDER_DEPTH = 10;
 // filtre, elles, sont toujours passées en paramètres liés.
 const ALLOWED_GROUP = ['type_document', 'annee', 'statut', 'nom_entreprise', 'auteur'];
 
+// Valeurs de remplacement du téléversement en masse, pour les trois colonnes que
+// le formulaire masque dans ce mode alors que la base les déclare NOT NULL
+// (`num_dossier`, `num_acte`, `nom_entreprise` — voir docs/setup_db.sql).
+//
+// C'est la correction d'une panne totale du mode en masse : le contrôleur y
+// insérait `num_dossier || null`, et PostgreSQL refusait chaque ligne avec
+// « null value in column "num_dossier" violates not-null constraint » (23502).
+// Comme l'insertion est enveloppée dans un try par fichier, l'échec ne remontait
+// pas en erreur HTTP : la réponse était un 201 « 0 créés, N échecs » — un succès
+// apparent pour un travail qui n'avait pas eu lieu.
+//
+// Un texte plutôt qu'une chaîne vide : ces trois valeurs sont AFFICHÉES sans
+// repli (`DocumentsPage` les met en colonne, `DraggableDocumentCard` les compose
+// en « dossier / acte — année »). Une chaîne vide laisserait des cellules et une
+// ligne « / — 2026 » que rien n'explique, alors que l'archiviste doit
+// précisément repérer ces fiches pour les compléter — c'est le sens du statut
+// « à indexer ». Le mot dit ce qui reste à faire, et reste modifiable ensuite
+// par la fiche du document (`updateDocument` accepte les trois colonnes).
+const BULK_PLACEHOLDER = 'À indexer';
+
 // Filtres reconnus dans `filter_json`, avec leur mode de comparaison.
 const ALLOWED_FILTERS = {
   statut: 'exact',
@@ -110,7 +130,7 @@ exports.createDocument = async (req, res) => {
   const userId = req.user.id;
   const {
     nom_entreprise, num_dossier, num_acte, annee, type_document, description,
-    tags, auteur, date_document, dossier_id, statut,
+    tags, auteur, date_document, dossier_id, statut, bulkUpload,
   } = req.body;
 
   // Sanitize tags early
@@ -118,14 +138,78 @@ exports.createDocument = async (req, res) => {
   if (tags && safeTags === null) {
     return res.status(400).json({ message: 'Format de tags invalide (caractères interdits détectés)' });
   }
-  // Use sanitized tags for DB operations
   const dbTags = safeTags || [];
 
-  if (!nom_entreprise || !num_dossier || !num_acte) {
+  const isBulk = String(bulkUpload) === 'true';
+
+  if (!isBulk && (!nom_entreprise || !num_dossier || !num_acte)) {
     return res.status(400).json({ message: 'Entreprise, n° dossier et n° acte sont requis' });
   }
 
   try {
+    if (isBulk) {
+      if (!req.files || !req.files.length) {
+        return res.status(400).json({ message: 'Aucun fichier fourni pour le téléversement en masse' });
+      }
+
+      const results = { created: [], failed: [] };
+      const rejectedFiles = req.rejectedFiles || [];
+
+      for (const file of req.files) {
+        try {
+          const tempRef = `DOC-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+          const docRes = await tenantDb.insert(
+            tenantId,
+            'documents',
+            ['reference_mfile', 'num_dossier', 'num_acte', 'nom_entreprise', 'annee', 'type_document', 'description', 'tags', 'auteur', 'date_document', 'statut', 'version', 'dossier_id', 'created_by'],
+            // Les trois colonnes NOT NULL reçoivent la saisie si elle existe (le
+            // formulaire peut être rempli même en masse), sinon le repli. Jamais
+            // NULL : la base refuserait la ligne — voir BULK_PLACEHOLDER.
+            [tempRef, num_dossier || BULK_PLACEHOLDER, num_acte || BULK_PLACEHOLDER, nom_entreprise || BULK_PLACEHOLDER, annee || new Date().getFullYear(), type_document || null, description || null, dbTags, auteur || null, date_document || null, 'à indexer', 1, dossier_id || null, userId]
+          );
+          const doc = docRes.rows[0];
+          const reference_mfile = await setCanonicalReference(tenantId, doc.id);
+
+          await addFileToDocument(tenantId, doc.id, userId, file);
+          const text = await extractText(file.path, file.mimetype);
+          if (text) {
+            const autoTags = extractAutoTags(text, dbTags);
+            const sanitizedAutoTags = autoTags.map(t => sanitizeTags(t)).filter(Boolean).flat();
+            if (sanitizedAutoTags.length > dbTags.length) {
+              await tenantDb.update(tenantId, 'documents', ['tags'], [sanitizedAutoTags], 'id', doc.id);
+            }
+          }
+
+          await logHistory(tenantId, doc.id, userId, 'Téléversement en masse', null, 'à indexer');
+          results.created.push({ id: doc.id, reference: reference_mfile, fileName: file.originalname });
+        } catch (err) {
+          console.error(`[bulk] Erreur fichier ${file.originalname}:`, err);
+          results.failed.push({ fileName: file.originalname, error: err.message });
+        }
+      }
+
+      // 201 UNIQUEMENT si quelque chose a été créé. Un lot entièrement en échec
+      // renvoyait auparavant « 201 Created » avec « 0 créés, N échecs » : le
+      // frontend traitait la réponse en succès, fermait sur un message vert, et
+      // l'utilisateur croyait ses fichiers versés. C'est exactement ce qui a
+      // masqué la panne des colonnes NOT NULL. 500 dit ce qui s'est passé — la
+      // cause est côté serveur, pas dans les fichiers envoyés.
+      if (results.created.length === 0 && results.failed.length > 0) {
+        return res.status(500).json({
+          message: `Aucun document n'a pu être créé (${results.failed.length} échec(s)).`,
+          ...results,
+          rejected: rejectedFiles,
+        });
+      }
+
+      return res.status(201).json({
+        message: `Téléversement terminé. ${results.created.length} créés, ${results.failed.length} échecs.`,
+        ...results,
+        rejected: rejectedFiles
+      });
+    }
+
+    // --- Mode standard (1 document, N fichiers) ---
     const tempRef = `DOC-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const result = await tenantDb.insert(
       tenantId,
@@ -148,9 +232,8 @@ exports.createDocument = async (req, res) => {
 
     // Auto-tagging basé sur le contenu extrait
     if (allText.trim()) {
-      const existingTags = dbTags; // Use already sanitized tags to avoid divergence
+      const existingTags = dbTags;
       const autoTags = extractAutoTags(allText, existingTags);
-      // Sanitize auto-tags too (they might contain special chars from content)
       const sanitizedAutoTags = autoTags.map(t => sanitizeTags(t)).filter(Boolean).flat();
       if (sanitizedAutoTags.length > existingTags.length) {
         await tenantDb.update(
@@ -516,7 +599,13 @@ exports.setStatus = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   const { statut, comment } = req.body;
-  const ALLOWED = ['disponible', 'prêt', 'archivé'];
+  // « à indexer » fait partie du domaine depuis la migration 018 : le
+  // téléversement en masse le pose, et le référentiel le regroupe. L'omettre ici
+  // rendait le statut à sens unique — on pouvait en sortir, jamais y revenir,
+  // alors qu'un archiviste qui constate des métadonnées erronées a besoin de
+  // remettre une fiche dans la file à indexer. Un glisser-déposer vers ce groupe,
+  // dans les vues dynamiques regroupées par statut, échouait aussi en 400.
+  const ALLOWED = ['disponible', 'prêt', 'archivé', 'à indexer'];
   if (!ALLOWED.includes(statut)) return res.status(400).json({ message: 'Statut invalide' });
 
   try {

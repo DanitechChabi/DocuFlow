@@ -3,14 +3,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Lock } from 'lucide-react';
 import { DocumentThumbnail } from './DocumentPreview';
-
-const STATUS_CLASSES = {
-  'disponible': 'status-badge-delivered',
-  'prêt': 'status-badge-progress',
-  'archivé': 'status-badge-annulled',
-};
-
-const STATUS_LABELS = { 'disponible': 'Disponible', 'prêt': 'Prêt', 'archivé': 'Archivé' };
+import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 /**
  * DraggableDocumentCard — fiche document déplaçable d'un groupe à l'autre dans

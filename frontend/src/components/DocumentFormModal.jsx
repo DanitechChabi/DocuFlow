@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Save, FileText, Calendar, Hash, Building2, AlertCircle, Upload, File, FolderOpen, User, Tag } from 'lucide-react';
 import { documentService } from '../services/documentService';
+import { toast } from './Toast';
 
 const emptyForm = () => ({
   nom_entreprise: '',
@@ -22,6 +23,9 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkResults, setBulkResults] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
   // Échap ferme la fenêtre, comme l'aperçu de document le fait déjà. Sans cela
@@ -55,9 +59,36 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Le plafond suit le mode : 100 fichiers en masse, 5 pour un document unique
+  // (au-delà, multer rejette côté serveur). La limite est ANNONCÉE : une
+  // troncature silencieuse (l'ancien `.slice(0, limit)`) laissait l'utilisateur
+  // croire que ses 120 fichiers étaient versés alors que 20 disparaissaient —
+  // précisément le genre d'écart invisible que le statut « à indexer » devait
+  // permettre de repérer.
+  const ajouterFichiers = (selected) => {
+    if (selected.length === 0) return;
+    const limit = bulkMode ? 100 : 5;
+    const total = files.length + selected.length;
+    if (total > limit) {
+      setError(
+        `${total} fichiers sélectionnés pour une limite de ${limit} par versement${bulkMode ? ' en masse' : ''}. `
+        + `Seuls les ${limit} premiers seront retenus — versez le reste dans un second lot.`
+      );
+    }
+    setFiles((prev) => [...prev, ...selected].slice(0, limit));
+  };
+
   const handleFileChange = (e) => {
-    const selected = Array.from(e.target.files || []);
-    setFiles((prev) => [...prev, ...selected].slice(0, 5));
+    ajouterFichiers(Array.from(e.target.files || []));
+    // Réinitialiser permet de resélectionner le MÊME fichier après un retrait :
+    // sans cela le champ garde sa valeur et n'émet plus d'événement change.
+    e.target.value = '';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    ajouterFichiers(Array.from(e.dataTransfer?.files || []));
   };
 
   const removeFile = (i) => setFiles((prev) => prev.filter((_, idx) => idx !== i));
@@ -65,6 +96,16 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setBulkResults(null);
+
+    // En masse, un document est créé PAR fichier : sans fichier il n'y a rien à
+    // créer. Le backend renverrait un 201 avec zéro création — soit un succès
+    // affiché pour un travail qui n'a pas eu lieu.
+    if (bulkMode && files.length === 0) {
+      setError('Ajoutez au moins un fichier : en téléversement en masse, un document est créé par fichier.');
+      return;
+    }
+
     setLoading(true);
     try {
       const tags = formData.tags.split(',').map((t) => t.trim()).filter(Boolean);
@@ -79,6 +120,7 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
         date_document: formData.date_document || null,
         tags,
         dossier_id: formData.dossier_id || null,
+        bulkUpload: bulkMode,
       };
 
       if (editing) {
@@ -92,13 +134,39 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
           if (v !== null && v !== undefined) fd.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
         });
         files.forEach((f) => fd.append('files', f));
-        await documentService.createDocument(fd);
+        const res = await documentService.createDocument(fd);
+        if (bulkMode) {
+          setBulkResults(res);
+          // Toast + onSuccess : la liste de documents doit se recharger dès le
+          // versement réussi. L'ancien `return` silencieux laissait la fenêtre
+          // de résultats s'afficher sur une liste figée : à la fermeture, les
+          // nouvelles fiches « à indexer » n'apparaissaient qu'après F5.
+          if (res.created?.length > 0) {
+            toast.success(`${res.created.length} document(s) créé(s), ${res.failed?.length || 0} échec(s).`);
+            if (onSuccess) onSuccess();
+          } else if (res.failed?.length > 0) {
+            toast.error(`Aucun document créé (${res.failed.length} échec(s)) — détail ci-dessous.`);
+          }
+          setLoading(false);
+          return;
+        }
       }
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || "Erreur lors de l'enregistrement du document");
+      // Un lot entièrement en échec arrive ici (le backend rend 500 et non 201 :
+      // un 201 « 0 créés » se lisait comme un succès et fermait la fenêtre sur un
+      // message vert). Le corps porte quand même le détail par fichier — on
+      // l'affiche, sinon l'utilisateur reçoit « Erreur lors de l'enregistrement »
+      // sans savoir lequel de ses vingt fichiers a échoué, ni pourquoi.
+      const corps = err.response?.data;
+      if (corps && (corps.failed?.length || corps.created?.length)) {
+        setBulkResults(corps);
+      }
+      setError(corps?.message || "Erreur lors de l'enregistrement du document");
     } finally {
+      // Toujours relâcher : en masse, l'ancienne garde `if (!bulkMode)` laissait
+      // le bouton figé sur « Enregistrement… » après une erreur réseau.
       setLoading(false);
     }
   };
@@ -118,28 +186,53 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
             </div>
           )}
 
-          <div className="col-span-2 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Entreprise</label>
-            <div className="relative group">
-              <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
-              <input type="text" name="nom_entreprise" className="input-premium pl-12" value={formData.nom_entreprise} onChange={handleChange} required placeholder="Nom de l'entreprise" />
+          {/* Bulk Mode Toggle */}
+          {!editing && (
+            <div className="col-span-2 flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white rounded-lg shadow-sm text-docuflow-secondary">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Téléversement en masse</p>
+                  <p className="text-[11px] text-slate-500">Ignorer l'indexation immédiate et créer un document par fichier</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={bulkMode} onChange={(e) => { setBulkMode(e.target.checked); setBulkResults(null); }} />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-docuflow-secondary"></div>
+              </label>
             </div>
-          </div>
+          )}
 
-          <div className="col-span-1 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° dossier</label>
-            <div className="relative group">
-              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
-              <input type="text" name="num_dossier" className="input-premium pl-12" value={formData.num_dossier} onChange={handleChange} required placeholder="D-2026-001" />
+          {!bulkMode && (
+            <div className="col-span-2 space-y-1.5">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Entreprise</label>
+              <div className="relative group">
+                <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
+                <input type="text" name="nom_entreprise" className="input-premium pl-12" value={formData.nom_entreprise} onChange={handleChange} required placeholder="Nom de l'entreprise" />
+              </div>
             </div>
-          </div>
-          <div className="col-span-1 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° acte</label>
-            <div className="relative group">
-              <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
-              <input type="text" name="num_acte" className="input-premium pl-12" value={formData.num_acte} onChange={handleChange} required placeholder="A-001" />
-            </div>
-          </div>
+          )}
+
+          {!bulkMode && (
+            <>
+              <div className="col-span-1 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° dossier</label>
+                <div className="relative group">
+                  <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
+                  <input type="text" name="num_dossier" className="input-premium pl-12" value={formData.num_dossier} onChange={handleChange} required placeholder="D-2026-001" />
+                </div>
+              </div>
+              <div className="col-span-1 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">N° acte</label>
+                <div className="relative group">
+                  <Hash size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
+                  <input type="text" name="num_acte" className="input-premium pl-12" value={formData.num_acte} onChange={handleChange} required placeholder="A-001" />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="col-span-1 space-y-1.5">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Année</label>
@@ -199,32 +292,70 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2">
               {editing ? 'Ajouter une version (fichiers)' : 'Fichiers'}
             </label>
+
+            {/* Zone cliquable ET déposable. Le champ `file` réel est masqué (les
+                navigateurs ne permettent pas de le styliser) : c'est ce bloc qui
+                le déclenche. Sans ce onClick, aucun fichier ne peut être choisi —
+                le téléversement en masse devient inatteignable depuis l'écran. */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const dropped = Array.from(e.dataTransfer.files || []);
-                setFiles((prev) => [...prev, ...dropped].slice(0, 5));
-              }}
-              className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:border-docuflow-secondary/50 hover:bg-blue-50/30 transition-colors"
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors ${
+                dragOver
+                  ? 'border-docuflow-secondary bg-blue-50/50'
+                  : 'border-slate-200 hover:border-docuflow-secondary hover:bg-slate-50/50'
+              }`}
             >
-              <Upload size={24} className="mx-auto mb-2 text-slate-400" />
+              <Upload size={24} className="mx-auto mb-2 text-docuflow-secondary" />
               <p className="text-sm text-slate-500 font-medium">Glissez vos fichiers ici ou <span className="text-docuflow-secondary font-bold">cliquez</span></p>
-              <p className="text-[11px] text-slate-400 mt-1">PDF, images, Word, Excel… (5 max)</p>
+              <p className="text-[11px] text-slate-400 mt-1">PDF, images, Word, Excel… ({bulkMode ? '100' : '5'} max)</p>
               <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
             </div>
+
             {files.length > 0 && (
               <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                  {files.length} fichier{files.length > 1 ? 's' : ''} sélectionné{files.length > 1 ? 's' : ''}
+                </p>
                 {files.map((f, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
-                    <span className="flex items-center gap-2 text-sm text-slate-600 font-medium"><File size={14} className="text-docuflow-secondary" /> {f.name}</span>
-                    <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 text-xs font-bold">Retirer</button>
+                    <span className="flex items-center gap-2 text-sm text-slate-600 font-medium truncate"><File size={14} className="text-docuflow-secondary flex-shrink-0" /> <span className="truncate">{f.name}</span></span>
+                    <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 text-xs font-bold flex-shrink-0 ml-2">Retirer</button>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {bulkResults && (
+            <div className="col-span-2 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 animate-scale-in">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-bold text-slate-900">Résultats du téléversement</p>
+                <button type="button" onClick={() => setBulkResults(null)} className="text-xs text-slate-400 hover:text-slate-600">Effacer</button>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                {(bulkResults.created || []).map((doc, i) => (
+                  <div key={i} className="flex items-center justify-between text-[12px] p-2 bg-white rounded-lg border border-slate-100">
+                    <span className="text-slate-600 font-medium truncate max-w-[200px]">{doc.fileName}</span>
+                    <span className="text-docuflow-secondary font-bold whitespace-nowrap">{doc.reference}</span>
+                  </div>
+                ))}
+                {(bulkResults.failed || []).map((fail, i) => (
+                  <div key={i} className="flex items-center justify-between text-[12px] p-2 bg-red-50 rounded-lg border border-red-100">
+                    <span className="text-red-600 font-medium truncate max-w-[200px]">{fail.fileName}</span>
+                    <span className="text-red-400 text-right ml-2">{fail.error}</span>
+                  </div>
+                ))}
+              </div>
+              {bulkResults.rejected && bulkResults.rejected.length > 0 && (
+                <div className="p-2 bg-amber-50 rounded-lg border border-amber-100 text-[11px] text-amber-700">
+                  <strong>Fichiers rejetés :</strong> {bulkResults.rejected.map(r => r.originalname).join(', ')}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="col-span-2 flex justify-end gap-3 pt-2 border-t border-slate-100">
             <button type="button" onClick={onClose} className="btn-secondary">Annuler</button>
