@@ -393,6 +393,26 @@ async function deleteField(tenantId, fieldId) {
 // ============================================================================
 
 /**
+ * Le document appartient-il au tenant de l'appelant ?
+ *
+ * Les fonctions ci-dessous validaient les CHAMPS contre le tenant (un champ
+ * d'une autre organisation est refusé) mais jamais le DOCUMENT : un archiviste
+ * du tenant A pouvait écrire des métadonnées sur le document d'un tenant B —
+ * et, plus grave, le journal d'audit enregistrait l'action au nom du document
+ * de B. Le contrôle se fait par document, exactement comme le fait
+ * relationService.createRelation.
+ */
+async function verifierDocumentTenant(tenantId, documentId, run) {
+  const { rows } = await run.query(
+    'SELECT id FROM documents WHERE id = $1 AND tenant_id = $2',
+    [documentId, tenantId]
+  );
+  if (rows.length === 0) {
+    throw new Error('Document non trouvé ou accès refusé.');
+  }
+}
+
+/**
  * Définit ou met à jour les métadonnées d'un document.
  * @param {number} tenantId
  * @param {number} documentId
@@ -401,6 +421,9 @@ async function deleteField(tenantId, fieldId) {
  */
 async function setDocumentMetadata(tenantId, documentId, values, client = null) {
   const run = client || db;
+
+  // Le document doit appartenir au tenant — voir verifierDocumentTenant.
+  await verifierDocumentTenant(tenantId, documentId, run);
 
   // On récupère tous les champs concernés pour validation
   const fieldIds = values.map(v => v.fieldId);
@@ -458,6 +481,9 @@ async function getDocumentMetadata(tenantId, documentId) {
 async function updateMetadataValue(tenantId, documentId, fieldId, value, client = null) {
   const run = client || db;
 
+  // Le document doit appartenir au tenant — voir verifierDocumentTenant.
+  await verifierDocumentTenant(tenantId, documentId, run);
+
   const fieldRes = await run.query(
     `SELECT f.id, f.label, f.type, f.required, f.options_json
      FROM metadata_fields f
@@ -496,6 +522,10 @@ async function updateMetadataValue(tenantId, documentId, fieldId, value, client 
 
 async function deleteMetadataValue(tenantId, documentId, fieldId, client = null) {
   const run = client || db;
+
+  // Le document doit appartenir au tenant — voir verifierDocumentTenant.
+  await verifierDocumentTenant(tenantId, documentId, run);
+
   const result = await run.query(
     `DELETE FROM metadata_values
      WHERE document_id = $1 AND field_id = $2

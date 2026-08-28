@@ -1,6 +1,13 @@
 const tenantDb = require('../config/db-tenant');
 const requestFieldService = require('../services/requestFieldService');
 
+// Personnel de traitement : seuls ces rôles consultent une demande qui ne leur
+// appartient pas. Sans ce contrôle, tout utilisateur connecté de
+// l'organisation — donc un simple demandeur — ouvrait la fiche de n'importe
+// quelle demande : motif, NOTES INTERNES du personnel, journal d'audit
+// complet. Le demandeur reste maître de SES demandes, le personnel voit tout.
+const STAFF_ROLES = ['archiviste', 'admin', 'superadmin'];
+
 exports.getRequestDetails = async (req, res) => {
   const { id } = req.params;
   const tenantId = req.user.tenant_id;
@@ -33,6 +40,13 @@ exports.getRequestDetails = async (req, res) => {
 
     if (!request) {
       return res.status(404).json({ message: 'Demande non trouvée' });
+    }
+
+    // Propriétaire ou personnel — voir STAFF_ROLES ci-dessus. Le 403 est renvoyé
+    // APRÈS le 404 pour ne pas révéler l'existence d'une demande d'un autre
+    // tenant : l'appelant sans droit sait seulement « rien pour lui ici ».
+    if (request.id_user !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Accès refusé' });
     }
     // Requête avec tentative tenant_id, fallback si colonne absente
     let logsResult;

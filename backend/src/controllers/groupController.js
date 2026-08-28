@@ -70,10 +70,11 @@ exports.deleteGroup = async (req, res) => {
 };
 
 exports.addUserToGroup = async (req, res) => {
+  const tenantId = req.user.tenant_id;
   const groupId = req.params.id;
   const { userId } = req.body;
   try {
-    const result = await groupService.addUserToGroup(userId, groupId);
+    const result = await groupService.addUserToGroup(tenantId, userId, groupId);
     res.status(201).json({ message: 'Utilisateur ajouté au groupe avec succès', result });
   } catch (err) {
     console.error(err);
@@ -82,10 +83,11 @@ exports.addUserToGroup = async (req, res) => {
 };
 
 exports.removeUserFromGroup = async (req, res) => {
+  const tenantId = req.user.tenant_id;
   const groupId = req.params.id;
   const userId = req.params.userId;
   try {
-    const deleted = await groupService.removeUserFromGroup(userId, groupId);
+    const deleted = await groupService.removeUserFromGroup(tenantId, userId, groupId);
     if (!deleted) {
       return res.status(404).json({ message: 'Appartenance non trouvée' });
     }
@@ -97,9 +99,10 @@ exports.removeUserFromGroup = async (req, res) => {
 };
 
 exports.getUsersInGroup = async (req, res) => {
+  const tenantId = req.user.tenant_id;
   const groupId = req.params.id;
   try {
-    const users = await groupService.getUsersInGroup(groupId);
+    const users = await groupService.getUsersInGroup(tenantId, groupId);
     res.json(users);
   } catch (err) {
     console.error(err);
@@ -108,9 +111,10 @@ exports.getUsersInGroup = async (req, res) => {
 };
 
 exports.getUserGroups = async (req, res) => {
+  const tenantId = req.user.tenant_id;
   const userId = req.params.userId;
   try {
-    const groups = await groupService.getUserGroups(userId);
+    const groups = await groupService.getUserGroups(tenantId, userId);
     res.json(groups);
   } catch (err) {
     console.error(err);
