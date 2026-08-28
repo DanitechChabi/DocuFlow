@@ -37,9 +37,13 @@ router.get('/dynamic-views/data', lireDocuments, documentController.getDynamicVi
 // et les extensions autorisées configurées par l'organisation.
 router.post('/', requirePermission('documents.upload'), uploadMultiple, uploadPolicyMiddleware, documentController.createDocument);
 router.get('/', lireDocuments, documentController.listDocuments);
+router.get('/corbeille', requirePermission('documents.view'), documentController.listCorbeille);
 router.get('/:id', lireDocuments, documentController.getDocument);
 router.patch('/:id', requirePermission('documents.edit'), documentController.updateDocument);
+// Suppression douce (corbeille) / restauration / destruction physique.
 router.delete('/:id', requirePermission('documents.delete'), documentController.deleteDocument);
+router.post('/:id/restore', requirePermission('documents.restore'), documentController.restoreDocument);
+router.delete('/:id/purge', requirePermission('documents.purge'), documentController.purgeDocument);
 router.post('/:id/files', requirePermission('documents.manage_versions'), uploadMultiple, uploadPolicyMiddleware, documentController.addFiles);
 router.delete('/:id/files/:fileId', requirePermission('documents.manage_versions'), documentController.deleteFile);
 router.post('/:id/status', requirePermission('documents.edit'), documentController.setStatus);

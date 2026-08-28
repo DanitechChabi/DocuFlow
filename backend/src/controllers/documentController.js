@@ -7,6 +7,7 @@ const metadataService = require('../services/metadataService');
 const documentAuditService = require('../services/documentAuditService');
 const relationService = require('../services/relationService');
 const retentionService = require('../services/retentionService');
+const stateMachine = require('../services/documentStateMachine');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -267,7 +268,9 @@ exports.listDocuments = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { q, type_document, annee, statut, dossier_id, tag, auteur, page = 1, page_size = 20 } = req.query;
 
-  const conds = ['d.tenant_id = $1'];
+  // La corbeille n'apparaît pas dans le référentiel : sa page dédiée la liste.
+  // (listCorbeille, plus bas)
+  const conds = ['d.tenant_id = $1', 'd.deleted_at IS NULL'];
   const vals = [tenantId];
 
   if (q) {
@@ -321,6 +324,15 @@ exports.listDocuments = async (req, res) => {
   const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
 
   try {
+    // Rétention : premier passage de la journée pour ce tenant (le scheduler
+    // en mémoire retient les 23 heures suivantes). La consultation du
+    // référentiel est le moment naturel — les documents à échéance sont
+    // précisément ceux qu'on est en train de regarder, et aucun cron externe
+    // n'est nécessaire ni sur Render free ni sur le poste bureau.
+    retentionService.retentionScheduler
+      .passageRetenu(tenantId, req.user.id, logHistory)
+      .catch(() => { /* déjà journalisé par le scheduler */ });
+
     const countRes = await db.query(`SELECT COUNT(*) AS total FROM documents d WHERE ${where}`, vals);
     const total = parseInt(countRes.rows[0].total, 10);
 
@@ -403,6 +415,11 @@ exports.getDocument = async (req, res) => {
     );
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
+    // La corbeille n'est pas consultable par la fiche standard : sa page dédiée
+    // liste les documents supprimés et propose la restauration. Une fiche
+    // supprimée ouverte par un lien périmé doit le DIRE, pas se lire comme
+    // active.
+    if (doc.deleted_at) return res.status(404).json({ message: 'Ce document est en corbeille', code: 'EN_CORBEILLE' });
 
     // document_files / document_history n'ont pas de colonne tenant_id :
     // le périmètre multi-tenant passe par le document parent (documents.tenant_id)
@@ -437,6 +454,16 @@ exports.getDocument = async (req, res) => {
 exports.updateDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
+
+  // CYCLE DE VIE : deux refus avant toute écriture.
+  try {
+    const verrou = await chargerPourEcriture(tenantId, id, req.user);
+    if (verrou) return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+
   const allowed = ['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'description', 'auteur', 'date_document', 'dossier_id'];
   // Colonnes numériques : une chaîne vide y provoquerait une erreur 22P02
   // (invalid input syntax for type integer) et donc un 500 opaque.
@@ -487,7 +514,95 @@ exports.updateDocument = async (req, res) => {
   }
 };
 
+
+// ============================================================================
+// SUPPRESSION — trois gestes distincts, trois niveaux de gravité.
+//
+//   DELETE  /:id            corbeille (réversible) — deleted_at/deleted_by
+//   POST    /:id/restore    restauration depuis la corbeille
+//   DELETE  /:id/purge      destruction physique (permission documents.purge)
+//
+// L'ancien DELETE était un hard delete intégral (fichiers, historique,
+// métadonnées, relations) sans filet — irréversible pour une GED, et la fiche
+// survivait aux demandes qui l'avaient produite sans trace. La destruction
+// physique reste possible, mais elle est un geste EXPRES, pas le bouton par
+// défaut — et elle ne vise que la corbeille : détruire physiquement un
+// document actif exige d'abord de le mettre en corbeille.
+// ============================================================================
+
 exports.deleteDocument = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const { id } = req.params;
+
+  try {
+    // Corbeille : marquer, ne rien détruire. Le document reste complet
+    // (fichiers, historique, métadonnées) et restaurable à l'identique.
+    const result = await db.query(
+      `UPDATE documents
+          SET deleted_at = now(), deleted_by = $3
+        WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+        RETURNING id, reference_mfile`,
+      [id, tenantId, req.user.id]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Document non trouvé (ou déjà en corbeille)' });
+    }
+
+    await logHistory(tenantId, id, req.user.id, 'Mis à la corbeille', null, null);
+    res.json({ message: 'Document mis à la corbeille — restaurable depuis la corbeille.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la mise à la corbeille' });
+  }
+};
+
+/** POST /:id/restore — sortir de la corbeille. */
+exports.restoreDocument = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const { id } = req.params;
+
+  try {
+    const result = await db.query(
+      `UPDATE documents
+          SET deleted_at = NULL, deleted_by = NULL
+        WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL
+        RETURNING id, reference_mfile, statut`,
+      [id, tenantId]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Document introuvable dans la corbeille' });
+    }
+    await logHistory(tenantId, id, req.user.id, 'Restauré depuis la corbeille', null, null);
+    res.json({ message: 'Document restauré.', document: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la restauration' });
+  }
+};
+
+/** GET /corbeille — contenu de la corbeille du tenant. */
+exports.listCorbeille = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  try {
+    const { rows } = await db.query(
+      `SELECT d.id, d.reference_mfile, d.nom_entreprise, d.num_dossier, d.num_acte,
+               d.statut, d.deleted_at, u.full_name AS deleted_by_name,
+               (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id)::int AS files_count
+          FROM documents d
+          LEFT JOIN users u ON u.id = d.deleted_by
+         WHERE d.tenant_id = $1 AND d.deleted_at IS NOT NULL
+         ORDER BY d.deleted_at DESC`,
+      [tenantId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors du chargement de la corbeille' });
+  }
+};
+
+/** DELETE /:id/purge — destruction physique, permission dédiée. */
+exports.purgeDocument = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   const client = await db.pool.connect();
@@ -495,34 +610,27 @@ exports.deleteDocument = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Vérifier que le document existe et appartient au tenant
-    const check = await client.query('SELECT id FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+    // La purge ne vise QUE la corbeille (voir l'en-tête du bloc).
+    const check = await client.query(
+      'SELECT id FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL',
+      [id, tenantId]
+    );
     if (!check.rows[0]) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Document non trouvé' });
+      return res.status(404).json({ message: 'Document introuvable en corbeille (la purge ne vise que la corbeille)' });
     }
 
-    // Récupérer les fichiers pour suppression ultérieure
+    // Fichiers pour suppression du stockage après commit.
     const filesRes = await client.query('SELECT * FROM document_files WHERE document_id = $1', [id]);
 
-    // --- APPROCHE ORIGINALE : DB d'abord, stockage après ---
-    // 1. Supprimer les références dans requests
+    // DB d'abord, stockage après — en cas d'échec du DELETE, les binaires
+    // restent intacts et l'opération est rejouable.
     await client.query('UPDATE requests SET document_id = NULL WHERE document_id = $1 AND tenant_id = $2', [id, tenantId]);
-
-    // 2. Supprimer les fichiers de la base
     await client.query('DELETE FROM document_files WHERE document_id = $1', [id]);
-
-    // 3. Supprimer l'historique
     await client.query('DELETE FROM document_history WHERE document_id = $1', [id]);
-
-    // 4. Supprimer le document
     await client.query('DELETE FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
-
-    // 5. Commit seulement après toutes les opérations DB réussies
     await client.query('COMMIT');
 
-    // 6. Supprimer les fichiers du stockage APRÈS le commit (en cas d'échec, rollback = pas de suppression)
-    // Si le stockage échoue ici, la DB est déjà supprimée → pas d'orphelins
     const deleteErrors = [];
     for (const f of filesRes.rows) {
       try {
@@ -531,21 +639,20 @@ exports.deleteDocument = async (req, res) => {
         deleteErrors.push({ file: f.stored_name, error: storageErr.message });
       }
     }
-
     if (deleteErrors.length > 0) {
-      // Storage failures are non-fatal for DB deletion but should be logged
       console.warn('[document] Certains fichiers n\'ont pas pu être supprimés du stockage:', deleteErrors);
     }
 
-    res.json({ message: 'Document supprimé' });
+    res.json({ message: 'Document définitivement détruit.' });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error(err);
-    res.status(500).json({ message: 'Erreur lors de la suppression du document' });
+    res.status(500).json({ message: 'Erreur lors de la purge' });
   } finally {
     client.release();
   }
 };
+
 
 /* ===== Fichiers & versions ===== */
 
@@ -553,8 +660,9 @@ exports.addFiles = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
-    const docRes = await tenantDb.query(tenantId, 'SELECT id FROM documents WHERE id = $1', [id]);
-    if (!docRes.rows[0]) return res.status(404).json({ message: 'Document non trouvé' });
+    // Cycle de vie : corbeille, archivé, verrou d'autrui (voir la garde).
+    const verrou = await chargerPourEcriture(tenantId, id, req.user);
+    if (verrou) return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
     if (!req.files || !req.files.length) return res.status(400).json({ message: 'Aucun fichier fourni' });
 
     const added = [];
@@ -575,6 +683,14 @@ exports.deleteFile = async (req, res) => {
   const client = await db.pool.connect();
 
   try {
+    // Cycle de vie : corbeille, archivé, verrou d'autrui (voir la garde).
+    // AVANT la transaction : un refus ne doit pas ouvrir de transaction pour rien.
+    const verrou = await chargerPourEcriture(tenantId, id, req.user);
+    if (verrou) {
+      client.release();
+      return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
+    }
+
     await client.query('BEGIN');
 
     const docRes = await client.query('SELECT id FROM documents WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
@@ -623,26 +739,71 @@ exports.deleteFile = async (req, res) => {
 
 /* ===== Cycle de vie ===== */
 
+/**
+ * Garde partagée des écritures documentaires.
+ *
+ * Toute modification (fiche, fichiers, statut, verrou) passe par ici :
+ *   • un document EN CORBEILLE ne se modifie pas — il se restaure ;
+ *   • un document ARCHIVÉ est figé — le désarchiver est le geste qui rouvre
+ *     l'édition (permission documents.archive, transition archivé → prêt) ;
+ *   • un document VERROUILLÉ (check-out) ne se modifie que par son détenteur —
+ *     c'était le sens du verrou, aucune écriture ne le respectait.
+ *
+ * @returns {Promise<{statut: number, message: string, code: string}|null>}
+ *           null = écrire ; sinon la réponse 4xx à rendre telle quelle.
+ */
+async function chargerPourEcriture(tenantId, id, user) {
+  const { rows } = await tenantDb.query(
+    tenantId,
+    'SELECT id, statut, deleted_at, is_checked_out, checked_out_by FROM documents WHERE id = $1',
+    [id]
+  );
+  const doc = rows[0];
+  if (!doc) return { statut: 404, message: 'Document non trouvé', code: 'INTROUVABLE' };
+  if (doc.deleted_at) {
+    return { statut: 404, message: 'Ce document est en corbeille — restaurez-le pour le modifier.', code: 'EN_CORBEILLE' };
+  }
+  if (doc.statut === 'archivé') {
+    return {
+      statut: 409,
+      message: 'Ce document est archivé (lecture seule). Désarchivez-le pour le modifier.',
+      code: 'ARCHIVE_LECTURE_SEULE',
+    };
+  }
+  if (doc.is_checked_out && Number(doc.checked_out_by) !== Number(user.id)) {
+    return {
+      statut: 409,
+      message: 'Ce document est verrouillé par un autre utilisateur (check-out).',
+      code: 'VERROUILLE',
+    };
+  }
+  return null;
+}
+
 exports.setStatus = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   const { statut, comment } = req.body;
-  // « à indexer » fait partie du domaine depuis la migration 018 : le
-  // téléversement en masse le pose, et le référentiel le regroupe. L'omettre ici
-  // rendait le statut à sens unique — on pouvait en sortir, jamais y revenir,
-  // alors qu'un archiviste qui constate des métadonnées erronées a besoin de
-  // remettre une fiche dans la file à indexer. Un glisser-déposer vers ce groupe,
-  // dans les vues dynamiques regroupées par statut, échouait aussi en 400.
-  const ALLOWED = ['disponible', 'prêt', 'archivé', 'à indexer'];
-  if (!ALLOWED.includes(statut)) return res.status(400).json({ message: 'Statut invalide' });
-
+  // LA MACHINE À ÉTATS DÉCIDE. L'ancien code acceptait n'importe quelle
+  // transition entre les statuts : un document archivé redevenait « actif »
+  // sans geste explicite, et « à indexer → archivé » (sauter toute l'indexation)
+  // passait aussi. Les transitions autorisées vivent dans documentStateMachine
+  // — miroir de la table document_transitions (migration 020) — avec le sens
+  // métier qui va avec : archivé = figé, en validation = intermédiaire
+  // refusable, à indexer = entrée du cycle.
   try {
     const docRes = await tenantDb.query(tenantId, 'SELECT * FROM documents WHERE id = $1', [id]);
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
+    if (doc.deleted_at) return res.status(404).json({ message: 'Document en corbeille' });
+
+    const transition = stateMachine.canTransition(doc.statut, statut);
+    if (!transition.ok) {
+      return res.status(400).json({ message: transition.reason, code: 'TRANSITION_REFUSEE' });
+    }
 
     await tenantDb.query(tenantId, 'UPDATE documents SET statut = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [statut, id]);
-    await logHistory(tenantId, id, req.user.id, 'Changement de statut', doc.statut, statut, comment);
+    await logHistory(tenantId, id, req.user.id, stateMachine.TRANSITIONS_LABELS[`${doc.statut}>${statut}`] || 'Changement de statut', doc.statut, statut, comment);
     res.json({ message: 'Statut mis à jour', statut });
   } catch (err) {
     console.error(err);
@@ -1129,26 +1290,31 @@ exports.checkoutDocument = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const docRes = await tenantDb.query(
-      tenantId,
-      'SELECT id, is_checked_out, checked_out_by FROM documents WHERE id = $1',
-      [id]
-    );
-    const doc = docRes.rows[0];
-    if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
+    // Cycle de vie : corbeille et archivé ne se verrouillent pas.
+    const verrou = await chargerPourEcriture(tenantId, id, req.user);
+    if (verrou) return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
 
-    if (doc.is_checked_out) {
-      if (doc.checked_out_by === userId) {
-        return res.status(400).json({ message: 'Vous avez déjà verrouillé ce document (check-out)' });
-      }
-      return res.status(409).json({ message: 'Ce document est actuellement verrouillé par un autre utilisateur' });
+    // VERROU ATOMIQUE. L'ancienne séquence lisait puis écrivait sans condition :
+    // deux utilisateurs cliquant à ~100 ms d'écart voyaient tous deux
+    // « non verrouillé », et leurs deux UPDATE passaient — le second écrasait
+    // le détenteur du premier, qui croyait tenir le verrou et modifiait « sous »
+    // l'autre. Le verrou porté par la clause WHERE, c'est la BASE qui arbitre :
+    // un seul gagne, l'autre reçoit 409.
+    //
+    // db.query DIRECT : l'auto-filtre de tenantDb colle sa condition APRÈS le
+    // RETURNING (il ne connaît que ORDER BY/LIMIT/GROUP BY/HAVING), ce qui
+    // détruit la requête — « l'argument de AND doit être boolean ». Le périmètre
+    // est déjà porté par la clause WHERE qualifiée.
+    const resultat = await db.query(
+      `UPDATE documents
+          SET is_checked_out = TRUE, checked_out_by = $1, checked_out_at = NOW()
+        WHERE id = $2 AND tenant_id = $3 AND is_checked_out = FALSE
+        RETURNING id`,
+      [userId, id, tenantId]
+    );
+    if (!resultat.rowCount) {
+      return res.status(409).json({ message: 'Ce document est actuellement verrouillé par un autre utilisateur', code: 'VERROUILLE' });
     }
-
-    await tenantDb.query(
-      tenantId,
-      'UPDATE documents SET is_checked_out = TRUE, checked_out_by = $1, checked_out_at = NOW() WHERE id = $2',
-      [userId, id]
-    );
 
     await logHistory(tenantId, id, userId, 'Verrouillage du document (Check-out)', null, null);
     res.json({ message: 'Document verrouillé pour édition (Check-out effectué)', is_checked_out: true, checked_out_by: userId });
@@ -1200,8 +1366,13 @@ exports.checkinDocument = async (req, res) => {
 exports.getDynamicViews = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
-    const result = await tenantDb.query(
-      tenantId,
+    // db.query DIRECT, pas tenantDb : l'auto-filtre de tenantDb injecte un
+    // « tenant_id = $N » NON QUALIFIÉ, ambigu dès que la requête joint deux
+    // tables porteuses de cette colonne (dynamic_views et users ici) —
+    // « la référence à la colonne tenant_id est ambigüe », 500 sur chaque
+    // ouverture des vues dynamiques. Le périmètre est déjà porté par la clause
+    // WHERE qualifiée ci-dessous.
+    const result = await db.query(
       `SELECT dv.*, u.username as creator_name
        FROM dynamic_views dv
        LEFT JOIN users u ON dv.created_by = u.id

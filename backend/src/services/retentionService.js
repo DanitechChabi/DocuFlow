@@ -119,7 +119,95 @@ const retentionService = {
       })));
     }
     return expired;
+  },
+
+  /**
+   * APPLIQUE les politiques expirées — c'était la fonctionnalité dormante :
+   * checkExpiredDocuments n'était appelé par aucune route, aucun cron, aucun
+   * démarrage. Chaque organisation est provisionnée avec une politique
+   * « Conservation standard, 5 ans, archivage » qui ne s'exécutait jamais.
+   *
+   * Trois actions, telles que déclarées par la politique :
+   *   archive → statut « archivé » (la machine à états l'autorise depuis tout
+   *             état non archivé de travail — c'est un geste de gouvernance) ;
+   *   delete  → corbeille (PAS une destruction physique : la rétention est une
+   *             politique, pas un purgeur incontrôlé — la purge reste un geste
+   *             humain avec la permission documents.purge) ;
+   *   alert   → trace dans le journal documentaire, rien de plus.
+   *
+   * @returns {Promise<{appliques: Array, erreurs: Array}>}
+   */
+  async applyRetention(tenantId, userId = null, { logHistory = null } = {}) {
+    const expires = await this.checkExpiredDocuments(tenantId);
+    const appliques = [];
+    const erreurs = [];
+
+    for (const e of expires) {
+      try {
+        if (e.action === 'archive') {
+          await db.query(
+            `UPDATE documents SET statut = 'archivé', updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1 AND tenant_id = $2 AND statut <> 'archivé' AND deleted_at IS NULL`,
+            [e.documentId, tenantId]
+          );
+        } else if (e.action === 'delete') {
+          // Corbeille, pas destruction (voir l'en-tête).
+          await db.query(
+            `UPDATE documents SET deleted_at = now(), deleted_by = NULL
+              WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+            [e.documentId, tenantId]
+          );
+        }
+        // 'alert' : pas d'écriture — le journal ci-dessous est la trace.
+
+        if (logHistory) {
+          const intitule = e.action === 'archive'
+            ? `Rétention « ${e.policyName} » : archivé automatiquement`
+            : e.action === 'delete'
+              ? `Rétention « ${e.policyName} » : mis à la corbeille automatiquement`
+              : `Rétention « ${e.policyName} » : échéance atteinte (alerte)`;
+          await logHistory(tenantId, e.documentId, userId, intitule, null, null);
+        }
+        appliques.push(e);
+      } catch (err) {
+        erreurs.push({ ...e, erreur: err.message });
+      }
+    }
+    return { appliques, erreurs };
   }
 };
 
+// ---------------------------------------------------------------------------
+// Ordonnanceur : la rétention s'applique périodiquement, sans humain.
+//
+// Pourquoi ici et pas dans app.js : le service porte SA politique d'exécution.
+// Chaque tenant est vérifié au plus toutes les 24 h (Map en mémoire), et une
+// erreur ne fait que reporter au prochain passage — une base indisponible ne
+// doit pas empêcher l'application de démarrer ni de servir.
+// ---------------------------------------------------------------------------
+const DERNIER_PASSAGE = new Map(); // tenantId → timestamp
+const INTERVALLE_MS = 24 * 3600 * 1000;
+
+/**
+ * Déclenche l'application de la rétention pour un tenant si son dernier
+ * passage date de plus de 24 h. Silencieux par conception : la rétention est
+ * un travail de fond, ses résultats sont dans le journal documentaire.
+ */
+async function passageRetenu(tenantId, userId = null, logHistory = null) {
+  const dernier = DERNIER_PASSAGE.get(tenantId) || 0;
+  if (Date.now() - dernier < INTERVALLE_MS) return;
+  DERNIER_PASSAGE.set(tenantId, Date.now());
+  try {
+    const { appliques, erreurs } = await retentionService.applyRetention(tenantId, userId, { logHistory });
+    if (appliques.length || erreurs.length) {
+      console.log(`[rétention] Tenant ${tenantId} : ${appliques.length} document(s) traité(s), ${erreurs.length} échec(s).`);
+    }
+  } catch (err) {
+    console.warn('[rétention] Passage impossible, reporté :', err.message);
+  }
+}
+
 module.exports = retentionService;
+// Posé APRÈS l'export principal : l'assignation `module.exports = ...` aurait
+// sinon écrasé cette propriété.
+module.exports.retentionScheduler = { passageRetenu };

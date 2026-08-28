@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "npm run test:license && npm run test:rbac",
+    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle",
     "test:license": "node src/desktop/licenseGuard.test.js",
-    "test:rbac": "node src/rbac.test.js"
+    "test:rbac": "node src/rbac.test.js",
+    "test:lifecycle": "node src/lifecycle.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",
