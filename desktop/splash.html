@@ -1,36 +1,14 @@
 <!DOCTYPE html>
 <!--
   splash.html — écran d'attente du démarrage.
-
-  POURQUOI CE FICHIER PLUTÔT QUE frontend/src/components/SplashScreen.jsx
-  Ce composant React est servi PAR le backend Express, lequel ne démarre qu'une
-  fois la base de données prête. Il ne peut donc rien afficher pendant la phase
-  qu'il s'agit précisément de couvrir : la création du cluster PostgreSQL au
-  premier lancement (`initdb`, plusieurs dizaines de secondes). D'où cette page
-  autonome, ouverte par le processus principal avant tout le reste.
-
-  Volontairement sans dépendance ni fichier annexe : ni image, ni police, ni
-  script externe. Avec `asar: true`, tout chemin relatif devient un chemin dans
-  une archive — une ressource oubliée se traduirait par un carré vide chez le
-  client, sur le seul écran qu'il voit au démarrage.
 -->
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <!--
-    `default-src 'none'` : cette page ne charge RIEN — ni réseau, ni image, ni
-    police. C'est là qu'est le risque réel, et il est fermé.
-
-    `script-src 'unsafe-inline'` est en revanche nécessaire : le processus
-    principal met le message d'état à jour par executeJavaScript(), dont le
-    traitement au regard de la CSP varie selon les versions d'Electron. Le
-    concéder ici ne coûte rien — tout le contenu de cette page est écrit ci-dessous
-    et aucune donnée extérieure n'y entre.
-  -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
   <title>DocuFlow</title>
   <style>
-    :root { --bleu: #3b82f6; --or: #d4af37; }
+    :root { --bleu: #3b82f6; --or: #d4af37; --bg: #0f172a; }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -41,49 +19,66 @@
       align-items: center;
       justify-content: center;
       gap: 26px;
-      background: radial-gradient(circle at 50% 40%, #1e293b 0%, #0f172a 70%);
+      background: radial-gradient(circle at 50% 40%, #1e293b 0%, var(--bg) 70%);
       color: #e2e8f0;
       font-family: "Segoe UI", system-ui, sans-serif;
       user-select: none;
       overflow: hidden;
+      transition: opacity 0.6s ease-out;
     }
+    body.fade-out { opacity: 0; }
 
-    /* Halo — même bleu que le splash de l'application, pour que le passage de
-       cette fenêtre à la suivante ne ressemble pas à deux logiciels différents. */
     .halo {
       position: fixed;
       width: 620px; height: 620px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(59,130,246,.28) 0%, rgba(59,130,246,.09) 40%, transparent 70%);
-      filter: blur(40px);
-      animation: respire 3.5s ease-in-out infinite;
+      background: radial-gradient(circle, rgba(59,130,246,.35) 0%, rgba(59,130,246,.12) 40%, transparent 70%);
+      filter: blur(60px);
+      animation: respire 4s ease-in-out infinite;
       pointer-events: none;
+      z-index: -1;
     }
-    @keyframes respire { 0%,100% { opacity:.55 } 50% { opacity:1 } }
+    @keyframes respire { 0%,100% { transform: scale(1); opacity:.6 } 50% { transform: scale(1.1); opacity:1 } }
 
     .marque {
       position: relative;
-      font-size: 44px;
+      font-size: 48px;
       font-weight: 300;
-      letter-spacing: .5px;
-      text-shadow: 0 0 60px rgba(59,130,246,.55);
+      letter-spacing: 1px;
+      text-shadow: 0 0 60px rgba(59,130,246,.6);
+      animation: apparition 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      opacity: 0;
+      transform: translateY(10px);
     }
-    .marque b { font-weight: 600; color: #fff; }
+    .marque b { font-weight: 700; color: #fff; }
+
+    @keyframes apparition {
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     .filet {
       width: 80px; height: 3px; border-radius: 2px;
       background: linear-gradient(90deg, transparent, var(--or), transparent);
+      animation: app_filet 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      opacity: 0;
+      transform: scaleX(0);
+      transform-origin: center;
+    }
+    @keyframes app_filet {
+      to { opacity: 1; transform: scaleX(1); }
     }
 
-    /* Barre indéterminée : la durée d'initdb dépend du disque et de l'antivirus,
-       aucun pourcentage honnête n'est calculable. Une barre qui avance sans
-       promettre d'échéance vaut mieux qu'un compteur inventé. */
     .piste {
       position: relative;
       width: 260px; height: 3px;
-      background: rgba(148,163,184,.22);
+      background: rgba(148,163,184,.2);
       border-radius: 2px;
       overflow: hidden;
+      animation: apparition_piste 1.5s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes apparition_piste {
+      to { opacity: 1; }
     }
     .piste::after {
       content: "";
@@ -105,11 +100,13 @@
       color: #94a3b8;
       text-align: center;
       padding: 0 30px;
+      animation: apparition_etat 1.8s ease-out forwards;
+      opacity: 0;
+    }
+    @keyframes apparition_etat {
+      to { opacity: 1; }
     }
 
-    /* Ne s'affiche qu'au premier lancement, quand le message d'état signale une
-       création de cluster : dire « patientez » sur un démarrage d'une seconde
-       inquiéterait pour rien. */
     #note {
       position: relative;
       font-size: 12px;
@@ -129,14 +126,14 @@
   <div id="note">Première ouverture : la préparation peut prendre une minute.</div>
 
   <script>
-    // Appelée par le processus principal (webContents.executeJavaScript).
-    // Portée globale volontaire : c'est le point d'entrée depuis main.js.
     window.majEtat = (texte) => {
       document.getElementById('etat').textContent = texte;
-      // La note d'attente n'apparaît que pour la création du cluster, seule
-      // étape réellement longue.
       const longue = /installation|préparation|création/i.test(texte);
       document.getElementById('note').classList.toggle('visible', longue);
+    };
+
+    window.fadeOut = () => {
+      document.body.classList.add('fade-out');
     };
   </script>
 </body>

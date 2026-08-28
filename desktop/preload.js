@@ -34,4 +34,5 @@ contextBridge.exposeInMainWorld('desktopApp', {
 
   /** Version de l'application, affichée à l'écran « À propos » et au support. */
   getVersion: () => ipcRenderer.invoke('desktop:version'),
+  setTitle: (title) => ipcRenderer.invoke('desktop:set-title', title),
 });

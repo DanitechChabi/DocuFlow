@@ -6,6 +6,30 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 const platformOwnerMiddleware = require('../middlewares/platformOwnerMiddleware');
 
+// ---------------------------------------------------------------------------
+// vendorOnly — l'administration des licences n'existe QUE sur le serveur éditeur.
+//
+// POURQUOI : platformOwnerMiddleware accorde ces pouvoirs au superadmin du
+// tenant 1. Or sur un poste de bureau, bootstrap.js CRÉE précisément un
+// superadmin de tenant 1 (admin / Admin123!, identifiants publics : ils sont
+// dans desktop/README.md). Chaque installation client embarquait donc un compte
+// « propriétaire de la plateforme » capable d'émettre, de prolonger ou de délier
+// des licences — c'est-à-dire de se donner l'abonnement gratuitement.
+//
+// La base locale est certes distincte de celle de Render, mais deux des quatre
+// routes n'en dépendent pas : `create` fait signer une clé par le serveur de
+// signature, et l'écran d'administration s'ouvre pour de bon. Le seul endroit
+// où ces routes ont un sens est le SaaS, où le tenant 1 est réellement l'éditeur.
+//
+// 404 et non 403 : en mode bureau ces routes ne devraient pas exister. Un 403
+// confirmerait leur présence et désignerait la cible à qui cherche.
+const vendorOnly = (req, res, next) => {
+  if (process.env.SERVE_FRONTEND === 'true') {
+    return res.status(404).json({ message: 'Route inconnue' });
+  }
+  next();
+};
+
 // Toutes les routes nécessitent auth + superadmin + ÊTRE LE PROPRIÉTAIRE DE LA PLATEFORME
 // (tenant 1). Les superadmins des entreprises créées via register-company n'ont
 // PAS accès aux données globales : ils utilisent leurs propres routes scoped.
@@ -49,9 +73,11 @@ router.delete('/audit', superadminController.purgeAuditLogs);
 // des préfixes rend la frontière lisible : tout ce qui est ici est gardé par les
 // trois middlewares posés en haut de ce fichier, dont platformOwnerMiddleware —
 // sans quoi le superadmin d'une entreprise cliente prolongerait sa propre licence.
-router.get('/licenses', licenseController.list);
-router.post('/licenses', licenseController.create);
-router.patch('/licenses/:id', licenseController.update);
-router.post('/licenses/:id/reset-machine', licenseController.resetMachine);
+//
+// REFUSÉES EN MODE BUREAU (vendorOnly) — voir l'en-tête du middleware ci-dessus.
+router.get('/licenses', vendorOnly, licenseController.list);
+router.post('/licenses', vendorOnly, licenseController.create);
+router.patch('/licenses/:id', vendorOnly, licenseController.update);
+router.post('/licenses/:id/reset-machine', vendorOnly, licenseController.resetMachine);
 
 module.exports = router;

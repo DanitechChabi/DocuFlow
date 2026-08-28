@@ -5,7 +5,12 @@ propre serveur PostgreSQL** dans une fenêtre Electron. Les documents de la GED
 restent sur le disque du poste : rien ne part vers un stockage en ligne.
 
 Au premier lancement, elle démarre sa base locale, crée le schéma, applique les
-migrations puis crée le compte superadministrateur — sans aucune intervention.
+migrations puis crée le compte administrateur — sans aucune intervention.
+
+Ce compte a le rôle **`admin`** : il gère l'entreprise (utilisateurs, sections,
+documents, configuration). Il n'a délibérément pas le rôle `superadmin`, qui
+ouvre le portail d'administration des licences réservé à l'éditeur — celui-ci
+n'existe que sur le serveur, jamais sur un poste client.
 
 ## Prérequis
 
@@ -32,7 +37,7 @@ migrations puis crée le compte superadministrateur — sans aucune intervention
 | `DB_USER`        | `postgres`  | Utilisateur                             |
 | `DB_PASSWORD`    | *(vide)*    | Mot de passe                            |
 | `DB_NAME`        | `docuflow`  | Nom de la base (créée si absente)       |
-| `ADMIN_USERNAME` | `admin`     | Superadministrateur par défaut          |
+| `ADMIN_USERNAME` | `admin`     | Administrateur d'entreprise par défaut  |
 | `ADMIN_PASSWORD` | `Admin123!` | Son mot de passe — **à changer**        |
 
 > Posées dans l'environnement avant le lancement, ou dans un `.env` placé à côté
