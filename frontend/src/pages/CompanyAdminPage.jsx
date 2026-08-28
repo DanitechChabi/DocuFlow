@@ -18,6 +18,8 @@ import MetadataSchemaPanel from '../components/admin/MetadataSchemaPanel';
 import RequestFieldsPanel from '../components/admin/RequestFieldsPanel';
 import ConfigurationConsole from '../components/admin/ConfigurationConsole';
 import FolderManager from '../components/admin/FolderManager';
+import RolesPanel from '../components/admin/RolesPanel';
+import { roleService } from '../services/roleService';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { toast } from '../components/Toast';
@@ -29,7 +31,9 @@ const roleColor = (role) => ({
   superadmin: 'bg-red-100 text-red-600',
 }[role] || 'bg-slate-100 text-slate-600');
 
-const ROLE_OPTIONS = [
+// Rôles attribuables : chargés depuis /api/roles — la table fait foi (rôles
+// personnalisés compris), avec repli sur l'ancienne liste si l'appel échoue.
+const ROLE_OPTIONS_LEGACY = [
   { key: 'demandeur', label: 'Demandeur' },
   { key: 'archiviste', label: 'Archiviste' },
   { key: 'admin', label: 'Admin' },
@@ -38,13 +42,14 @@ const ROLE_OPTIONS = [
 // Déclaré hors du composant : `useOngletUrl` mémorise sur ce tableau, et un
 // littéral reconstruit à chaque rendu invaliderait le calcul en permanence.
 // L'ordre fixe le premier élément comme onglet par défaut.
-const PANNEAUX = ['users', 'sections', 'groups', 'metadata', 'request-fields', 'folders', 'branding', 'configuration'];
+const PANNEAUX = ['users', 'roles', 'sections', 'groups', 'metadata', 'request-fields', 'folders', 'branding', 'configuration'];
 
 // Libellé lisible de chaque panneau, pour le fil d'Ariane et le titre d'onglet du
 // navigateur. Sans lui, dix onglets « Administration » resteraient indiscernables
 // et le fil s'arrêterait au niveau de la page, sans dire où l'on est dedans.
 const NOMS_PANNEAUX = {
   users: 'Utilisateurs',
+  roles: 'Rôles & permissions',
   sections: 'Sections',
   groups: 'Groupes',
   metadata: 'Métadonnées',
@@ -68,6 +73,23 @@ const CompanyAdminPage = () => {
   // au bouton Retour. Voir useOngletUrl pour le détail de ce que l'état local
   // faisait perdre.
   const [activePanel, setActivePanel] = useOngletUrl(PANNEAUX);
+  // Rôles attribuables (RBAC) : la liste vient du serveur — superadmin exclu
+  // (réservé au propriétaire de la plateforme), rôles désactivés exclus.
+  const [roleOptions, setRoleOptions] = useState(ROLE_OPTIONS_LEGACY);
+  useEffect(() => {
+    let monte = true;
+    roleService.getRoles()
+      .then((roles) => {
+        if (!monte || !Array.isArray(roles)) return;
+        setRoleOptions(
+          roles
+            .filter((r) => r.is_active && r.key !== 'superadmin')
+            .map((r) => ({ key: r.key, label: r.name }))
+        );
+      })
+      .catch(() => { /* repli : liste historique */ });
+    return () => { monte = false; };
+  }, []);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -392,6 +414,13 @@ const CompanyAdminPage = () => {
           </div>
         )}
 
+        {/* ============ RÔLES & PERMISSIONS ============ */}
+        {activePanel === 'roles' && (
+          <div className="animate-fade-in-up">
+            <RolesPanel />
+          </div>
+        )}
+
         {/* ============ GROUPES ============ */}
         {activePanel === 'groups' && (
           <div className="animate-fade-in-up">
@@ -544,7 +573,7 @@ const CompanyAdminPage = () => {
                     {sections.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                   <select className="input-premium" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}>
-                    {ROLE_OPTIONS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    {roleOptions.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                   </select>
                 </div>
                 <div className="flex gap-3 pt-2">
@@ -568,7 +597,7 @@ const CompanyAdminPage = () => {
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rôle</label>
                   <select className="input-premium" value={editUser.role} onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}>
-                    {ROLE_OPTIONS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    {roleOptions.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                   </select>
                 </div>
                 <div className="flex gap-3">

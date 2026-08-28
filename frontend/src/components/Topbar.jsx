@@ -59,6 +59,10 @@ const Topbar = () => {
   const hasCustomLogo = Boolean(settings.site_logo_url);
   const isStaff = ['archiviste', 'admin', 'superadmin'].includes(user?.role);
   const isSuperadmin = user?.role === 'superadmin';
+  // L'administrateur d'entreprise accède au portail d'administration depuis que
+  // le RBAC lui donne les permissions users.*/roles.*/settings.manage — le menu
+  // suit les mêmes droits que les routes.
+  const isAdminEntreprise = isSuperadmin || user?.role === 'admin';
   const isOwner = isSuperadmin && user?.tenant_id === 1;
 
   // Navigation principale — style GitHub inline compact
@@ -293,7 +297,7 @@ const Topbar = () => {
                     <UserIcon size={16} /> Mon profil
                   </button>
 
-                  {isSuperadmin && (
+                  {isAdminEntreprise && (
                     <button
                       onClick={() => { navigate(isOwner ? '/super-admin-portal' : '/admin-portal'); setUserMenuOpen(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
