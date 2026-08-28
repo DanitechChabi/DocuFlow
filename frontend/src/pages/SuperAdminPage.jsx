@@ -21,6 +21,7 @@ import FolderManager from '../components/admin/FolderManager';
 import LicensePanel from '../components/admin/LicensePanel';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
+import { estBureau } from '../utils/plateforme';
 import { toast } from '../components/Toast';
 import { authService } from '../services/authService';
 
@@ -34,9 +35,16 @@ const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-
 
 // Hors du composant, pour la même raison que dans CompanyAdminPage : useOngletUrl
 // mémorise sur cette référence. Le premier élément est l'onglet par défaut.
+//
+// 'licenses' est absent en mode bureau : la liste sert de référentiel des onglets
+// atteignables par l'URL, et un poste client n'a pas à ouvrir le portail
+// d'administration des licences de l'éditeur (voir utils/plateforme.js).
+// Évalué une seule fois au chargement du module, comme la référence l'exige —
+// le mode d'exécution ne change pas en cours de session.
 const PANNEAUX = [
   'dashboard', 'requests', 'users', 'superadmins', 'sections', 'metadata',
-  'folders', 'tenants', 'licenses', 'audit', 'branding', 'configuration',
+  'folders', 'tenants', ...(estBureau() ? [] : ['licenses']), 'audit',
+  'branding', 'configuration',
 ];
 
 const NOMS_PANNEAUX = {
@@ -522,6 +530,9 @@ const SuperAdminPage = () => {
   };
 
   // --- TABS ---
+  // `filter(Boolean)` : l'onglet Licences est retiré du tableau en mode bureau
+  // plutôt que masqué en CSS, pour que useOngletUrl ne le reconnaisse pas comme
+  // onglet valide — sinon /super-admin-portal?onglet=licences le rouvrirait.
   const tabs = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'requests', label: 'Demandes', icon: FileText, badge: stats.totalRequests },
@@ -531,11 +542,11 @@ const SuperAdminPage = () => {
     { id: 'metadata', label: 'Métadonnées', icon: Database },
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'tenants', label: 'Entreprises', icon: Building2, badge: stats.totalTenants },
-    { id: 'licenses', label: 'Licences', icon: KeyRound },
+    !estBureau() && { id: 'licenses', label: 'Licences', icon: KeyRound },
     { id: 'audit', label: 'Journal', icon: ScrollText },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
-  ];
+  ].filter(Boolean);
 
   // Non-propriétaire : la redirection est déjà programmée par l'effet ci-dessus,
   // on n'affiche rien en attendant. Placé APRÈS tous les hooks (voir plus haut).
@@ -1038,8 +1049,13 @@ const SuperAdminPage = () => {
         {/* ============ LICENCES ============ */}
         {/* Licences de bureau : émission, prolongation, révocation et transfert
             de poste. Distinct de LicensePage, qui est l'écran d'activation vu
-            par le client sur sa machine. */}
-        {activePanel === 'licenses' && (
+            par le client sur sa machine.
+
+            La garde `!estBureau()` est répétée ici et pas seulement sur l'onglet :
+            le panneau appelle /api/superadmin/licenses au montage, qui répond 404
+            en mode bureau — l'écran s'afficherait donc en erreur au lieu de ne pas
+            s'afficher. */}
+        {activePanel === 'licenses' && !estBureau() && (
           <div className="animate-fade-in-up">
             <LicensePanel />
           </div>

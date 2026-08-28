@@ -122,7 +122,6 @@ const PrivacyPage = ({ type = 'privacy' }) => {
               </ul>
               <p className="font-bold mt-3">Cookies tiers :</p>
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Google Identity Services</strong> : pour la connexion Google (si configurée)</li>
               </ul>
             </Section>
 
@@ -147,7 +146,6 @@ const PrivacyPage = ({ type = 'privacy' }) => {
 
             <Section icon={Shield} title="5. Cookies tiers et services externes">
               <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>Google Identity Services</strong> : pour la connexion Google (soumis à la politique Google)</li>
                 <li><strong>Resend</strong> : envoi d'emails transactionnels (pas de cookies)</li>
               </ul>
             </Section>

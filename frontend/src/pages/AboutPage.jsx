@@ -93,7 +93,7 @@ const stack = [
   { label: 'Interface', value: 'React 19 · Vite' },
   { label: 'Serveur', value: 'Node.js · Express' },
   { label: 'Base de données', value: 'PostgreSQL' },
-  { label: 'Authentification', value: 'JWT · Google OAuth' },
+  { label: 'Authentification', value: 'JWT' },
 ];
 
 const AboutPage = () => {

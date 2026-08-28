@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { licenseService } from '../services/licenseService';
+import { estBureau } from '../utils/plateforme';
 
 // ============================================================================
 // LicenseContext — état de la licence de la version bureau.
@@ -17,10 +18,10 @@ import { licenseService } from '../services/licenseService';
 // interrogent le backend séparément et affichent des verdicts divergents.
 // ============================================================================
 
-// `window.desktopApp` est exposé par desktop/preload.js. Lu une seule fois : le
-// contextBridge est en place avant l'exécution du bundle, et la valeur ne peut
-// pas changer en cours de session.
-const isDesktop = () => Boolean(window.desktopApp?.isDesktop);
+// Détection centralisée dans utils/plateforme.js : la même question est posée par
+// SuperAdminPage pour retirer le portail des licences, et deux définitions
+// parallèles finiraient par diverger.
+const isDesktop = estBureau;
 
 // État servi sur le web, et tant que le premier appel n'a pas répondu en mode
 // bureau. `allowed: true` par défaut est délibéré : l'application ne doit pas

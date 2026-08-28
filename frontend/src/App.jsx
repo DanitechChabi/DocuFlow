@@ -20,6 +20,7 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { LicenseProvider, useLicense } from './contexts/LicenseContext';
 import { authService } from './services/authService';
 import ErrorBoundary from './components/ErrorBoundary';
+import LicenseGuard from './components/LicenseGuard';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = authService.getCurrentUser();
@@ -33,27 +34,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 /**
- * Renvoie vers l'écran de licence quand l'abonnement du poste ne permet plus
- * l'accès (version bureau uniquement).
- *
- * PAS DE BOUCLE DE REDIRECTION : /license est déclarée hors de ProtectedRoute,
- * donc elle ne renvoie jamais vers /login, et cette garde ne s'applique qu'aux
- * routes métier. Un poste sans licence peut ainsi se connecter puis atterrir sur
- * l'écran d'activation, sans jamais rebondir entre les deux.
- *
- * Sur le web, `allowed` vaut toujours vrai (LicenseProvider est inerte) : ce
- * composant y est donc un simple passe-plat, sans requête ni redirection.
- */
-const LicenseGate = ({ children }) => {
-  const { allowed, loading } = useLicense();
-  // `loading` protège le tout premier rendu : l'état initial est permissif, mais
-  // rediriger pendant la vérification ferait clignoter l'écran d'activation
-  // devant un client parfaitement à jour.
-  if (!loading && !allowed) return <Navigate to="/license" replace />;
-  return children;
-};
-
-/**
  * Éléments flottants communs (messagerie), masqués tant que la licence bloque.
  *
  * Sans cette garde, le bouton de messagerie resterait affiché par-dessus l'écran
@@ -61,8 +41,8 @@ const LicenseGate = ({ children }) => {
  * une rafale de 402 en boucle, et un bouton qui ne peut rien ouvrir.
  */
 const FloatingLayer = () => {
-  const { allowed } = useLicense();
-  if (!allowed) return null;
+  const license = useLicense();
+  if (!license || !license.allowed) return null;
   return <MessagingFloatingButton />;
 };
 
@@ -87,7 +67,7 @@ function App() {
         <Route path="/license" element={<LicensePage />} />
 
         {/* Layout partagé : topbar horizontale + contenu */}
-        <Route element={<ProtectedRoute><LicenseGate><AppLayout /></LicenseGate></ProtectedRoute>}>
+        <Route element={<ProtectedRoute><LicenseGuard><AppLayout /></LicenseGuard></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard tab="dashboard" />} />
           <Route path="/dashboard/requests" element={<Dashboard tab="requests" />} />
           <Route path="/dashboard/tasks" element={<Dashboard tab="my_tasks" />} />
