@@ -134,9 +134,15 @@ const Sidebar = ({ unreadCount = 0 }) => {
   const renduLien = (item, mobile = false) => {
     if (!item.visible) return null;
     if (item.doublon) return null; // « Recherche » : le champ topbar + Ctrl+K suffisent
-    const classes = ({ isActive }) => `group flex items-center gap-3 rounded-xl transition-colors ${
-      mobile ? 'px-3 py-2.5 text-sm' : 'px-3 py-2 text-[13px]'
-    } font-semibold ${isActive ? '' : ''}`;
+    // ALIGNEMENT : l'icône vit dans un conteneur de taille fixe (20 px) — les
+    // libellés s'alignent verticalement quelle que soit la largeur naturelle
+    // de l'icône. En mode replié, l'entrée se concentre sur son icône dans le
+    // rail de 68 px.
+    const classes = ({ isActive }) => `group flex items-center rounded-xl transition-colors ${
+      mobile ? 'px-3 py-2.5 text-sm gap-3'
+        : repliee ? 'justify-center px-0 py-2.5 text-[13px]'
+        : 'px-3 py-2 text-[13px] gap-3'
+    } font-semibold`;
     const style = ({ isActive }) => ({
       color: isActive ? tText : tMuted,
       backgroundColor: isActive ? tActiveBg : 'transparent',
@@ -144,7 +150,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
 
     const contenu = (
       <>
-        <span className="flex-shrink-0" style={{ color: 'inherit' }}>{item.icon}</span>
+        <span className={`w-5 h-5 flex items-center justify-center flex-shrink-0 ${repliee && !mobile ? 'mx-auto' : ''}`} style={{ color: 'inherit' }}>{item.icon}</span>
         <span className={`truncate ${repliee && !mobile ? 'hidden' : ''}`}>{item.label}</span>
         {item.label === 'Notifications' && unreadCount > 0 && (
           <span className={`ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold ${repliee && !mobile ? 'hidden' : ''}`}>
@@ -232,7 +238,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
       <button
         onClick={() => setUserMenuOpen(!userMenuOpen)}
         data-tour="profile"
-        className="w-full flex items-center gap-3 px-2 py-2 rounded-xl transition-colors"
+        className={`w-full flex items-center rounded-xl transition-colors ${repliee ? 'justify-center px-0' : 'gap-3 px-2'} py-2`}
         style={{ color: tText, backgroundColor: 'transparent' }}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = tHover; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -352,7 +358,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
       </nav>
 
       {/* Utilisateur */}
-      <div className="px-2 pb-3 border-t" style={{ borderColor: tBorder }}>
+      <div className={`${repliee ? 'px-1' : 'px-2'} pb-3 border-t`} style={{ borderColor: tBorder }}>
         {blocUtilisateur}
       </div>
     </>

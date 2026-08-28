@@ -245,7 +245,7 @@ const DocumentChatbot = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 left-6 z-30 group"
+          className="fixed bottom-6 right-20 z-30 group"
           title="DocuBot — Assistant documentaire"
           aria-label="Ouvrir DocuBot, l'assistant documentaire"
         >
@@ -278,7 +278,7 @@ const DocumentChatbot = () => {
         <div
           role="dialog"
           aria-label="DocuBot — assistant documentaire"
-          className="fixed bottom-6 left-6 z-40 w-[min(380px,calc(100vw-3rem))] h-[min(520px,calc(100dvh-6rem))] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
+          className="fixed bottom-6 right-6 z-40 w-[min(380px,calc(100vw-3rem))] h-[min(520px,calc(100dvh-6rem))] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in"
           style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
         >
           {/* En-tête */}
