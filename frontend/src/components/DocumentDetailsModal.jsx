@@ -287,6 +287,32 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   </div>
                 )}
 
+                {/* Demandes liées : la réciproque du lien demandes ↔ documents
+                    (migration 021) — la demande qui a PRODUIT ce document, et
+                    celles qui s'y réfèrent. */}
+                {demandesLiees.length > 0 && (
+                  <div className="glass-card-premium p-5 space-y-3">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <FileSearch size={14} /> Demandes liées ({demandesLiees.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {demandesLiees.map((r) => (
+                        <div key={r.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between text-xs">
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-700">Demande #{r.id} — {r.type_document || 'Document'}</span>
+                            <p className="text-slate-500 truncate max-w-[200px]">
+                              {r.nom_entreprise}{r.demandeur_name && ` · ${r.demandeur_name}`}
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold flex-shrink-0">
+                            {r.link_type === 'produit' ? 'Produit par' : r.link_type === 'piece' ? 'Pièce de' : 'Référence'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/*
                   Verrouillage pour édition. Cette carte appartient à la colonne
                   des métadonnées, et non à la liste des fichiers : le verrou
