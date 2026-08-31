@@ -34,6 +34,14 @@ const GlobalSearch = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
+  // Ouverture tactile : la loupe de la barre supérieure (mobile) émet
+  // l'événement — Ctrl+K suppose un clavier qu'un téléphone n'a pas.
+  useEffect(() => {
+    const ouvrir = () => setIsOpen(true);
+    window.addEventListener('docuflow:open-search', ouvrir);
+    return () => window.removeEventListener('docuflow:open-search', ouvrir);
+  }, []);
+
   // Focus l'input quand le modal s'ouvre
   useEffect(() => {
     if (isOpen) {

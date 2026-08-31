@@ -20,6 +20,7 @@ import FolderTree from '../components/FolderTree';
 import PageHeader from '../components/PageHeader';
 import GEDOverview from '../components/GEDOverview';
 import { useOngletUrl } from '../hooks/useOngletUrl';
+import { usePermissions } from '../hooks/usePermissions';
 import { STATUS_CLASSES, STATUS_LABELS, STATUS_VALUES } from '../utils/documentStatuses';
 
 // Étiquette produite par le COALESCE de getDynamicViewData pour les documents
@@ -35,6 +36,11 @@ const MODES_AFFICHAGE = ['list', 'dynamic'];
 const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   const user = authService.getCurrentUser();
   const isAdmin = ['superadmin', 'admin', 'archiviste'].includes(user?.role);
+  // Le bouton de périmètres se montre à qui portera la permission — le serveur
+  // garde le dernier mot. isAdmin commande les gestes de l'arbre ; les ACL ont
+  // leur propre permission, plus fine : un rôle personnalisé « gardien des
+  // archives RH » peut administrer les accès sans créer un seul dossier.
+  const { can } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Recherche globale depuis la topbar → pré-remplir ?q=
@@ -464,12 +470,14 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
               <FolderTree
                 dossiers={folders}
                 isAdmin={isAdmin}
+                peutAcls={can('folders.manage_permissions')}
                 dossierActif={filters.dossier_id}
                 onSelectionner={handleFolderFilter}
                 onCreer={handleCreateFolder}
                 onRenommer={handleRenameFolder}
                 onDeplacer={handleMoveFolder}
                 onSupprimer={handleDeleteFolder}
+                onAclsChange={loadFolders}
               />
               {/* Le comportement n'est pas devinable : sélectionner « Archives »
                   ramène aussi les documents de « Archives / 2025 ». */}

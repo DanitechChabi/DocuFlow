@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   ChevronRight, ChevronDown, Folder, FolderOpen, FolderPlus,
-  Pencil, Trash2, Check, X, AlertTriangle, CornerUpLeft,
+  Pencil, Trash2, Check, X, AlertTriangle, CornerUpLeft, Lock, ShieldCheck,
 } from 'lucide-react';
+import FolderAclPanel from './FolderAclPanel';
 
 /**
  * FolderTree — arborescence des dossiers documentaires.
@@ -49,12 +50,13 @@ function construireArbre(dossiers) {
  * dix niveaux côté backend, donc la pile ne peut pas filer.
  */
 const Noeud = ({
-  noeud, profondeur, deplies, onBasculer, isAdmin,
+  noeud, profondeur, deplies, onBasculer, isAdmin, peutAcls,
   dossierActif, onSelectionner,
   edition, setEdition, onRenommer,
   ajoutSous, setAjoutSous, onCreer,
   deplacement, setDeplacement, onDeplacer, destinations,
   suppression, setSuppression, onSupprimer,
+  perimetres, setPerimetres, onAclsChange,
 }) => {
   const ouvert = deplies.has(noeud.id);
   const aDesEnfants = noeud.enfants.length > 0;
@@ -102,6 +104,14 @@ const Noeud = ({
               <span className={`text-sm truncate ${actif ? 'font-semibold text-docuflow-secondary' : 'text-slate-700'}`}>
                 {noeud.name}
               </span>
+              {noeud.restricted && (
+                // Le serveur marque restreints le dossier qui porte une ACL
+                // et ses sous-dossiers (héritage) : le cadenas dit « ici, on
+                // n'entre pas par défaut ».
+                <span className="badge-warn shrink-0" title="Dossier restreint : seuls les sujets déclarés y accèdent.">
+                  <Lock size={11} />
+                </span>
+              )}
               {noeud.orphelin && (
                 <span className="badge-warn shrink-0" title="Ce dossier était rattaché à un parent introuvable ; il est affiché à la racine.">
                   <AlertTriangle size={11} /> Détaché
@@ -132,6 +142,22 @@ const Noeud = ({
                 <button type="button" onClick={() => setSuppression(noeud)}
                   className="btn-icon btn-sm btn-ghost text-slate-400 hover:text-[var(--df-danger)]" title="Supprimer">
                   <Trash2 size={13} />
+                </button>
+              </span>
+            )}
+
+            {peutAcls && (
+              // Périmètres : hors du groupe admin — c'est un pouvoir différent
+              // (qui entre où), porté par sa propre permission.
+              <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPerimetres(perimetres === noeud.id ? null : noeud.id)}
+                  className={`btn-icon btn-sm btn-ghost ${perimetres === noeud.id ? 'text-docuflow-secondary' : ''}`}
+                  title="Périmètres d'accès (qui peut consulter ce dossier)"
+                  aria-expanded={perimetres === noeud.id}
+                >
+                  <ShieldCheck size={13} />
                 </button>
               </span>
             )}
@@ -170,6 +196,16 @@ const Noeud = ({
         </div>
       )}
 
+      {perimetres === noeud.id && (
+        <div style={{ paddingLeft: `${(profondeur + 1) * 1.15 + 1.6}rem` }} className="py-1">
+          <FolderAclPanel
+            dossier={noeud}
+            onFinish={() => setPerimetres(null)}
+            onChange={onAclsChange}
+          />
+        </div>
+      )}
+
       {ouvert && aDesEnfants && (
         <ul>
           {noeud.enfants.map((enfant) => (
@@ -178,10 +214,11 @@ const Noeud = ({
               noeud={enfant}
               profondeur={profondeur + 1}
               {...{
-                deplies, onBasculer, isAdmin, dossierActif, onSelectionner,
+                deplies, onBasculer, isAdmin, peutAcls, dossierActif, onSelectionner,
                 edition, setEdition, onRenommer, ajoutSous, setAjoutSous, onCreer,
                 deplacement, setDeplacement, onDeplacer, destinations,
                 suppression, setSuppression, onSupprimer,
+                perimetres, setPerimetres, onAclsChange,
               }}
             />
           ))}
@@ -322,16 +359,18 @@ const SupprimerLigne = ({ noeud, onValider, onAnnuler }) => {
  * @param {object}   props
  * @param {Array}    props.dossiers      Liste plate renvoyée par getFolders()
  * @param {boolean}  props.isAdmin       Autorise création / renommage / déplacement / suppression
+ * @param {boolean}  props.peutAcls      Autorise l'administration des périmètres (folders.manage_permissions)
  * @param {string}   props.dossierActif  Identifiant du dossier filtré (ou '')
  * @param {function} props.onSelectionner Change le filtre courant
  * @param {function} props.onCreer       (nom, parentId) => Promise
  * @param {function} props.onRenommer    (id, nom) => Promise
  * @param {function} props.onDeplacer    (id, parentId) => Promise
  * @param {function} props.onSupprimer   (id, recursif) => Promise
+ * @param {function} props.onAclsChange  () => void — recharger après un changement de périmètre
  */
 const FolderTree = ({
-  dossiers = [], isAdmin = false, dossierActif = '',
-  onSelectionner, onCreer, onRenommer, onDeplacer, onSupprimer,
+  dossiers = [], isAdmin = false, peutAcls = false, dossierActif = '',
+  onSelectionner, onCreer, onRenommer, onDeplacer, onSupprimer, onAclsChange,
 }) => {
   const arbre = useMemo(() => construireArbre(dossiers), [dossiers]);
 
@@ -349,6 +388,7 @@ const FolderTree = ({
   const [ajoutRacine, setAjoutRacine] = useState(false);
   const [deplacement, setDeplacement] = useState(null);
   const [suppression, setSuppression] = useState(null);
+  const [perimetres, setPerimetres] = useState(null);
 
   const basculer = (id) => setDeplies((prec) => {
     const suivant = new Set(prec);
@@ -410,6 +450,7 @@ const FolderTree = ({
               deplies={deplies}
               onBasculer={basculer}
               isAdmin={isAdmin}
+              peutAcls={peutAcls}
               dossierActif={dossierActif}
               onSelectionner={onSelectionner}
               edition={edition}
@@ -430,6 +471,9 @@ const FolderTree = ({
               suppression={suppression}
               setSuppression={setSuppression}
               onSupprimer={(id, recursif) => apres(onSupprimer(id, recursif))}
+              perimetres={perimetres}
+              setPerimetres={setPerimetres}
+              onAclsChange={onAclsChange}
             />
           ))}
         </ul>

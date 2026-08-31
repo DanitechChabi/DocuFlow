@@ -8,6 +8,8 @@ const documentAuditService = require('../services/documentAuditService');
 const relationService = require('../services/relationService');
 const retentionService = require('../services/retentionService');
 const stateMachine = require('../services/documentStateMachine');
+const aclService = require('../services/aclService');
+const { ROLES_SYSTEME } = require('../config/permissions');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -158,6 +160,16 @@ exports.createDocument = async (req, res) => {
     return res.status(400).json({ message: 'Entreprise, n° dossier et n° acte sont requis' });
   }
 
+  // PÉRIMÈTRE (ACL) : verser dans un dossier exige 'write' sur CE dossier —
+  // la permission documents.upload dit qu'on peut verser, l'ACL dit où.
+  // Sans dossier, pas de restriction (les non classés suivent le RBAC seul).
+  if (dossier_id && !(await aclService.peutEcrire(tenantId, userId, dossier_id))) {
+    return res.status(403).json({
+      message: "Ce dossier est hors de votre périmètre d'écriture.",
+      code: 'HORS_PERIMETRE',
+    });
+  }
+
   try {
     if (isBulk) {
       if (!req.files || !req.files.length) {
@@ -272,6 +284,35 @@ exports.listDocuments = async (req, res) => {
   // (listCorbeille, plus bas)
   const conds = ['d.tenant_id = $1', 'd.deleted_at IS NULL'];
   const vals = [tenantId];
+
+  // PÉRIMÈTRES (ACL) : la liste ne montre que les documents des dossiers
+  // accessibles à CET utilisateur — et les documents non classés, qu'aucune
+  // ACL ne peut viser. L'ensemble est résolu en une passe (cache 60 s) puis
+  // borné ici : l'« agent RH » voit RH, pas Finance, pas Direction.
+  try {
+    const { visibles } = await aclService.dossiersAccessibles(tenantId, req.user.id);
+    if (visibles.size === 0 && !dossier_id) {
+      // Aucun dossier accessible (échec fermé) : rien à montrer — mais les
+      // documents non classés restent visibles (périmètre GED, pas dossier).
+      conds.push('d.dossier_id IS NULL');
+    } else if (visibles.size > 0) {
+      const ids = [...visibles];
+      const bornes = ids.map((_, idx) => `$${vals.length + 1 + idx}`);
+      vals.push(...ids);
+      conds.push(`(d.dossier_id IS NULL OR d.dossier_id IN (${bornes.join(', ')}))`);
+    }
+  } catch (err) {
+    // Échec de résolution : liste vide plutôt qu'une liste qui montre tout —
+    // l'échec fermé du service couvre déjà ce cas, ce filet protège contre
+    // une exception imprévue dans la construction de la clause.
+    console.error('[documents] Périmètres non résolus — liste vide :', err.message);
+    return res.json({
+      documents: [],
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 },
+      facets: {},
+      storage_used: null,
+    });
+  }
 
   if (q) {
     vals.push(`%${q}%`);
@@ -421,6 +462,14 @@ exports.getDocument = async (req, res) => {
     // active.
     if (doc.deleted_at) return res.status(404).json({ message: 'Ce document est en corbeille', code: 'EN_CORBEILLE' });
 
+    // PÉRIMÈTRE (ACL) : la fiche d'un dossier non lisible ne se consulte pas —
+    // la liste ne le montre pas, l'ouvrir par un identifiant deviné ne doit
+    // pas contourner la restriction.
+    const niveauLecture = await aclService.peutLire(tenantId, req.user.id, doc.dossier_id);
+    if (!niveauLecture) {
+      return res.status(403).json({ message: "Ce document appartient à un dossier hors de votre périmètre.", code: 'HORS_PERIMETRE' });
+    }
+
     // document_files / document_history n'ont pas de colonne tenant_id :
     // le périmètre multi-tenant passe par le document parent (documents.tenant_id)
     const filesRes = await db.query(
@@ -462,6 +511,19 @@ exports.updateDocument = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Erreur serveur' });
+  }
+
+  // PÉRIMÈTRE (ACL) : dossier_id est modifiable ici — déplacer un document
+  // est une écriture sur le dossier CIBLE aussi. Sans ce garde, restreindre
+  // « Finance » ne servirait à rien : il suffirait d'y glisser un document
+  // depuis un dossier ouvert. La déclassification (dossier_id null) reste
+  // libre : les non classés suivent le RBAC seul.
+  if (req.body.dossier_id !== undefined && req.body.dossier_id !== null
+    && !(await aclService.peutEcrire(tenantId, req.user.id, req.body.dossier_id))) {
+    return res.status(403).json({
+      message: "Le dossier de destination est hors de votre périmètre d'écriture.",
+      code: 'HORS_PERIMETRE',
+    });
   }
 
   const allowed = ['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'description', 'auteur', 'date_document', 'dossier_id'];
@@ -535,6 +597,12 @@ exports.deleteDocument = async (req, res) => {
   const { id } = req.params;
 
   try {
+    // PÉRIMÈTRE (ACL) : mettre à la corbeille est une écriture — le périmètre
+    // du dossier du document décide (garde silencieuse si document introuvable :
+    // le UPDATE ci-dessous répond déjà 404 pour ce cas).
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'write');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     // Corbeille : marquer, ne rien détruire. Le document reste complet
     // (fichiers, historique, métadonnées) et restaurable à l'identique.
     const result = await db.query(
@@ -562,6 +630,12 @@ exports.restoreDocument = async (req, res) => {
   const { id } = req.params;
 
   try {
+    // PÉRIMÈTRE (ACL) : restaurer réintroduit le document dans la GED — le
+    // périmètre d'écriture du dossier décide (l'agent RH ne ressuscite pas
+    // un document Finance mis à la corbeille par un autre).
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'write');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const result = await db.query(
       `UPDATE documents
           SET deleted_at = NULL, deleted_by = NULL
@@ -584,15 +658,22 @@ exports.restoreDocument = async (req, res) => {
 exports.listCorbeille = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
+    // PÉRIMÈTRE (ACL) : la corbeille est une liste de documents — même
+    // bornage que la liste principale : les dossiers lisibles, et les non
+    // classés (métadonnées comprises : la restriction n'annonce pas ce
+    // qu'elle protège).
+    const { lisibles } = await aclService.dossiersAccessibles(tenantId, req.user.id);
+
     const { rows } = await db.query(
       `SELECT d.id, d.reference_mfile, d.nom_entreprise, d.num_dossier, d.num_acte,
-               d.statut, d.deleted_at, u.full_name AS deleted_by_name,
+               d.statut, d.dossier_id, d.deleted_at, u.full_name AS deleted_by_name,
                (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id)::int AS files_count
           FROM documents d
           LEFT JOIN users u ON u.id = d.deleted_by
          WHERE d.tenant_id = $1 AND d.deleted_at IS NOT NULL
+           AND (d.dossier_id IS NULL OR d.dossier_id = ANY($2::int[]))
          ORDER BY d.deleted_at DESC`,
-      [tenantId]
+      [tenantId, [...lisibles]]
     );
     res.json(rows);
   } catch (err) {
@@ -755,7 +836,7 @@ exports.deleteFile = async (req, res) => {
 async function chargerPourEcriture(tenantId, id, user) {
   const { rows } = await tenantDb.query(
     tenantId,
-    'SELECT id, statut, deleted_at, is_checked_out, checked_out_by FROM documents WHERE id = $1',
+    'SELECT id, statut, deleted_at, is_checked_out, checked_out_by, dossier_id FROM documents WHERE id = $1',
     [id]
   );
   const doc = rows[0];
@@ -777,6 +858,48 @@ async function chargerPourEcriture(tenantId, id, user) {
       code: 'VERROUILLE',
     };
   }
+  // PÉRIMÈTRE (ACL) : écrire exige 'write' sur le dossier du document.
+  // Le niveau admin/manage passe — un archiviste sans périmètre sur « Finance »
+  // ne peut pas y modifier une fiche, même si sa permission GED le permettait.
+  if (!(await aclService.peutEcrire(tenantId, user.id, doc.dossier_id))) {
+    return {
+      statut: 403,
+      message: "Ce document appartient à un dossier hors de votre périmètre d'écriture.",
+      code: 'HORS_PERIMETRE',
+    };
+  }
+  return null;
+}
+
+/**
+ * PÉRIMÈTRE (ACL) — garde pour les routes ciblant un document par id sans
+ * charger sa fiche au préalable (métadonnées, audit, relations, partage,
+ * corbeille…). Résout le dossier du document puis arbitre le niveau demandé.
+ *
+ * @param {'read'|'write'} mode lecture : tout niveau d'accès vaut sauf
+ *        'none' ; écriture : 'write' ou 'manage' (ou dossier libre).
+ * @returns {Promise<{statut:number, message:string, code:string}|null>}
+ *          La réponse de refus à renvoyer, ou null — document introuvable
+ *          (la route a déjà la sienne pour ce cas) ou accès accordé.
+ */
+async function gardePerimetreDocument(tenantId, userId, docId, mode) {
+  const { rows } = await db.query(
+    'SELECT dossier_id FROM documents WHERE id = $1 AND tenant_id = $2',
+    [docId, tenantId]
+  );
+  if (!rows[0]) return null;
+  const accorde = mode === 'read'
+    ? await aclService.peutLire(tenantId, userId, rows[0].dossier_id)
+    : await aclService.peutEcrire(tenantId, userId, rows[0].dossier_id);
+  if (!accorde) {
+    return {
+      statut: 403,
+      message: mode === 'read'
+        ? 'Ce document appartient à un dossier hors de votre périmètre.'
+        : "Ce document appartient à un dossier hors de votre périmètre d'écriture.",
+      code: 'HORS_PERIMETRE',
+    };
+  }
   return null;
 }
 
@@ -796,6 +919,12 @@ exports.setStatus = async (req, res) => {
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
     if (doc.deleted_at) return res.status(404).json({ message: 'Document en corbeille' });
+
+    // PÉRIMÈTRE (ACL) : changer le statut est une écriture — même garde que
+    // la correction de fiche.
+    if (!(await aclService.peutEcrire(tenantId, req.user.id, doc.dossier_id))) {
+      return res.status(403).json({ message: "Ce document appartient à un dossier hors de votre périmètre d'écriture.", code: 'HORS_PERIMETRE' });
+    }
 
     const transition = stateMachine.canTransition(doc.statut, statut);
     if (!transition.ok) {
@@ -939,6 +1068,13 @@ function rattacherOrphelins(arbre, toutes, tenantId) {
 exports.listFolders = async (req, res) => {
   const tenantId = req.user.tenant_id;
   try {
+    // PÉRIMÈTRE (ACL) : l'arborescence ne montre que les dossiers accessibles
+    // — un dossier restreint invisible n'apparaît ni dans l'arbre ni dans les
+    // filtres. La restriction protège, elle n'annonce pas. Le filtrage est
+    // post-arbre (chargerArborescence reste la référence de forme) : on retire
+    // les nœuds invisibles en conservant leurs parents visibles.
+    const { visibles, restreints } = await aclService.dossiersAccessibles(tenantId, req.user.id);
+
     const arbre = await chargerArborescence(tenantId);
 
     // Un dossier présent en base mais absent de l'arbre signale une donnée
@@ -954,7 +1090,19 @@ exports.listFolders = async (req, res) => {
       console.warn(`[dossiers] ${orphelins.length} dossier(s) hors arborescence pour l'organisation ${tenantId}`);
     }
 
-    res.json([...arbre, ...orphelins]);
+    // Marquer puis retirer : `restricted` couvre l'héritage (le sous-dossier
+    // d'un dossier restreint l'est aussi), l'indicateur s'adresse à
+    // l'interface ; les invisibles disparaissent, parents visibles conservés.
+    // Un échec de résolution (échec fermé) vide `visibles` : plus rien ne
+    // passe, y compris les racines ouvertes — préférable à tout montrer.
+    const marquer = (noeud) => {
+      const enfantsFiltres = (noeud.children || []).map(marquer).filter(Boolean);
+      if (!visibles.has(noeud.id)) return null;
+      return { ...noeud, restricted: restreints.has(noeud.id) || undefined, children: enfantsFiltres };
+    };
+
+    const arbreFiltre = [...arbre, ...orphelins].map(marquer).filter(Boolean);
+    res.json(arbreFiltre);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du chargement des dossiers' });
@@ -999,6 +1147,17 @@ exports.createFolder = async (req, res) => {
     const { erreur, parentId } = await validerParent(tenantId, parent_id);
     if (erreur) return res.status(400).json({ message: erreur });
 
+    // PÉRIMÈTRE (ACL) : créer un sous-dossier exige 'write' sur le parent —
+    // sinon n'importe qui pourrait ouvrir une branche dans un espace restreint
+    // et y verser des documents. À la racine, la permission folders.create
+    // (RBAC, déjà passée) suffit : la racine n'est le sous-arbre de personne.
+    if (parentId != null && !(await aclService.peutEcrire(tenantId, req.user.id, parentId))) {
+      return res.status(403).json({
+        message: "Ce dossier parent est hors de votre périmètre d'écriture.",
+        code: 'HORS_PERIMETRE',
+      });
+    }
+
     const result = await tenantDb.insert(
       tenantId,
       'document_folders',
@@ -1040,6 +1199,13 @@ exports.renameFolder = async (req, res) => {
     const champs = [];
     const vals = [];
 
+    // PÉRIMÈTRE (ACL) : renommer ou déplacer un dossier restreint exige
+    // 'write' sur lui — un dossier libre suit le RBAC seul (folders.edit /
+    // folders.move, déjà vérifiées par la route).
+    if (!(await aclService.peutEcrire(tenantId, req.user.id, dossierId))) {
+      return res.status(403).json({ message: "Ce dossier est hors de votre périmètre d'écriture.", code: 'HORS_PERIMETRE' });
+    }
+
     if (name !== undefined) {
       vals.push(String(name).trim());
       champs.push(`name = $${vals.length}`);
@@ -1048,6 +1214,13 @@ exports.renameFolder = async (req, res) => {
     if (deplacement) {
       const { erreur, parentId } = await validerParent(tenantId, parent_id);
       if (erreur) return res.status(400).json({ message: erreur });
+
+      // PÉRIMÈTRE (ACL) : déplacer une branche sous un parent restreint
+      // exige 'write' sur le parent d'accueil — mêmes règles que la création
+      // d'un sous-dossier.
+      if (parentId !== null && !(await aclService.peutEcrire(tenantId, req.user.id, parentId))) {
+        return res.status(403).json({ message: "Le dossier de destination est hors de votre périmètre d'écriture.", code: 'HORS_PERIMETRE' });
+      }
 
       if (parentId === dossierId) {
         return res.status(400).json({ message: 'Un dossier ne peut pas être son propre parent' });
@@ -1111,6 +1284,18 @@ exports.deleteFolder = async (req, res) => {
     const branche = arbre.filter((f) => (f.path_ids || []).includes(dossierId));
     const descendants = branche.filter((f) => f.id !== dossierId);
 
+    // PÉRIMÈTRE (ACL) : supprimer un dossier restreint dissout son périmètre
+    // — ses documents sont déclassés à la racine (ON DELETE SET NULL), donc
+    // rendus à tous. Ce geste d'administration exige 'manage' sur le dossier,
+    // direct ou hérité d'un manage au-dessus. Un dossier libre suit le RBAC
+    // seul (folders.delete, déjà vérifiée par la route).
+    if (noeud && !(await aclService.peutGerer(tenantId, req.user.id, dossierId))) {
+      return res.status(403).json({
+        message: 'Supprimer ce dossier dissoudrait un périmètre restreint — seuls ses gestionnaires peuvent le faire.',
+        code: 'HORS_PERIMETRE',
+      });
+    }
+
     // Un dossier qui contient des sous-dossiers n'est pas supprimé par accident.
     // `parent_id` est en ON DELETE SET NULL : les enfants remonteraient
     // silencieusement à la racine, ce qui ressemble à une perte de classement
@@ -1150,6 +1335,121 @@ exports.deleteFolder = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression du dossier' });
+  }
+};
+
+/* ===== Périmètres d'accès par dossier (ACL) ===== */
+
+// Le sujet d'une ACL doit exister dans l'organisation. Une ACL posée sur un
+// identifiant étranger serait inerte (aucun utilisateur du tenant n'y
+// correspond jamais) mais polluerait l'administration — et une ACL « role »
+// sur une clé inconnue afficherait un sujet fantôme.
+async function sujetExiste(tenantId, subject_type, subject_id) {
+  if (subject_type === 'user') {
+    const { rows } = await db.query('SELECT 1 FROM users WHERE id = $1 AND tenant_id = $2', [Number(subject_id), tenantId]);
+    return rows.length > 0;
+  }
+  if (subject_type === 'group') {
+    const { rows } = await db.query('SELECT 1 FROM groups WHERE id = $1 AND tenant_id = $2', [Number(subject_id), tenantId]);
+    return rows.length > 0;
+  }
+  if (subject_type === 'role') {
+    // Les rôles système vivent dans le catalogue, les personnalisés en base.
+    if (ROLES_SYSTEME.some((r) => r.key === String(subject_id))) return true;
+    const { rows } = await db.query('SELECT 1 FROM roles WHERE key = $1 AND tenant_id = $2', [String(subject_id), tenantId]);
+    return rows.length > 0;
+  }
+  return false;
+}
+
+// Le dossier visé existe-t-il dans CE tenant ? — une réponse 404 franche
+// plutôt qu'une erreur SQL sur la clé étrangère.
+async function dossierDuTenant(tenantId, folderId) {
+  const { rows } = await db.query('SELECT id FROM document_folders WHERE id = $1 AND tenant_id = $2', [folderId, tenantId]);
+  return rows.length > 0;
+}
+
+/** GET /folders/:id/acls — la liste des accès posés sur un dossier. */
+exports.listFolderAcls = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const folderId = Number(req.params.id);
+  try {
+    if (!(await dossierDuTenant(tenantId, folderId))) {
+      return res.status(404).json({ message: 'Dossier non trouvé' });
+    }
+    // Consulter les ACL d'un dossier restreint annonce QUI y entre — cela
+    // se mérite : 'manage' sur le dossier (un dossier libre suit la
+    // permission folders.manage_permissions, déjà passée par la route).
+    if (!(await aclService.peutGerer(tenantId, req.user.id, folderId))) {
+      return res.status(403).json({ message: 'Seuls les gestionnaires du périmètre peuvent consulter ses accès.', code: 'HORS_PERIMETRE' });
+    }
+    const acls = await aclService.listAcls(tenantId, folderId);
+    res.json({ acls, restreint: acls.length > 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors du chargement des accès du dossier' });
+  }
+};
+
+/**
+ * POST /folders/:id/acls — poser un accès { subject_type, subject_id, level }.
+ * Poser la PREMIÈRE ACL d'un dossier restreint tout son sous-arbre : la
+ * réponse le dit, l'interface doit l'annoncer avant le geste (pas après).
+ */
+exports.setFolderAcl = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const folderId = Number(req.params.id);
+  const { subject_type, subject_id, level } = req.body;
+  try {
+    if (!(await dossierDuTenant(tenantId, folderId))) {
+      return res.status(404).json({ message: 'Dossier non trouvé' });
+    }
+    if (!(await aclService.peutGerer(tenantId, req.user.id, folderId))) {
+      return res.status(403).json({ message: 'Seuls les gestionnaires du périmètre peuvent modifier ses accès.', code: 'HORS_PERIMETRE' });
+    }
+    if (!(await sujetExiste(tenantId, subject_type, subject_id))) {
+      return res.status(400).json({ message: 'Sujet introuvable dans votre organisation.' });
+    }
+    const premiere = !(await aclService.dossierRestreint(tenantId, folderId));
+    await aclService.setAcl(tenantId, folderId, { subject_type, subject_id, level }, req.user.id);
+    res.status(201).json({
+      message: premiere
+        ? 'Accès posé — le dossier et tout son sous-arbre deviennent RESTREINTS : seuls les sujets déclarés y accèdent.'
+        : 'Accès mis à jour.',
+      restreint: true,
+      premiere_acl: premiere,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la pose de l\'accès' });
+  }
+};
+
+/** DELETE /folders/:id/acls/:subjectType/:subjectId — retirer un accès. */
+exports.deleteFolderAcl = async (req, res) => {
+  const tenantId = req.user.tenant_id;
+  const folderId = Number(req.params.id);
+  const { subjectType, subjectId } = req.params;
+  try {
+    if (!(await dossierDuTenant(tenantId, folderId))) {
+      return res.status(404).json({ message: 'Dossier non trouvé' });
+    }
+    if (!(await aclService.peutGerer(tenantId, req.user.id, folderId))) {
+      return res.status(403).json({ message: 'Seuls les gestionnaires du périmètre peuvent modifier ses accès.', code: 'HORS_PERIMETRE' });
+    }
+    const supprime = await aclService.removeAcl(tenantId, folderId, subjectType, subjectId);
+    if (!supprime) return res.status(404).json({ message: 'Cet accès n\'existe pas sur ce dossier.' });
+    const restreint = await aclService.dossierRestreint(tenantId, folderId);
+    res.json({
+      message: restreint
+        ? 'Accès retiré.'
+        : 'Dernier accès retiré — le dossier redevient accessible aux porteurs des permissions GED.',
+      restreint,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors du retrait de l\'accès' });
   }
 };
 
@@ -1196,11 +1496,17 @@ exports.shareDocument = async (req, res) => {
   try {
     const docRes = await tenantDb.query(
       tenantId,
-      'SELECT id, reference_mfile, nom_entreprise, num_dossier, num_acte, type_document, annee FROM documents WHERE id = $1',
+      'SELECT id, reference_mfile, nom_entreprise, num_dossier, num_acte, type_document, annee, dossier_id FROM documents WHERE id = $1',
       [id]
     );
     const doc = docRes.rows[0];
     if (!doc) return res.status(404).json({ message: 'Document non trouvé' });
+
+    // PÉRIMÈTRE (ACL) : le partage annonce le document (référence, entreprise,
+    // numéros) hors de la plateforme — la lecture du dossier doit être acquise.
+    if (!(await aclService.peutLire(tenantId, req.user.id, doc.dossier_id))) {
+      return res.status(403).json({ message: "Ce document appartient à un dossier hors de votre périmètre.", code: 'HORS_PERIMETRE' });
+    }
 
     const { sendMail, loadBranding } = require('../services/mailService');
     // escapeHtml is already defined at module scope above (see TAG SANITISATION section)
@@ -1332,7 +1638,7 @@ exports.checkinDocument = async (req, res) => {
   try {
     const docRes = await tenantDb.query(
       tenantId,
-      'SELECT id, is_checked_out, checked_out_by FROM documents WHERE id = $1',
+      'SELECT id, is_checked_out, checked_out_by, dossier_id FROM documents WHERE id = $1',
       [id]
     );
     const doc = docRes.rows[0];
@@ -1345,6 +1651,13 @@ exports.checkinDocument = async (req, res) => {
     const isAdmin = ADMIN_ROLES.includes(req.user.role);
     if (doc.checked_out_by !== userId && !isAdmin) {
       return res.status(403).json({ message: 'Seul l\'utilisateur ayant effectué le check-out (ou un administrateur) peut libérer le document' });
+    }
+
+    // PÉRIMÈTRE (ACL) : le check-in clôt une écriture — si le périmètre du
+    // dossier s'est resserré pendant l'édition, le détenteur du verrou ne
+    // le libère pas ; un administrateur reste le recours.
+    if (!(await aclService.peutEcrire(tenantId, userId, doc.dossier_id))) {
+      return res.status(403).json({ message: "Ce document appartient à un dossier hors de votre périmètre d'écriture.", code: 'HORS_PERIMETRE' });
     }
 
     await tenantDb.query(
@@ -1511,6 +1824,12 @@ exports.getDynamicViewData = async (req, res) => {
       }
     }
 
+    // PÉRIMÈTRE (ACL) : la vue dynamique EST une liste de documents — même
+    // bornage que la liste principale : dossiers lisibles, et non classés.
+    const { lisibles } = await aclService.dossiersAccessibles(tenantId, req.user.id);
+    conds.push(`(d.dossier_id IS NULL OR d.dossier_id = ANY($${vals.length + 1}::int[]))`);
+    vals.push([...lisibles]);
+
     // L'aperçu exige les données du fichier le plus récent de chaque document.
     // DISTINCT ON les récupère en une passe, sans sous-requête corrélée par
     // ligne : sur une vue qui regroupe plusieurs milliers de documents, la
@@ -1644,6 +1963,11 @@ exports.getDocumentMetadata = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
+    // PÉRIMÈTRE (ACL) : les métadonnées complètent la fiche — même périmètre
+    // de lecture qu'elle.
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'read');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const values = await metadataService.getDocumentMetadata(tenantId, parseInt(id, 10));
     res.json(values);
   } catch (err) {
@@ -1659,6 +1983,12 @@ exports.setDocumentMetadata = async (req, res) => {
   if (!Array.isArray(metadata)) return res.status(400).json({ message: 'Le corps de la requête doit contenir un tableau de métadonnées' });
 
   try {
+    // PÉRIMÈTRE (ACL) : l'indexation écrit dans la fiche — même garde que la
+    // correction de fiche, sans la sémantique de verrou (elle porte les
+    // fichiers, pas les métadonnées).
+    const refusMeta = await gardePerimetreDocument(tenantId, req.user.id, id, 'write');
+    if (refusMeta) return res.status(refusMeta.statut).json({ message: refusMeta.message, code: refusMeta.code });
+
     // Tolère `definitionId` (ancien nom côté client) en plus de `fieldId`.
     const values = metadata.map((m) => ({
       fieldId: Number(m.fieldId ?? m.definitionId ?? m.field_id),
@@ -1689,6 +2019,11 @@ exports.getDocumentAudit = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
+    // PÉRIMÈTRE (ACL) : le journal détaille les gestes sur le document —
+    // même périmètre de lecture que la fiche.
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'read');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const audit = await documentAuditService.getAuditForDocument(tenantId, parseInt(id, 10));
     res.json(audit);
   } catch (err) {
@@ -1704,6 +2039,11 @@ exports.getDocumentRequests = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
+    // PÉRIMÈTRE (ACL) : la réciproque du lien demandes ↔ documents complète
+    // la fiche — même périmètre de lecture.
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'read');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const { rows } = await db.query(
       `SELECT r.id, r.statut, r.type_document, r.nom_entreprise, r.num_dossier, r.num_acte,
               r.created_at, u.full_name AS demandeur_name,
@@ -1729,6 +2069,11 @@ exports.getDocumentRelations = async (req, res) => {
   const tenantId = req.user.tenant_id;
   const { id } = req.params;
   try {
+    // PÉRIMÈTRE (ACL) : les relations décrivent le document — même périmètre
+    // de lecture que la fiche.
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'read');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const relations = await relationService.getRelationsForDocument(tenantId, parseInt(id, 10));
     res.json(relations);
   } catch (err) {
@@ -1747,6 +2092,11 @@ exports.createDocumentRelation = async (req, res) => {
   }
 
   try {
+    // PÉRIMÈTRE (ACL) : lier deux documents écrit dans la fiche source —
+    // même périmètre d'écriture.
+    const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'write');
+    if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
+
     const relation = await relationService.createRelation({
       tenantId,
       fromDocId: parseInt(id, 10),

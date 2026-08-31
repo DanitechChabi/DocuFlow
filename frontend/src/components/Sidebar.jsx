@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FileSearch, PlusCircle, ClipboardList, History, Building2,
   FolderOpen, Wand2, Archive, Trash2, Bell,
-  User as UserIcon, ChevronLeft, ChevronRight, Menu, X,
+  User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass,
 } from 'lucide-react';
 import { authService } from '../services/authService';
@@ -43,12 +43,12 @@ const DEFAULT_MARK_LIGHT = '/brand/docuflow-mark-light.png';
 
 const STOCKAGE_REPLIE = 'docuflow:sidebar-repliee';
 
-// Contexte interne : la barre supérieure héberge le bouton d'ouverture du
-// drawer mobile (la sidebar elle-même est hors de portée du pouce en haut de
-// colonne) — il lui faut l'état du drawer sans dupliquer la mécanique.
-const DrawerContext = React.createContext({ ouvrir: () => {} });
+// L'état du drawer mobile appartient au LAYOUT (AppLayout) : le bouton
+// d'ouverture vit dans la barre supérieure, qui est le FRÈRE de la sidebar
+// dans l'arbre React — un contexte fourni ici ne l'atteignait pas, et le
+// bouton appelait un no-op (le menu n'ouvrait jamais sur téléphone).
 
-const Sidebar = ({ unreadCount = 0 }) => {
+const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () => {} }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authService.getCurrentUser();
@@ -73,7 +73,6 @@ const Sidebar = ({ unreadCount = 0 }) => {
   const [repliee, setRepliee] = useState(() => {
     try { return localStorage.getItem(STOCKAGE_REPLIE) === '1'; } catch { return false; }
   });
-  const [drawerOuvert, setDrawerOuvert] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem(STOCKAGE_REPLIE, repliee ? '1' : '0'); } catch { /* privé */ }
@@ -218,7 +217,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
         to={item.to}
         end={item.end}
         data-tour={item.tourId}
-        onClick={() => setDrawerOuvert(false)}
+        onClick={() => onDrawerChange(false)}
         className={classes}
         style={style}
         title={repliee && !mobile ? item.label : undefined}
@@ -259,7 +258,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
 
   const restartTour = () => {
     setUserMenuOpen(false);
-    setDrawerOuvert(false);
+    onDrawerChange(false);
     navigate('/');
     setTimeout(() => window.dispatchEvent(new CustomEvent(RESTART_TOUR_EVENT)), 400);
   };
@@ -318,7 +317,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
                   key={item.label}
                   to={item.to}
                   data-tour={item.tourId}
-                  onClick={() => { setUserMenuOpen(false); setDrawerOuvert(false); }}
+                  onClick={() => { setUserMenuOpen(false); onDrawerChange(false); }}
                   className="flex items-center gap-2.5 px-4 py-2 text-sm font-semibold transition-colors"
                   style={{ color: tText }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = tHover; }}
@@ -359,7 +358,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
     <>
       {/* Logo + repli */}
       <div className="flex items-center gap-2 px-3 h-16 flex-shrink-0">
-        <NavLink to="/" data-tour="sidebar" className="flex items-center gap-2 min-w-0 flex-1" onClick={() => setDrawerOuvert(false)}>
+        <NavLink to="/" data-tour="sidebar" className="flex items-center gap-2 min-w-0 flex-1" onClick={() => onDrawerChange(false)}>
           <div
             className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${hasCustomLogo ? 'rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 overflow-hidden' : ''}`}
           >
@@ -384,7 +383,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
           </button>
         )}
         {mobile && (
-          <button onClick={() => setDrawerOuvert(false)} className="p-1.5 rounded-lg" style={{ color: tMuted }} aria-label="Fermer le menu">
+          <button onClick={() => onDrawerChange(false)} className="p-1.5 rounded-lg" style={{ color: tMuted }} aria-label="Fermer le menu">
             <X size={18} />
           </button>
         )}
@@ -403,7 +402,7 @@ const Sidebar = ({ unreadCount = 0 }) => {
   );
 
   return (
-    <DrawerContext.Provider value={{ ouvrir: () => setDrawerOuvert(true), tText }}>
+    <>
       {/* Desktop : colonne fixe */}
       <aside
         className="hidden lg:flex flex-col flex-shrink-0 transition-[width] duration-200 border-r"
@@ -416,32 +415,20 @@ const Sidebar = ({ unreadCount = 0 }) => {
         {corps(false)}
       </aside>
 
-      {/* Mobile : drawer coulissant */}
+      {/* Mobile : drawer coulissant — ouvert par la barre supérieure (voir
+          AppLayout), refermé par son voile, un lien ou le bouton de fermeture. */}
       {drawerOuvert && (
         <div className="lg:hidden fixed inset-0 z-[90] flex">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setDrawerOuvert(false)} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => onDrawerChange(false)} />
           <aside
-            className="relative flex flex-col w-[270px] h-full shadow-2xl animate-fade-in"
+            className="relative flex flex-col w-[270px] max-w-[85vw] h-full shadow-2xl animate-fade-in"
             style={{ backgroundColor: primaryColor }}
           >
             {corps(true)}
           </aside>
         </div>
       )}
-    </DrawerContext.Provider>
-  );
-};
-
-/** Bouton d'ouverture du menu mobile — à rendre dans la barre supérieure.
- *  Posé APRÈS la déclaration : l'assignation s'exécute au chargement du
- *  module, avant elle tombait dans la zone morte de `const Sidebar` et
- *  l'ReferenceError emportait tout l'écran (page blanche). */
-Sidebar.MobileButton = () => {
-  const { ouvrir } = React.useContext(DrawerContext);
-  return (
-    <button onClick={ouvrir} className="lg:hidden p-2 rounded-md text-white" aria-label="Menu">
-      <Menu size={20} />
-    </button>
+    </>
   );
 };
 

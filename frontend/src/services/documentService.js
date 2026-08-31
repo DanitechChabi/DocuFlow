@@ -97,6 +97,22 @@ export const documentService = {
     return response.data;
   },
 
+  // Périmètres d'accès par dossier (ACL) — qui peut lire/écrire CE dossier et
+  // son sous-arbre. La première ACL posée restreint le dossier : la réponse
+  // du serveur le dit (premiere_acl).
+  getFolderAcls: async (id) => {
+    const response = await api.get(`/documents/folders/${id}/acls`);
+    return response.data;
+  },
+  setFolderAcl: async (id, { subject_type, subject_id, level }) => {
+    const response = await api.post(`/documents/folders/${id}/acls`, { subject_type, subject_id, level });
+    return response.data;
+  },
+  deleteFolderAcl: async (id, subjectType, subjectId) => {
+    const response = await api.delete(`/documents/folders/${id}/acls/${encodeURIComponent(subjectType)}/${encodeURIComponent(subjectId)}`);
+    return response.data;
+  },
+
   // Lien demande ↔ document
   linkDocumentToRequest: async (requestId, documentId) => {
     const response = await api.patch(`/requests/${requestId}/document`, { document_id: documentId });

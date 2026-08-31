@@ -66,7 +66,7 @@ BEGIN
                 'documents.view','documents.upload','documents.edit','documents.rename','documents.move',
                 'documents.download','documents.share','documents.delete','documents.restore','documents.archive',
                 'documents.manage_versions','documents.view_history','documents.index','documents.validate',
-                'folders.view','folders.create','folders.edit','folders.move','folders.delete',
+                'folders.view','folders.create','folders.edit','folders.move','folders.delete','folders.manage_permissions',
                 'search.documents','search.requests','search.advanced',
                 'users.view','users.create','users.edit','users.disable',
                 'roles.view','roles.create','roles.edit','roles.delete',
@@ -88,7 +88,7 @@ BEGIN
                 'documents.view','documents.upload','documents.edit','documents.rename','documents.move',
                 'documents.download','documents.share','documents.archive','documents.manage_versions',
                 'documents.view_history','documents.index','documents.validate',
-                'folders.view','folders.create','folders.edit','folders.move','folders.delete',
+                'folders.view','folders.create','folders.edit','folders.move','folders.delete','folders.manage_permissions',
                 'search.documents','search.requests','search.advanced',
                 'groups.view'
              ]),

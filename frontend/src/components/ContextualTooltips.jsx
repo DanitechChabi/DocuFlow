@@ -56,6 +56,18 @@ const ContextualTooltips = ({ enabled = true }) => {
     setActiveTooltip(null);
   }, [activeTooltip, markSeen]);
 
+  // Auto-fermeture : un conseil qui reste affiché devient du mobilier. Surtout,
+  // il ne doit JAMAIS s'installer en voile bloquant — l'ancien overlay
+  // plein écran (inset-0) avalait chaque tap du téléphone sans prévenir : le
+  // tooltip se rendait souvent hors champ, l'utilisateur ne voyait que le
+  // bout de la page… et « le menu hamburger n'ouvrait pas ». Le tooltip est
+  // un conseil passif : il se lit, se ferme, ou s'en va tout seul.
+  useEffect(() => {
+    if (!activeTooltip) return undefined;
+    const t = setTimeout(() => dismiss(), 10000);
+    return () => clearTimeout(t);
+  }, [activeTooltip, dismiss]);
+
   // Afficher les tooltips non vus après un délai
   useEffect(() => {
     if (!enabled) return;
@@ -102,13 +114,14 @@ const ContextualTooltips = ({ enabled = true }) => {
 
   return (
     <>
-      {/* Overlay semi-transparent */}
-      <div className="fixed inset-0 z-[90] bg-slate-900/20" onClick={dismiss} />
-
-      {/* Tooltip */}
+      {/* Tooltip — NON MODAL : aucun voile plein écran. Un conseil passif ne
+          mérite pas de capturer les clics de toute la page. */}
       <div
-        className="fixed z-[95] w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in-up"
-        style={{ top: Math.max(16, pos.top), left: Math.max(16, Math.min(pos.left, window.innerWidth - 340)) }}
+        className="fixed z-[95] w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in-up"
+        style={{
+          top: Math.min(Math.max(16, pos.top), window.innerHeight - 180),
+          left: Math.max(16, Math.min(pos.left, window.innerWidth - 340)),
+        }}
       >
         {/* Header */}
         <div className="px-5 pt-4 pb-3 bg-gradient-to-r from-docuflow-secondary/5 to-blue-500/5 flex items-center justify-between">

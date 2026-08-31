@@ -22,6 +22,14 @@ router.post('/folders', requirePermission('folders.create'), documentController.
 router.patch('/folders/:id', requirePermission('folders.edit'), documentController.renameFolder);
 router.delete('/folders/:id', requirePermission('folders.delete'), documentController.deleteFolder);
 
+// Périmètres d'accès par dossier (ACL) — la double garde est voulue : la
+// permission RBAC dit QUI administre les périmètres, le contrôle peutGerer
+// dit sur QUEL dossier (manage direct ou hérité). Les rôles admin/superadmin
+// passent toujours (voir aclService).
+router.get('/folders/:id/acls', requirePermission('folders.manage_permissions'), documentController.listFolderAcls);
+router.post('/folders/:id/acls', requirePermission('folders.manage_permissions'), documentController.setFolderAcl);
+router.delete('/folders/:id/acls/:subjectType/:subjectId', requirePermission('folders.manage_permissions'), documentController.deleteFolderAcl);
+
 // Indexation depuis une demande — le geste documentaire par excellence.
 router.post('/from-request/:requestId', requirePermission('documents.index'), documentController.indexFromRequest);
 
