@@ -4,6 +4,14 @@ const uploadController = require('../controllers/uploadController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { uploadMultiple, uploadSingle } = require('../helpers/upload');
 
+// Téléchargement — AVANT authMiddleware, volontairement : un <img src> ou
+// <a href> ne porte pas d'en-tête Authorization, donc ces routes ne peuvent
+// pas dépendre d'une session active. L'autorisation tient au ticket signé
+// (voir storageService.secureFileUrl / helpers/fileTicket.js), revérifié en
+// direct par le contrôleur (même contrôle d'accès que les routes de listing).
+router.get('/request/:requestId/files/:fileId/download', uploadController.downloadRequestFile);
+router.get('/message/:messageId/files/:fileId/download', uploadController.downloadMessageFile);
+
 router.use(authMiddleware);
 
 // Fichiers des demandes

@@ -313,7 +313,10 @@ exports.findMatchingDocument = async (req, res) => {
         [document.id]
       );
       const f = fileRes.rows[0];
-      if (f) fileUrl = storage.fileUrl(req, f);
+      // Ce fichier vient de document_files (document déjà versé en GED), pas
+      // de request_files : le ticket doit être du bon domaine, sinon la
+      // route de téléchargement le rejette (kind ne correspond pas).
+      if (f) fileUrl = storage.secureFileUrl(req, { kind: 'document', ownerId: document.id, fileRow: f });
     }
 
     res.json({

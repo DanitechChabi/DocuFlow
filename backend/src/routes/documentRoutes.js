@@ -6,6 +6,14 @@ const { requirePermission } = require('../middlewares/requirePermission');
 const uploadPolicyMiddleware = require('../middlewares/uploadPolicyMiddleware');
 const { uploadMultiple } = require('../helpers/upload');
 
+// Téléchargement/aperçu de fichier — AVANT authMiddleware, volontairement :
+// un <img src> ou <a href> ne porte pas d'en-tête Authorization, donc cette
+// route ne peut pas dépendre d'une session active. L'autorisation tient au
+// ticket signé (voir storageService.secureFileUrl / helpers/fileTicket.js),
+// que le contrôleur revérifie lui-même (permission + ACL de dossier) avant
+// de livrer le fichier.
+router.get('/:id/files/:fileId/download', documentController.downloadDocumentFile);
+
 // Toutes les routes documents exigent une authentification
 router.use(authMiddleware);
 

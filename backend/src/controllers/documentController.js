@@ -9,7 +9,11 @@ const relationService = require('../services/relationService');
 const retentionService = require('../services/retentionService');
 const stateMachine = require('../services/documentStateMachine');
 const aclService = require('../services/aclService');
+const roleService = require('../services/roleService');
 const { ROLES_SYSTEME } = require('../config/permissions');
+const { verifyFileTicket } = require('../helpers/fileTicket');
+const { FILES_DIR } = require('../config/paths');
+const path = require('path');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -481,7 +485,10 @@ exports.getDocument = async (req, res) => {
        ORDER BY df.version DESC`,
       [id, tenantId]
     );
-    const files = filesRes.rows.map((f) => ({ ...f, url: storage.fileUrl(req, f) }));
+    const files = filesRes.rows.map((f) => ({
+      ...f,
+      url: storage.secureFileUrl(req, { kind: 'document', ownerId: id, fileRow: f }),
+    }));
 
     const histRes = await db.query(
       `SELECT h.*, u.full_name AS user_name
@@ -497,6 +504,92 @@ exports.getDocument = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du chargement du document' });
+  }
+};
+
+/**
+ * Téléchargement/aperçu d'un fichier de document — seule route autorisée à
+ * livrer l'octet (voir app.js : le /uploads statique ne sert plus rien sous
+ * /files). Pas de authMiddleware ici : un <img src> ou <a href> ne porte pas
+ * d'en-tête Authorization, donc l'autorisation tient entièrement au ticket
+ * (voir helpers/fileTicket.js), que la route REVÉRIFIE en direct (permission
+ * RBAC + ACL de dossier) plutôt que de faire confiance à sa seule présence —
+ * un rôle a pu changer dans les cinq minutes de validité du ticket.
+ */
+exports.downloadDocumentFile = async (req, res) => {
+  const { id, fileId } = req.params;
+  const ticket = req.query.t;
+
+  const decoded = verifyFileTicket(ticket, { kind: 'document', fileId });
+  if (!decoded) {
+    return res.status(403).json({ message: 'Lien de téléchargement invalide ou expiré' });
+  }
+  const { uid, tenantId } = decoded;
+
+  try {
+    const userRes = await db.query(
+      'SELECT username, role FROM users WHERE id = $1 AND tenant_id = $2',
+      [uid, tenantId]
+    );
+    if (userRes.rows.length === 0) {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+    const { username, role } = userRes.rows[0];
+
+    const accorde = await roleService.possede(tenantId, role, 'documents.view');
+    if (!accorde) {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const fileRes = await db.query(
+      `SELECT df.*, d.dossier_id, d.deleted_at
+       FROM document_files df
+       JOIN documents d ON d.id = df.document_id AND d.tenant_id = $3
+       WHERE df.id = $1 AND df.document_id = $2`,
+      [fileId, id, tenantId]
+    );
+    const file = fileRes.rows[0];
+    if (!file || file.deleted_at) {
+      return res.status(404).json({ message: 'Fichier introuvable' });
+    }
+
+    const peutLire = await aclService.peutLire(tenantId, uid, file.dossier_id);
+    if (!peutLire) {
+      return res.status(403).json({ message: 'Ce document appartient à un dossier hors de votre périmètre.', code: 'HORS_PERIMETRE' });
+    }
+
+    // Traçabilité — append-only, jamais purgée (contrairement à
+    // document_history, voir sa note d'en-tête). C'est tout le sens de ce
+    // chantier : savoir qui a consulté quel document, et quand.
+    documentAuditService.logAction({
+      tenantId,
+      documentId: Number(id),
+      userId: uid,
+      username,
+      action: 'FILE_DOWNLOADED',
+      details: { fileId: Number(fileId), original_name: file.original_name },
+      ipAddress: req.ip,
+    }).catch(() => {});
+
+    if (storage.USE_CLOUDINARY && file.cloudinary_public_id) {
+      const signedUrl = storage.signedCloudinaryUrl(file);
+      if (signedUrl) return res.redirect(signedUrl);
+    }
+
+    const diskPath = path.join(FILES_DIR, file.stored_name || '');
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`
+    );
+    return res.sendFile(diskPath, (err) => {
+      if (err && !res.headersSent) {
+        res.status(404).json({ message: 'Fichier introuvable sur le disque' });
+      }
+    });
+  } catch (err) {
+    console.error('[documents] download error:', err);
+    return res.status(500).json({ message: 'Erreur lors du téléchargement' });
   }
 };
 
@@ -1842,7 +1935,7 @@ exports.getDynamicViewData = async (req, res) => {
     const construireRequete = (avecFichiers) => `
       ${avecFichiers ? `WITH dernier_fichier AS (
         SELECT DISTINCT ON (df.document_id)
-               df.document_id, df.stored_name, df.secure_url,
+               df.id, df.document_id, df.stored_name, df.secure_url,
                df.cloudinary_public_id, df.mime_type, df.original_name, df.version
         FROM document_files df
         ORDER BY df.document_id, df.version DESC, df.id DESC
@@ -1861,6 +1954,7 @@ exports.getDynamicViewData = async (req, res) => {
                'auteur', d.auteur,
                'is_checked_out', d.is_checked_out,
                'checked_out_by', d.checked_out_by${avecFichiers ? `,
+               'file_id', f.id,
                'stored_name', f.stored_name,
                'secure_url', f.secure_url,
                'cloudinary_public_id', f.cloudinary_public_id,
@@ -1890,16 +1984,15 @@ exports.getDynamicViewData = async (req, res) => {
     // bureau (le port change à chaque lancement) et absolue en mode hébergé.
     // Voir helpers/publicUrl.js — la règle n'a qu'un seul domicile.
     //
-    // Le garde-fou couvre les trois sources que fileUrl sait exploiter. Sans
-    // lui, un document non numérisé (LEFT JOIN sans correspondance) produirait
-    // une URL vers /uploads/files/null : la vignette tenterait un chargement
-    // voué à l'échec au lieu d'afficher « Non numérisé ».
+    // Le garde-fou porte sur file_id : sans lui, un document non numérisé
+    // (LEFT JOIN sans correspondance) produirait un ticket pour un fichier
+    // inexistant au lieu d'afficher « Non numérisé ».
     const groups = result.rows.map((groupe) => ({
       ...groupe,
       documents: (groupe.documents || []).map((doc) => ({
         ...doc,
-        apercu_url: (doc.secure_url || doc.cloudinary_public_id || doc.stored_name)
-          ? storage.fileUrl(req, doc)
+        apercu_url: doc.file_id
+          ? storage.secureFileUrl(req, { kind: 'document', ownerId: doc.id, fileRow: { id: doc.file_id } })
           : null,
       })),
     }));

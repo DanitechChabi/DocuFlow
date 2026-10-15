@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { FILES_DIR } = require('../config/paths');
+const { verifyFileTicket } = require('../helpers/fileTicket');
 
 // Rôles autorisés à agir sur les demandes d'autrui : le personnel de traitement.
 // Un demandeur ne touche que SES demandes — sinon, dans la même organisation,
@@ -102,7 +103,7 @@ exports.uploadRequestFiles = async (req, res) => {
         );
         files.push({
           ...result.rows[0],
-          url: storage.fileUrl(req, { ...result.rows[0], stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: file.mimetype, secure_url: info.secureUrl })
+          url: storage.secureFileUrl(req, { kind: 'request', ownerId: requestId, fileRow: result.rows[0] }),
         });
       }
 
@@ -148,13 +149,65 @@ exports.getRequestFiles = async (req, res) => {
     // Ajouter l'URL de téléchargement via storageService
     const files = result.rows.map(f => ({
       ...f,
-      url: storage.fileUrl(req, f)
+      url: storage.secureFileUrl(req, { kind: 'request', ownerId: requestId, fileRow: f }),
     }));
 
     res.json(files);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des fichiers' });
+  }
+};
+
+/**
+ * Téléchargement d'une pièce jointe de demande — pas de authMiddleware (voir
+ * la même remarque sur la route documents) : l'autorisation tient au ticket,
+ * revérifié en direct via verifierAccesDemande (même contrôle que la liste).
+ */
+exports.downloadRequestFile = async (req, res) => {
+  const { requestId, fileId } = req.params;
+  const ticket = req.query.t;
+
+  const decoded = verifyFileTicket(ticket, { kind: 'request', fileId });
+  if (!decoded) {
+    return res.status(403).json({ message: 'Lien de téléchargement invalide ou expiré' });
+  }
+  const { uid, tenantId } = decoded;
+
+  try {
+    const userRes = await db.query('SELECT role FROM users WHERE id = $1 AND tenant_id = $2', [uid, tenantId]);
+    if (userRes.rows.length === 0) {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const acces = await verifierAccesDemande(tenantId, requestId, { id: uid, role: userRes.rows[0].role });
+    if (!acces.ok) {
+      return res.status(acces.statut).json({ message: acces.message });
+    }
+
+    const fileRes = await db.query(
+      'SELECT * FROM request_files WHERE id = $1 AND request_id = $2 AND tenant_id = $3',
+      [fileId, requestId, tenantId]
+    );
+    const file = fileRes.rows[0];
+    if (!file) {
+      return res.status(404).json({ message: 'Fichier introuvable' });
+    }
+
+    if (storage.USE_CLOUDINARY && file.cloudinary_public_id) {
+      const signedUrl = storage.signedCloudinaryUrl(file);
+      if (signedUrl) return res.redirect(signedUrl);
+    }
+
+    const diskPath = path.join(FILES_DIR, file.stored_name || '');
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`);
+    return res.sendFile(diskPath, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ message: 'Fichier introuvable sur le disque' });
+    });
+  } catch (err) {
+    console.error('[upload] download request file error:', err);
+    return res.status(500).json({ message: 'Erreur lors du téléchargement' });
   }
 };
 
@@ -238,7 +291,12 @@ exports.uploadMessageFile = async (req, res) => {
       file_size: req.file.size,
       secure_url: info.secureUrl,
       tenant_id: tenantId,
-      url: storage.fileUrl(req, { stored_name: info.storedName, cloudinary_public_id: info.cloudinaryPublicId, mime_type: req.file.mimetype, secure_url: info.secureUrl })
+      // Pas d'URL ici : avant lien à un message réel (linkMessageFiles), il
+      // n'existe aucune ligne message_attachments à laquelle scoper un
+      // ticket — et le frontend ne l'affiche pas à ce stade (aperçu local
+      // depuis le File sélectionné). Une URL de téléchargement n'existe
+      // qu'après coup, via getMessageFiles.
+      url: null,
     });
   } catch (err) {
     console.error(err);
@@ -338,12 +396,63 @@ exports.getMessageFiles = async (req, res) => {
 
     const files = result.rows.map(f => ({
       ...f,
-      url: storage.fileUrl(req, f)
+      url: storage.secureFileUrl(req, { kind: 'message', ownerId: messageId, fileRow: f }),
     }));
 
     res.json(files);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des fichiers' });
+  }
+};
+
+/**
+ * Téléchargement d'une pièce jointe de message — pas de authMiddleware (même
+ * raison que les deux autres routes de téléchargement) : l'autorisation
+ * tient au ticket, revérifié en direct par le même contrôle participant que
+ * getMessageFiles.
+ */
+exports.downloadMessageFile = async (req, res) => {
+  const { messageId, fileId } = req.params;
+  const ticket = req.query.t;
+
+  const decoded = verifyFileTicket(ticket, { kind: 'message', fileId });
+  if (!decoded) {
+    return res.status(403).json({ message: 'Lien de téléchargement invalide ou expiré' });
+  }
+  const { uid, tenantId } = decoded;
+
+  try {
+    const message = await db.query(
+      'SELECT id FROM messages WHERE id = $1 AND tenant_id = $2 AND (sender_id = $3 OR receiver_id = $3)',
+      [messageId, tenantId, uid]
+    );
+    if (message.rows.length === 0) {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const fileRes = await db.query(
+      'SELECT * FROM message_attachments WHERE id = $1 AND message_id = $2',
+      [fileId, messageId]
+    );
+    const file = fileRes.rows[0];
+    if (!file) {
+      return res.status(404).json({ message: 'Fichier introuvable' });
+    }
+
+    if (storage.USE_CLOUDINARY && file.cloudinary_public_id) {
+      const signedUrl = storage.signedCloudinaryUrl(file);
+      if (signedUrl) return res.redirect(signedUrl);
+    }
+
+    const diskPath = path.join(FILES_DIR, file.stored_name || '');
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`);
+    return res.sendFile(diskPath, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ message: 'Fichier introuvable sur le disque' });
+    });
+  } catch (err) {
+    console.error('[upload] download message file error:', err);
+    return res.status(500).json({ message: 'Erreur lors du téléchargement' });
   }
 };

@@ -23,7 +23,7 @@ const licenseRoutes = require('./routes/licenseRoutes');
 const path = require('path');
 
 // Dossier des uploads (surchargeable via UPLOADS_DIR — bureau Electron)
-const { UPLOADS_DIR, FILES_DIR } = require('./config/paths');
+const { UPLOADS_DIR } = require('./config/paths');
 
 const app = express();
 
@@ -107,6 +107,18 @@ app.use('/api/billing', require('./routes/billingRoutes'));
 
 app.use(express.json({ limit: '10mb' }));
 
+// Garde avant le statique ci-dessous : UPLOADS_DIR contient FILES_DIR
+// (uploads/files/) en sous-dossier, donc express.static(UPLOADS_DIR) servait
+// aussi /uploads/files/* — tout document, pièce jointe de demande ou de
+// message stocké en local — SANS authentification, RBAC, ACL de dossier ni
+// trace d'audit, à quiconque devinait ou obtenait un nom de fichier stocké.
+// Les fichiers privés transitent désormais uniquement par les routes
+// protégées (/api/documents/:id/files/:fileId/download et équivalents pour
+// les demandes/messages, voir storageService.secureFileUrl). Les logos
+// d'organisation, à la racine de UPLOADS_DIR (pas sous files/), restent
+// servis tels quels : aucune migration d'URL nécessaire.
+app.use('/uploads/files', (req, res) => res.status(404).end());
+
 // Dossier uploads en statique (logo)
 app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -153,10 +165,6 @@ app.use('/api/audit', auditRoutes);
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
 app.use('/api/licenses', licenseRoutes);
-
-// Dossier des fichiers uploadés (local + sous-dossier documents)
-app.use('/uploads/files', express.static(FILES_DIR));
-app.use('/uploads/files/documents', express.static(FILES_DIR));
 
 // --- Mode bureau (Electron) : sert le frontend compilé, même-origine ---
 // Opt-in via SERVE_FRONTEND=true (défini par desktop/main.js).
