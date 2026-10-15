@@ -333,8 +333,10 @@ const Dashboard = ({ tab = 'dashboard' }) => {
       </>
       )}
 
-          {/* Contenu principal */}
-          <div className="space-y-4 animate-fade-in-up delay-200">
+          {/* Contenu principal — keyé sur l'onglet actif : sans ça, passer de
+              « Mes demandes » à « Historique » remplaçait le tableau sans
+              aucune transition (même conteneur, pas de remount). */}
+          <div key={tab} className="space-y-4 animate-page-enter">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 {/* Le titre de section n'apparaît que sur le tableau de bord, où
@@ -386,12 +388,13 @@ const Dashboard = ({ tab = 'dashboard' }) => {
 
             <div className="surface overflow-hidden">
               {tab === 'history' ? (
-                <HistoryTable logs={logs} onRequestClick={handleOpenDetails} />
+                <HistoryTable logs={logs} onRequestClick={handleOpenDetails} loading={loading} />
               ) : (
                 <RequestTable
                   requests={tab === 'my_tasks' ? tasks : requests}
                   onOpenDetails={handleOpenDetails}
                   search={search}
+                  loading={loading}
                 />
               )}
             </div>

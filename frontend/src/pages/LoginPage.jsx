@@ -6,6 +6,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { LogIn, User, Lock, AlertCircle, Eye, EyeOff, Building2, Loader2 } from 'lucide-react';
 import { toast } from '../components/Toast';
 import { useTitrePage } from '../hooks/useTitrePage';
+import AuthBackdrop from '../components/auth/AuthBackdrop';
+import AuthBrandMark from '../components/auth/AuthBrandMark';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -123,8 +125,10 @@ const LoginPage = () => {
   // Écran de chargement de l'entreprise (page dédiée)
   if (slug && companyLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
+        style={{ background: `linear-gradient(135deg, ${settings.accent_color || '#f8fafc'} 0%, white 50%, ${(settings.secondary_color || '#3b82f6')}10 100%)` }}>
+        <AuthBackdrop />
+        <div className="flex flex-col items-center gap-3 text-slate-400 relative z-10">
           <Loader2 size={28} className="animate-spin text-docuflow-secondary" />
           <span className="text-sm font-medium">Chargement de l'espace entreprise…</span>
         </div>
@@ -135,7 +139,9 @@ const LoginPage = () => {
   // Entreprise introuvable (page dédiée)
   if (slug && companyError && !company) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden p-4">
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
+        style={{ background: `linear-gradient(135deg, ${settings.accent_color || '#f8fafc'} 0%, white 50%, ${(settings.secondary_color || '#3b82f6')}10 100%)` }}>
+        <AuthBackdrop />
         <div className="max-w-md w-full text-center animate-fade-in-up relative z-10">
           <div className="w-20 h-20 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-6">
             <Building2 size={36} className="text-red-500" />
@@ -158,26 +164,12 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
       style={{ background: `linear-gradient(135deg, ${settings.accent_color || '#f8fafc'} 0%, white 50%, ${(settings.secondary_color || '#3b82f6')}10 100%)` }}>
-      {/* Animated background grid */}
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: `linear-gradient(${(settings.secondary_color || '#3b82f6')}03 1px, transparent 1px), linear-gradient(90deg, ${(settings.secondary_color || '#3b82f6')}03 1px, transparent 1px)`, backgroundSize: '64px 64px' }}></div>
-
-      {/* Glow orbs */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: (settings.secondary_color || '#3b82f6') + '15' }}></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full blur-3xl pointer-events-none animate-float delay-300" style={{ backgroundColor: (settings.primary_color || '#0f172a') + '08' }}></div>
+      <AuthBackdrop />
 
       <div className="max-w-md w-full animate-fade-in-up relative z-10">
         {/* Logo section */}
         <div className="text-center mb-8">
-          <div className="relative inline-flex mb-5">
-            <div className="absolute -inset-3 rounded-full blur-xl opacity-30 animate-glow-pulse" style={{ background: `linear-gradient(135deg, ${settings.secondary_color || '#3b82f6'}, ${settings.primary_color || '#0f172a'})` }}></div>
-            <div className="relative w-20 h-20 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(135deg, ${settings.primary_color || '#0f172a'}, ${settings.dark_color || '#1e293b'})` }}>
-              {displayLogo ? (
-                <img src={displayLogo} alt="Logo" className="w-16 h-16 object-contain" />
-              ) : (
-                <span className="text-3xl font-black text-white">D</span>
-              )}
-            </div>
-          </div>
+          <AuthBrandMark icon={Building2} logoSrc={displayLogo} />
           <h1 className="text-3xl font-black tracking-tight" style={{ color: settings.primary_color || '#0f172a' }}>
             {displayName}
           </h1>
@@ -192,13 +184,13 @@ const LoginPage = () => {
 
         <div className="glass-card-premium p-8 shadow-elevated">
           {suspended && (
-            <div className="mb-6 p-4 bg-orange-50/80 backdrop-blur-sm text-orange-600 rounded-xl border border-orange-200 text-sm font-bold flex items-center gap-3 animate-fade-in-down">
+            <div className="mb-6 p-4 bg-orange-50/80 backdrop-blur-sm text-orange-600 rounded-xl border border-orange-200 text-sm font-bold flex items-center gap-3 animate-alert-in">
               <AlertCircle size={18} className="flex-shrink-0" />
               Cette entreprise est suspendue. Contactez le support.
             </div>
           )}
           {error && (
-            <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm text-red-600 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-3 animate-fade-in-down">
+            <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm text-red-600 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-3 animate-alert-in">
               <AlertCircle size={18} className="flex-shrink-0" />
               {error}
             </div>
@@ -219,7 +211,7 @@ const LoginPage = () => {
           )}
 
           <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 animate-fade-in-up delay-100">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
               <div className="relative group">
                 <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -236,7 +228,7 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 animate-fade-in-up delay-200">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe</label>
               <div className="relative group">
                 <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -263,7 +255,7 @@ const LoginPage = () => {
             <button
               type="submit"
               disabled={loading || suspended}
-              className="btn-primary w-full flex items-center justify-center gap-2 text-base py-3.5 relative overflow-hidden group"
+              className="btn-primary w-full flex items-center justify-center gap-2 text-base py-3.5 relative overflow-hidden group animate-fade-in-up delay-300"
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-2">

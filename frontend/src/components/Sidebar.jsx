@@ -10,6 +10,8 @@ import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { RESTART_TOUR_EVENT } from './OnboardingTour';
+import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
+import Modal from './ui/Modal';
 
 // ============================================================================
 // Sidebar — navigation principale de la plateforme à deux modules.
@@ -247,6 +249,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
 
   // --- Menu utilisateur (bas de sidebar, remplace le dropdown avatar) ---
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userMenuRendered, userMenuClosing] = useDelayedUnmount(userMenuOpen, 160);
   const userMenuRef = React.useRef(null);
   useEffect(() => {
     const handler = (e) => {
@@ -295,10 +298,10 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         {!repliee && <ChevronRight size={14} style={{ color: tMuted }} className={userMenuOpen ? 'rotate-90 transition-transform' : 'transition-transform'} />}
       </button>
 
-      {userMenuOpen && (
+      {userMenuRendered && (
         <div
-          className={`${repliee ? 'left-full bottom-2 ml-2' : 'bottom-full left-2 right-2 mb-2'} absolute z-50 rounded-2xl shadow-2xl border overflow-hidden py-1.5`}
-          style={{ backgroundColor: sidebarLight ? '#ffffff' : '#1e293b', borderColor: tBorder, minWidth: '200px' }}
+          className={`${repliee ? 'left-full bottom-2 ml-2' : 'bottom-full left-2 right-2 mb-2'} absolute z-50 rounded-2xl shadow-2xl border overflow-hidden py-1.5 ${userMenuClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
+          style={{ backgroundColor: sidebarLight ? '#ffffff' : '#1e293b', borderColor: tBorder, minWidth: '200px', transformOrigin: repliee ? 'left bottom' : 'bottom' }}
         >
           <div className="px-4 py-2 border-b" style={{ borderColor: tBorder }}>
             <div className="text-sm font-bold" style={{ color: tText }}>{user?.full_name}</div>
@@ -416,18 +419,21 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
       </aside>
 
       {/* Mobile : drawer coulissant — ouvert par la barre supérieure (voir
-          AppLayout), refermé par son voile, un lien ou le bouton de fermeture. */}
-      {drawerOuvert && (
-        <div className="lg:hidden fixed inset-0 z-[90] flex">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => onDrawerChange(false)} />
-          <aside
-            className="relative flex flex-col w-[270px] max-w-[85vw] h-full shadow-2xl animate-fade-in"
-            style={{ backgroundColor: primaryColor }}
-          >
-            {corps(true)}
-          </aside>
-        </div>
-      )}
+          AppLayout), refermé par son voile, un lien ou le bouton de fermeture.
+          `backdropClassName="lg:hidden"` car Modal portale au-delà de tout
+          wrapper DOM local : un `lg:hidden` posé ici n'aurait aucun effet. */}
+      <Modal
+        open={drawerOuvert}
+        onClose={() => onDrawerChange(false)}
+        variant="drawer-left"
+        zIndex="z-[90]"
+        backdropClassName="lg:hidden"
+        panelClassName="flex flex-col w-[270px] max-w-[85vw] h-full shadow-2xl"
+      >
+        <aside className="flex flex-col h-full" style={{ backgroundColor: primaryColor }}>
+          {corps(true)}
+        </aside>
+      </Modal>
     </>
   );
 };

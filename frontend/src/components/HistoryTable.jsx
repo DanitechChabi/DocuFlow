@@ -1,7 +1,20 @@
 import React from 'react';
 import { Clock, ShieldCheck, ExternalLink, History } from 'lucide-react';
 
-const HistoryTable = ({ logs, onRequestClick }) => {
+const SkeletonRows = ({ count = 5 }) => (
+  <>
+    {Array.from({ length: count }).map((_, idx) => (
+      <tr key={idx}>
+        <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="skeleton w-8 h-8 rounded-full" /><div className="skeleton h-4 w-24" /></div></td>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-32" /></td>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-28" /></td>
+        <td className="px-6 py-4 text-right"><div className="skeleton h-4 w-16 ml-auto" /></td>
+      </tr>
+    ))}
+  </>
+);
+
+const HistoryTable = ({ logs, onRequestClick, loading = false }) => {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse min-w-[500px] md:min-w-0">
@@ -14,7 +27,7 @@ const HistoryTable = ({ logs, onRequestClick }) => {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
-          {logs.map((log, idx) => {
+          {loading ? <SkeletonRows /> : logs.map((log, idx) => {
             // `actor_name` / `occurred_at` sont les champs canoniques renvoyés par
             // le backend (voir auditService.normalizeLog) ; les colonnes
             // historiques restent lues en secours. Une action système sans auteur
@@ -63,7 +76,7 @@ const HistoryTable = ({ logs, onRequestClick }) => {
             </tr>
             );
           })}
-          {logs.length === 0 && (
+          {!loading && logs.length === 0 && (
             <tr>
               <td colSpan={4} className="p-12 text-center">
                 <History size={40} className="mx-auto mb-3 text-slate-200" />

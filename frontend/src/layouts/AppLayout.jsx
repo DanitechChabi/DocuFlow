@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, MessageCircle, Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import DocumentChatbot from '../components/DocumentChatbot';
@@ -25,6 +25,7 @@ import { useSettings } from '../contexts/SettingsContext';
  */
 const AppLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const settings = useSettings();
   const [search, setSearch] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
@@ -108,7 +109,7 @@ const AppLayout = () => {
             >
               <MessageCircle size={19} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold leading-none animate-pulse">
+                <span key={unreadCount} className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold leading-none animate-pop-in">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -118,7 +119,12 @@ const AppLayout = () => {
         </header>
 
         <main className="flex-1 overflow-y-auto relative">
-          <Outlet />
+          {/* `key` sur le chemin : React remonte le contenu à chaque navigation,
+              ce qui rejoue `page-enter` — sans ça, l'Outlet remplace le contenu
+              sans aucune transition. */}
+          <div key={location.pathname} className="animate-page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
 

@@ -4,6 +4,8 @@ import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { Building2, User, Mail, Lock, UserPlus, AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
 import { useTitrePage } from '../hooks/useTitrePage';
+import AuthBackdrop from '../components/auth/AuthBackdrop';
+import AuthBrandMark from '../components/auth/AuthBrandMark';
 
 // Convertit un nom en code entreprise : minuscules, sans accents, espaces → tirets
 const toSlug = (value) =>
@@ -91,10 +93,11 @@ const CompanyRegisterPage = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden p-4">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none"></div>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
+        style={{ background: `linear-gradient(135deg, ${settings.accent_color || '#f8fafc'} 0%, white 50%, ${(settings.secondary_color || '#3b82f6')}10 100%)` }}>
+        <AuthBackdrop />
         <div className="glass-card-premium p-12 max-w-md text-center animate-scale-in relative z-10">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5 animate-pop-in delay-100">
             <CheckCircle size={36} className="text-green-600" />
           </div>
           <h2 className="text-2xl font-black text-slate-800 mb-2">Entreprise créée !</h2>
@@ -108,20 +111,13 @@ const CompanyRegisterPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-blue-50 relative overflow-hidden py-12 px-4">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none"></div>
-      <div className="absolute top-[-15%] right-[-10%] w-[45%] h-[45%] bg-blue-500/10 rounded-full blur-3xl pointer-events-none animate-float"></div>
-      <div className="absolute bottom-[-15%] left-[-10%] w-[45%] h-[45%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-float delay-500"></div>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden py-12 px-4"
+      style={{ background: `linear-gradient(135deg, ${settings.accent_color || '#f8fafc'} 0%, white 50%, ${(settings.secondary_color || '#3b82f6')}10 100%)` }}>
+      <AuthBackdrop />
 
       <div className="max-w-lg w-full animate-fade-in-up relative z-10">
         <div className="text-center mb-8">
-          <div className="relative inline-flex mb-4">
-            <div className="absolute -inset-2 bg-gradient-to-r from-docuflow-secondary to-blue-400 rounded-full blur-xl opacity-30 animate-glow-pulse"></div>
-            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 shadow-lg flex items-center justify-center">
-              <Building2 size={28} className="text-white" />
-            </div>
-          </div>
+          <AuthBrandMark icon={Building2} size="sm" />
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">
             Créer mon espace entreprise
           </h2>
@@ -132,14 +128,14 @@ const CompanyRegisterPage = () => {
 
         <div className="glass-card-premium p-8 shadow-elevated">
           {error && (
-            <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm text-red-600 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-3 animate-fade-in-down">
+            <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm text-red-600 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-3 animate-alert-in">
               <AlertCircle size={18} className="flex-shrink-0" />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="grid grid-cols-2 gap-x-6 gap-y-5">
-            <div className="col-span-2 space-y-1.5">
+          <form onSubmit={handleRegister} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 animate-fade-in-up delay-100">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom de l'entreprise</label>
               <div className="relative group">
                 <Building2 size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -155,7 +151,7 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 animate-fade-in-up delay-200">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Code entreprise</label>
               <div className="relative group">
                 <KeyRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -176,11 +172,11 @@ const CompanyRegisterPage = () => {
               </p>
             </div>
 
-            <div className="col-span-2 border-t border-slate-100 pt-5 mt-1">
+            <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-5 mt-1 animate-fade-in-up delay-200">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Compte administrateur</p>
             </div>
 
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 animate-fade-in-up delay-300">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nom complet</label>
               <div className="relative group">
                 <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -196,7 +192,7 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-1 space-y-1.5">
+            <div className="col-span-1 space-y-1.5 animate-fade-in-up delay-400">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Identifiant</label>
               <div className="relative group">
                 <UserPlus size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -212,7 +208,7 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-1 space-y-1.5">
+            <div className="col-span-1 space-y-1.5 animate-fade-in-up delay-400">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mot de passe</label>
               <div className="relative group">
                 <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -229,7 +225,7 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 animate-fade-in-up delay-500">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email administrateur</label>
               <div className="relative group">
                 <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -245,7 +241,7 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-2 space-y-1.5">
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 animate-fade-in-up delay-500">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email de contact (optionnel)</label>
               <div className="relative group">
                 <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-docuflow-secondary transition-colors pointer-events-none" />
@@ -260,11 +256,11 @@ const CompanyRegisterPage = () => {
               </div>
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full flex items-center justify-center gap-2 text-base py-3.5 relative overflow-hidden group"
+                className="btn-primary w-full flex items-center justify-center gap-2 text-base py-3.5 relative overflow-hidden group animate-fade-in-up delay-500"
               >
                 {loading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -276,6 +272,9 @@ const CompanyRegisterPage = () => {
                     <Building2 size={20} />
                     Créer mon espace entreprise
                   </span>
+                )}
+                {!loading && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
                 )}
               </button>
             </div>

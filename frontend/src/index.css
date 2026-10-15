@@ -225,6 +225,59 @@
   0%, 100% { box-shadow: 0 0 0 4px var(--df-accent-20); }
   50%      { box-shadow: 0 0 0 7px var(--df-accent-10); }
 }
+/* Secousse d'un message bloquant (erreur, compte suspendu) : attire l'œil
+   sans redescendre dans un registre ludique — quatre allers-retours, 4px max. */
+@keyframes shake-x {
+  10%, 90%      { transform: translateX(-1px); }
+  20%, 80%      { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60%      { transform: translateX(4px); }
+}
+/* Petit rebond pour les moments de réussite (inscription, création d'espace) :
+   le seul endroit où l'interface a le droit de se montrer un peu contente. */
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* Fondu simple, sans déplacement : pour les fonds de panneau/modale, où un
+   glissement parasiterait la lecture du contenu qui, lui, glisse ou grossit. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* Sorties — miroir des entrées ci-dessus, utilisées quand un composant reste
+   monté le temps de son animation de fermeture avant d'être retiré du DOM. */
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.98); }
+}
+@keyframes slide-out-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+@keyframes slide-out-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+/* Transition de page/onglet : plus discrète que fade-in-up (cartes), pour ne
+   pas rejouer le même mouvement à chaque clic de navigation. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Oscillation de la cloche à l'arrivée d'une notification — un seul aller-retour. */
+@keyframes ring-bell {
+  0%, 100% { transform: rotate(0deg); }
+  20%      { transform: rotate(-12deg); }
+  40%      { transform: rotate(10deg); }
+  60%      { transform: rotate(-6deg); }
+  80%      { transform: rotate(3deg); }
+}
 
 .animate-fade-in-up     { animation: fade-in-up 0.32s var(--df-ease) both; }
 .animate-fade-in-down   { animation: fade-in-down 0.28s var(--df-ease) both; }
@@ -236,11 +289,36 @@
 .animate-glow-pulse     { animation: glow-pulse 3s ease-in-out infinite; }
 .animate-float          { animation: float 3s ease-in-out infinite; }
 .animate-toast-in       { animation: toast-in 0.24s var(--df-ease) both; }
+.animate-pop-in         { animation: pop-in 0.42s var(--df-ease) both; }
+.animate-fade-in        { animation: fade-in 0.2s var(--df-ease) both; }
+/* Alerte bloquante : apparaît puis se secoue une fois installée — pas les
+   deux mouvements en même temps, ce qui brouillerait la lecture du texte. */
+.animate-alert-in {
+  animation: fade-in-down 0.28s var(--df-ease) both,
+             shake-x 0.4s var(--df-ease) 0.28s both;
+}
+/* Expand/collapse fluide sans mesure JS de hauteur : la ligne `1fr`/`0fr` est
+   la seule qu'on anime, `overflow: hidden` masque le contenu pendant la
+   transition. Voir FolderTree.jsx. */
+.animate-collapse {
+  display: grid;
+  overflow: hidden;
+  transition: grid-template-rows var(--df-duration) var(--df-ease);
+}
 .animate-shimmer {
   background: linear-gradient(90deg, var(--df-surface-sunken) 25%, var(--df-surface-hover) 50%, var(--df-surface-sunken) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
+
+/* Sorties — appliquées le temps que le composant appelant retarde son
+   démontage (voir components/ui/Modal.jsx et Toast.jsx). */
+.animate-fade-out        { animation: fade-out 0.18s var(--df-ease) both; }
+.animate-scale-out       { animation: scale-out 0.18s var(--df-ease) both; }
+.animate-slide-out-right { animation: slide-out-right 0.24s var(--df-ease) both; }
+.animate-slide-out-left  { animation: slide-out-left 0.24s var(--df-ease) both; }
+.animate-page-enter      { animation: page-enter 0.22s var(--df-ease) both; }
+.animate-ring-bell       { animation: ring-bell 0.5s var(--df-ease) both; transform-origin: top center; }
 
 /* Anneau du tour d'accueil — désigne l'élément mis en avant. */
 .docuflow-ring {

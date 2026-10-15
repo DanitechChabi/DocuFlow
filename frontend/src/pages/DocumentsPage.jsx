@@ -5,7 +5,7 @@ import {
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
   FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2,
 } from 'lucide-react';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
 import { toast } from '../components/Toast';
@@ -15,6 +15,7 @@ import DocumentDetailsModal from '../components/DocumentDetailsModal';
 import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
 import DynamicViewBuilder from '../components/DynamicViewBuilder';
 import DraggableDocumentGroup from '../components/DraggableDocumentGroup';
+import DraggableDocumentCard from '../components/DraggableDocumentCard';
 import { DocumentPreviewLightbox } from '../components/DocumentPreview';
 import FolderTree from '../components/FolderTree';
 import PageHeader from '../components/PageHeader';
@@ -91,6 +92,8 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   const [activeViewId, setActiveViewId] = useState(null);
   const [activeGroupField, setActiveGroupField] = useState('type_document');
   const [pendingDropGroup, setPendingDropGroup] = useState(null);
+  const [justDroppedGroup, setJustDroppedGroup] = useState(null);
+  const [activeDragDoc, setActiveDragDoc] = useState(null);
   // Aperçu plein écran : l'état vit ici et non dans la fiche, pour qu'une seule
   // vue soit ouverte à la fois. Portée par chaque carte, une centaine de fiches
   // porteraient une centaine d'états morts.
@@ -138,7 +141,12 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
    * modifier. Le statut passe donc par `setStatus`, qui journalise en plus le
    * changement dans l'historique du document.
    */
+  const handleDragStart = ({ active }) => {
+    setActiveDragDoc(active.data?.current?.document || null);
+  };
+
   const handleDocumentDrop = async ({ active, over }) => {
+    setActiveDragDoc(null);
     if (!over) return; // relâché en dehors d'un groupe
 
     const targetGroup = over.data?.current?.groupName;
@@ -175,6 +183,8 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
       // cette logique et divergerait au premier écart.
       await loadDynamicView();
       toast.success(`Document déplacé vers « ${targetGroup} »`);
+      setJustDroppedGroup(targetGroup);
+      setTimeout(() => setJustDroppedGroup(null), 700);
     } catch (err) {
       const data = err.response?.data;
       toast.error(data?.message || data?.error || 'Le déplacement a échoué');
@@ -579,7 +589,13 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                     la métadonnée « {activeGroupField} » du document est mise à jour.
                   </p>
                 )}
-                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDocumentDrop}>
+                <DndContext
+                  sensors={dndSensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDocumentDrop}
+                  onDragCancel={() => setActiveDragDoc(null)}
+                >
                   {dynamicGroups.map((grp) => (
                     <div key={grp.group_name} className="mb-4">
                       <DraggableDocumentGroup
@@ -592,12 +608,16 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                         // aucun dépôt quand le regroupement porte sur le statut.
                         acceptsDrop={isAdmin && !(activeGroupField === 'statut' && grp.group_name === UNCLASSIFIED_GROUP)}
                         isPending={pendingDropGroup === grp.group_name}
+                        justDropped={justDroppedGroup === grp.group_name}
                         onOpenDocument={setDetailDoc}
                         onApercuDocument={setApercuDoc}
                         onSupprimerDocument={isAdmin ? setSupprimerDoc : undefined}
                       />
                     </div>
                   ))}
+                  <DragOverlay>
+                    {activeDragDoc && <DraggableDocumentCard document={activeDragDoc} overlay />}
+                  </DragOverlay>
                 </DndContext>
               </>
             )}
@@ -623,8 +643,21 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {!loading && data?.documents?.map((d) => (
-                  <tr key={d.id} onClick={() => setDetailDoc(d.id)} className="hover:bg-blue-50/40 cursor-pointer transition-colors">
+                {loading && Array.from({ length: 6 }).map((_, idx) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-20" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-28" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-24" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-16" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-12" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-20" /></td>
+                    <td className="px-4 py-3"><div className="skeleton h-5 w-16 rounded-full" /></td>
+                    <td className="px-4 py-3 text-center"><div className="skeleton h-4 w-8 mx-auto" /></td>
+                    <td className="px-4 py-3 text-center"><div className="skeleton h-8 w-8 rounded-lg mx-auto" /></td>
+                  </tr>
+                ))}
+                {!loading && data?.documents?.map((d, idx) => (
+                  <tr key={d.id} onClick={() => setDetailDoc(d.id)} className="hover:bg-blue-50/40 cursor-pointer transition-colors animate-fade-in-up" style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}>
                     <td className="px-4 py-3 font-bold text-docuflow-secondary">{d.reference_mfile}</td>
                     <td className="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><Building2 size={14} className="text-slate-400" /> {d.nom_entreprise}</td>
                     <td className="px-4 py-3 text-slate-600">{d.num_dossier} / {d.num_acte}</td>

@@ -257,7 +257,7 @@ const Topbar = () => {
           >
             <MessageCircle size={20} />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold leading-none animate-pulse">
+              <span key={unreadCount} className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold leading-none animate-pop-in">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

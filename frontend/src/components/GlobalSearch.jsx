@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { documentService } from '../services/documentService';
 import { useSettings } from '../contexts/SettingsContext';
 import { authService } from '../services/authService';
+import Modal from './ui/Modal';
 
 /**
  * Recherche globale style Cmd+K (Notion, Linear, Vercel).
@@ -113,11 +114,13 @@ const GlobalSearch = () => {
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
+    <Modal
+      open={isOpen}
+      onClose={() => setIsOpen(false)}
+      zIndex="z-[100]"
+      panelClassName="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden mt-[15vh]"
+    >
         {/* Input */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
           <Search size={20} className="text-slate-400 flex-shrink-0" />
@@ -160,9 +163,10 @@ const GlobalSearch = () => {
                   <button
                     key={i}
                     onClick={item.action}
-                    className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-colors animate-fade-in-up ${
                       i === selectedIndex ? 'bg-docuflow-secondary/5' : 'hover:bg-slate-50'
                     }`}
+                    style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}
                   >
                     <Icon size={16} className="text-slate-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -190,8 +194,7 @@ const GlobalSearch = () => {
             <Command size={10} />K
           </span>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

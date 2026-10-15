@@ -3,6 +3,7 @@ import { X, Send, MessageCircle, ArrowLeft, ChevronRight, Paperclip, File, Downl
 import { messageService } from '../services/messageService';
 import { authService } from '../services/authService';
 import { uploadService } from '../services/uploadService';
+import Modal from './ui/Modal';
 
 const userColors = [
   'from-docuflow-secondary to-blue-600',
@@ -203,13 +204,14 @@ const MessagingPanel = ({ isOpen, onClose }) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <>
-      <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40 animate-fade-in" onClick={onClose} />
-
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-elevated z-50 animate-slide-in-right flex flex-col">
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      variant="drawer-right"
+      zIndex="z-50"
+      panelClassName="w-full max-w-md h-full bg-white shadow-elevated flex flex-col"
+    >
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -448,8 +450,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
             </div>
           )}
         </div>
-      </div>
-    </>
+    </Modal>
   );
 };
 

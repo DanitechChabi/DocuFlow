@@ -2,13 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
+import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
 
 const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState({ top: 0, right: 16 }); // DEFAULT right:16 (viewport gutter)
+  const [justArrived, setJustArrived] = useState(false);
   const btnRef = useRef(null);
+  const prevUnreadRef = useRef(0);
+  const [dropdownRendered, dropdownClosing] = useDelayedUnmount(isOpen, 160);
 
   const fetchNotifications = async () => {
     try {
@@ -89,6 +93,19 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
   const hasUnread = unreadCount > 0;
 
+  // Secousse de la cloche uniquement quand le compteur augmente réellement —
+  // pas à chaque rendu où `hasUnread` est déjà vrai (sinon ça jouerait en
+  // boucle au moindre re-render sans rapport avec une vraie nouveauté).
+  useEffect(() => {
+    const prev = prevUnreadRef.current;
+    prevUnreadRef.current = unreadCount;
+    if (unreadCount > prev) {
+      setJustArrived(true);
+      const t = setTimeout(() => setJustArrived(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [unreadCount]);
+
   return (
     <>
       <button
@@ -101,22 +118,28 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
         }`}
         title="Notifications"
       >
-        <Bell size={22} />
+        <Bell size={22} className={justArrived ? 'animate-ring-bell' : ''} />
         {hasUnread && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white animate-scale-in shadow-md">
+          <span
+            key={unreadCount}
+            className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white animate-scale-in shadow-md"
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
-      {isOpen && createPortal(
+      {dropdownRendered && createPortal(
         <>
           {/* Backdrop */}
-          <div className="fixed inset-0 z-[9998]" onClick={() => setIsOpen(false)} />
+          <div
+            className={`fixed inset-0 z-[9998] ${dropdownClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+            onClick={() => setIsOpen(false)}
+          />
 
           {/* Dropdown */}
           <div
-            className="fixed z-[9999] w-[min(24rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-elevated border border-slate-100 animate-scale-in overflow-hidden"
+            className={`fixed z-[9999] w-[min(24rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-elevated border border-slate-100 overflow-hidden ${dropdownClosing ? 'animate-scale-out' : 'animate-scale-in'}`}
             style={{ top: coords.top, right: coords.right }}
           >
             {/* Header */}

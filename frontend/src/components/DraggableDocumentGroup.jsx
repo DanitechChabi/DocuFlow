@@ -20,6 +20,7 @@ const DraggableDocumentGroup = ({
   canDrag = false,
   acceptsDrop = true,
   isPending = false,
+  justDropped = false,
   onOpenDocument,
   onApercuDocument,
   onSupprimerDocument,
@@ -33,9 +34,11 @@ const DraggableDocumentGroup = ({
   return (
     <div
       ref={setNodeRef}
-      className={`glass-card-premium p-5 space-y-3 transition-all ${
+      className={`glass-card-premium p-5 space-y-3 transition-all duration-500 ${
         isOver && acceptsDrop ? 'ring-2 ring-docuflow-secondary ring-offset-2 bg-blue-50/40' : ''
-      } ${isPending ? 'opacity-60 pointer-events-none' : ''}`}
+      } ${isPending ? 'opacity-60 pointer-events-none' : ''} ${
+        justDropped ? 'ring-2 ring-emerald-400 ring-offset-2' : ''
+      }`}
     >
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
@@ -48,15 +51,16 @@ const DraggableDocumentGroup = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {documents.map((docItem) => (
-          <DraggableDocumentCard
-            key={docItem.id}
-            document={docItem}
-            canDrag={canDrag}
-            onOpen={onOpenDocument}
-            onApercu={onApercuDocument}
-            onSupprimer={onSupprimerDocument}
-          />
+        {documents.map((docItem, idx) => (
+          <div key={docItem.id} className="animate-fade-in-up" style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}>
+            <DraggableDocumentCard
+              document={docItem}
+              canDrag={canDrag}
+              onOpen={onOpenDocument}
+              onApercu={onApercuDocument}
+              onSupprimer={onSupprimerDocument}
+            />
+          </div>
         ))}
       </div>
 

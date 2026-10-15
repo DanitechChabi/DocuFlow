@@ -34,23 +34,31 @@ const ICON_COLORS = {
   info: 'text-blue-500',
 };
 
+// Durée de l'animation de sortie (voir .animate-fade-out dans index.css) :
+// le toast reste monté ce temps-là, marqué `leaving`, avant d'être retiré du
+// tableau — sans ça il disparaissait d'un coup, l'empilement « sautait ».
+const EXIT_DURATION = 200;
+
 const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
+
+  const startExit = useCallback((id) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, EXIT_DURATION);
+  }, []);
 
   useEffect(() => {
     const handler = (t) => {
       setToasts((prev) => [...prev, t]);
       if (t.duration > 0) {
-        setTimeout(() => {
-          setToasts((prev) => prev.filter((x) => x.id !== t.id));
-        }, t.duration);
+        setTimeout(() => startExit(t.id), t.duration);
       }
     };
     listeners.push(handler);
     return () => { listeners = listeners.filter((fn) => fn !== handler); };
-  }, []);
-
-  const dismiss = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, [startExit]);
 
   if (toasts.length === 0) return null;
 
@@ -61,11 +69,11 @@ const ToastContainer = () => {
         return (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg animate-fade-in-down max-w-sm ${COLORS[t.type]}`}
+            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm ${t.leaving ? 'animate-fade-out' : 'animate-fade-in-down'} ${COLORS[t.type]}`}
           >
             <Icon size={18} className={ICON_COLORS[t.type]} />
             <p className="text-sm font-medium flex-1">{t.message}</p>
-            <button onClick={() => dismiss(t.id)} className="p-1 hover:bg-black/5 rounded-lg transition-colors flex-shrink-0">
+            <button onClick={() => startExit(t.id)} className="p-1 hover:bg-black/5 rounded-lg transition-colors flex-shrink-0">
               <X size={14} />
             </button>
           </div>

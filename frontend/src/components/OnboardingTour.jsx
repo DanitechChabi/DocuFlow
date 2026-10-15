@@ -370,7 +370,7 @@ const OnboardingTour = ({
         ${Math.max(0, targetRect.left - 8)}px ${Math.min(window.innerHeight, targetRect.bottom + 8)}px
       )
     `,
-    transition: 'clip-path 0.3s ease-out',
+    transition: 'clip-path 0.3s var(--df-ease)',
   } : null;
 
   // Flèche : carré blanc pivoté à 45°, bordé sur les deux faces tournées vers la
@@ -459,7 +459,7 @@ const OnboardingTour = ({
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-docuflow-secondary to-blue-500 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-docuflow-secondary to-blue-500 rounded-full transition-all duration-300 ease-[var(--df-ease)]"
                   style={{ width: `${progress}%` }}
                 />
               </div>

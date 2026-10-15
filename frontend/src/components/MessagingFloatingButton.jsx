@@ -60,7 +60,10 @@ const MessagingFloatingButton = () => {
           <>
             <MessageCircle size={24} className="text-white" />
             {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 min-w-[24px] h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5 border-2 border-white animate-float shadow-lg">
+              <span
+                key={unreadCount}
+                className="absolute -top-2 -right-2 min-w-[24px] h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5 border-2 border-white animate-pop-in shadow-lg"
+              >
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

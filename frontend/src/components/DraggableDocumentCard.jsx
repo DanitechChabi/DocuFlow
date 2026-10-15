@@ -21,18 +21,21 @@ import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
  * @param {function} props.onApercu Ouvre l'aperçu plein écran. L'état de cette
  *   vue appartient au parent : une seule est ouverte à la fois, alors qu'un
  *   groupe compte des centaines de fiches.
+ * @param {boolean} props.overlay Rendu statique pour le clone affiché sous le
+ *   curseur (`DragOverlay`) : pas de `useDraggable` ici, sinon deux éléments
+ *   s'enregistreraient avec le même id pendant le glissement.
  */
-const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onApercu, onSupprimer }) => {
+const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onApercu, onSupprimer, overlay = false }) => {
   const locked = !!doc.is_checked_out;
   const draggable = canDrag && !locked;
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `doc-${doc.id}`,
-    disabled: !draggable,
+    disabled: !draggable || overlay,
     data: { documentId: doc.id, document: doc },
   });
 
-  const style = {
+  const style = overlay ? undefined : {
     // Pas de `transition` ici : pendant le glissement, dnd-kit met à jour
     // `transform` à chaque frame ; une transition CSS ferait traîner la fiche
     // derrière le curseur.
@@ -43,10 +46,12 @@ const DraggableDocumentCard = ({ document: doc, canDrag = false, onOpen, onAperc
 
   return (
     <div
-      ref={setNodeRef}
+      ref={overlay ? undefined : setNodeRef}
       style={style}
       className={`p-3 bg-slate-50 rounded-xl border transition-colors space-y-1.5 ${
-        isDragging ? 'border-docuflow-secondary shadow-lg' : 'border-slate-100 hover:bg-blue-50/50'
+        overlay
+          ? 'border-docuflow-secondary shadow-2xl rotate-2 scale-105 cursor-grabbing'
+          : isDragging ? 'border-docuflow-secondary shadow-lg' : 'border-slate-100 hover:bg-blue-50/50'
       }`}
     >
       <div className="flex items-center justify-between gap-2">

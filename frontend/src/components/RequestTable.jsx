@@ -20,7 +20,25 @@ const FILTERS = [
   { key: 'annulé', label: 'Annulé' },
 ];
 
-const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
+// Lignes d'attente pendant le chargement — évite le message « Aucune demande
+// trouvée » qui s'affichait avant les données (le tableau démarre vide avant
+// le premier fetch), un faux négatif trompeur à l'arrivée sur la page.
+const SkeletonRows = ({ count = 5 }) => (
+  <>
+    {Array.from({ length: count }).map((_, idx) => (
+      <tr key={idx}>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-32 mb-2" /><div className="skeleton h-3 w-20" /></td>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-24 mb-2" /><div className="skeleton h-3 w-16" /></td>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-28 mb-2" /><div className="skeleton h-3 w-14" /></td>
+        <td className="px-6 py-4"><div className="skeleton h-5 w-20 rounded-full" /></td>
+        <td className="px-6 py-4"><div className="skeleton h-4 w-20" /></td>
+        <td className="px-6 py-4 text-right"><div className="skeleton h-4 w-14 ml-auto" /></td>
+      </tr>
+    ))}
+  </>
+);
+
+const RequestTable = ({ requests, onOpenDetails, search = '', loading = false }) => {
   const [filter, setFilter] = useState('all');
 
   const searchTerm = String(search || '').trim().toLowerCase();
@@ -88,7 +106,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filteredRequests.map((req, idx) => {
+            {loading ? <SkeletonRows /> : filteredRequests.map((req, idx) => {
               const status = statusConfig[req.statut] || { label: req.statut, cls: 'bg-slate-100 text-slate-600' };
               return (
                 <tr
@@ -144,7 +162,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '' }) => {
                 </tr>
               );
             })}
-            {filteredRequests.length === 0 && (
+            {!loading && filteredRequests.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-12 text-center">
                   <FileText size={40} className="mx-auto mb-3 text-slate-200" />

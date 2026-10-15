@@ -199,7 +199,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
   const peutLiberer = estDetenteur || isAdmin;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="bg-white rounded-3xl shadow-elevated w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -547,7 +547,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
 
       {/* Modal de partage */}
       {showShare && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setShowShare(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowShare(false)}>
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl animate-scale-in overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-3">

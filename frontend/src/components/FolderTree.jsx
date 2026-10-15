@@ -206,23 +206,25 @@ const Noeud = ({
         </div>
       )}
 
-      {ouvert && aDesEnfants && (
-        <ul>
-          {noeud.enfants.map((enfant) => (
-            <Noeud
-              key={enfant.id}
-              noeud={enfant}
-              profondeur={profondeur + 1}
-              {...{
-                deplies, onBasculer, isAdmin, peutAcls, dossierActif, onSelectionner,
-                edition, setEdition, onRenommer, ajoutSous, setAjoutSous, onCreer,
-                deplacement, setDeplacement, onDeplacer, destinations,
-                suppression, setSuppression, onSupprimer,
-                perimetres, setPerimetres, onAclsChange,
-              }}
-            />
-          ))}
-        </ul>
+      {aDesEnfants && (
+        <div className="animate-collapse" style={{ gridTemplateRows: ouvert ? '1fr' : '0fr' }}>
+          <ul className="min-h-0 overflow-hidden">
+            {noeud.enfants.map((enfant) => (
+              <Noeud
+                key={enfant.id}
+                noeud={enfant}
+                profondeur={profondeur + 1}
+                {...{
+                  deplies, onBasculer, isAdmin, peutAcls, dossierActif, onSelectionner,
+                  edition, setEdition, onRenommer, ajoutSous, setAjoutSous, onCreer,
+                  deplacement, setDeplacement, onDeplacer, destinations,
+                  suppression, setSuppression, onSupprimer,
+                  perimetres, setPerimetres, onAclsChange,
+                }}
+              />
+            ))}
+          </ul>
+        </div>
       )}
     </li>
   );

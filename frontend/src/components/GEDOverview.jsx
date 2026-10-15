@@ -86,8 +86,8 @@ const GEDOverview = ({ data, folders, loading }) => {
             <div className="py-6 text-center text-slate-400"><div className="w-6 h-6 border-2 border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto" /></div>
           ) : recents.length ? (
             <div className="space-y-2">
-              {recents.map((d) => (
-                <div key={d.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
+              {recents.map((d, idx) => (
+                <div key={d.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-800 truncate">{d.reference_mfile}</div>
                     <div className="text-[11px] text-slate-400 truncate">{d.nom_entreprise}{d.type_document && ` · ${d.type_document}`}</div>
