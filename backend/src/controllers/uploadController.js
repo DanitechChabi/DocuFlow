@@ -6,12 +6,12 @@ const fs = require('fs');
 
 const { FILES_DIR } = require('../config/paths');
 const { verifyFileTicket } = require('../helpers/fileTicket');
-
-// Rôles autorisés à agir sur les demandes d'autrui : le personnel de traitement.
-// Un demandeur ne touche que SES demandes — sinon, dans la même organisation,
-// n'importe quel compte pouvait lire, verser ou supprimer les pièces jointes
-// d'une demande qui ne lui appartient pas.
-const STAFF_ROLES = ['archiviste', 'admin', 'superadmin'];
+// Qui agit sur les pièces jointes d'une demande : son auteur, son assigné, ou
+// le personnel de traitement — la règle commune à la fiche et aux listes (voir
+// requestAccessService). Un demandeur ne touche que SES demandes — sinon, dans
+// la même organisation, n'importe quel compte pouvait lire, verser ou
+// supprimer les pièces jointes d'une demande qui ne lui appartient pas.
+const requestAccess = require('../services/requestAccessService');
 
 /**
  * La demande appartient-elle au tenant ET l'appelant a-t-il le droit d'y
@@ -22,13 +22,13 @@ const STAFF_ROLES = ['archiviste', 'admin', 'superadmin'];
 async function verifierAccesDemande(tenantId, requestId, user) {
   const { rows } = await tenantDb.query(
     tenantId,
-    'SELECT id, id_user FROM requests WHERE id = $1',
+    'SELECT id, id_user, assignee_id FROM requests WHERE id = $1',
     [requestId]
   );
   if (rows.length === 0) {
     return { ok: false, statut: 404, message: 'Demande non trouvée' };
   }
-  if (rows[0].id_user !== user.id && !STAFF_ROLES.includes(user.role)) {
+  if (!(await requestAccess.peutConsulter({ ...user, tenant_id: tenantId }, rows[0]))) {
     return { ok: false, statut: 403, message: 'Accès refusé' };
   }
   return { ok: true };
@@ -220,7 +220,7 @@ exports.deleteRequestFile = async (req, res) => {
     // DEMANDE parente : c'est elle qui définit le droit, le fichier n'est que
     // sa pièce jointe.
     const result = await db.query(
-      `SELECT rf.*, r.id_user
+      `SELECT rf.*, r.id_user, r.assignee_id
          FROM request_files rf
          JOIN requests r ON r.id = rf.request_id
         WHERE rf.id = $1 AND rf.tenant_id = $2`,
@@ -231,7 +231,7 @@ exports.deleteRequestFile = async (req, res) => {
     }
 
     const file = result.rows[0];
-    if (file.id_user !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
+    if (!(await requestAccess.peutConsulter(req.user, file))) {
       return res.status(403).json({ message: 'Accès refusé' });
     }
 

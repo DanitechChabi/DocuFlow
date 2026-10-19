@@ -4,6 +4,7 @@ const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
+const { PERMISSIONS_VUE_GLOBALE } = require('../services/requestAccessService');
 
 // Toutes les routes de demandes nécessitent une authentification
 router.use(authMiddleware);
@@ -39,7 +40,10 @@ router.get('/my-requests', requirePermission('requests.view'), requestController
 router.get('/my-tasks', requirePermission('requests.process'), requestController.getMyTasks);
 router.get('/stats', requirePermission('requests.process'), requestController.getStats);
 router.get('/history', requirePermission('requests.view_history'), requestController.getAuditLogs);
-router.get('/all', requireAnyPermission(['requests.process', 'requests.view']), requestController.getAllRequests);
+// Toutes les demandes : traiter OU affecter (requestAccessService). Autrefois
+// requests.view suffisait — permission du demandeur, qui listait alors toutes
+// les demandes de son organisation d'un appel API direct.
+router.get('/all', requireAnyPermission(PERMISSIONS_VUE_GLOBALE), requestController.getAllRequests);
 // Ancien chemin `/verify-mfile`, renommé : l'interface ne mentionne plus le nom
 // d'un logiciel tiers. Le comportement est inchangé — on cherche dans le
 // référentiel documentaire un document de mêmes numéros de dossier et d'acte.
