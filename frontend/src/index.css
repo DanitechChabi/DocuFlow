@@ -1045,3 +1045,22 @@ button:disabled, [disabled] { cursor: not-allowed; }
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Impression d'un document dédié (registre des prêts…).
+   La page à imprimer rend sa version papier dans un PORTAIL, enfant direct de
+   <body> (.portail-impression) : à l'impression, tout le reste de <body> est
+   retiré du rendu — menu, barre supérieure, boutons flottants, modales — et
+   le portail s'imprime sur toute sa hauteur, sans hériter de la mise en page
+   plein écran de l'application (h-dvh, overflow caché). À l'écran, il est
+   invisible.
+   --------------------------------------------------------------------------- */
+.portail-impression { display: none; }
+@media print {
+  body > :not(.portail-impression) { display: none !important; }
+  .portail-impression { display: block; color: #0f172a; font-size: 11px; }
+  .portail-impression table { width: 100%; border-collapse: collapse; }
+  .portail-impression th, .portail-impression td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; vertical-align: top; }
+  .portail-impression tr { break-inside: avoid; }
+  @page { size: A4 landscape; margin: 12mm; }
+}

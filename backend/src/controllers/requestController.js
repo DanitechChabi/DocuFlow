@@ -12,6 +12,7 @@ const { normalizeOptions, allowedValues } = require('../helpers/requestOptions')
 const { lireSaisie, libelleDemande } = require('../helpers/requestInput');
 const requestAccess = require('../services/requestAccessService');
 const roleService = require('../services/roleService');
+const loanService = require('../services/loanService');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
@@ -435,7 +436,8 @@ exports.getUserRequests = async (req, res) => {
       'SELECT * FROM requests WHERE id_user = $1 ORDER BY created_at DESC',
       [userId]
     );
-    res.json(result.rows);
+    // État du prêt éventuel (badge « Prêté », « En retard », « Retourné »).
+    res.json(await loanService.annoterListe(tenantId, result.rows));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des demandes' });
@@ -456,7 +458,10 @@ exports.getAllRequests = async (req, res) => {
        ORDER BY r.created_at DESC`,
       [tenantId]
     );
-    res.json(result.rows);
+    // Relances des prêts en retard : à la consultation, faute de tâche
+    // planifiée — sans attendre ni bloquer la liste.
+    loanService.relancerRetards(tenantId).catch((e) => console.error('[prêts] relances :', e.message));
+    res.json(await loanService.annoterListe(tenantId, result.rows));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des demandes' });
@@ -793,7 +798,7 @@ exports.getMyTasks = async (req, res) => {
        ORDER BY r.created_at DESC`,
       [tenantId, userId]
     );
-    res.json(result.rows);
+    res.json(await loanService.annoterListe(tenantId, result.rows));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la récupération des tâches' });

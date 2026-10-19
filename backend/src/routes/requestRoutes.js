@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
+const loanController = require('../controllers/loanController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
 const { PERMISSIONS_VUE_GLOBALE } = require('../services/requestAccessService');
@@ -31,6 +32,17 @@ router.get('/fields', requirePermission('settings.manage'), requestFieldControll
 router.put('/fields', requirePermission('settings.manage'), requestFieldController.syncFields);
 router.post('/fields/provision', requirePermission('settings.manage'), requestFieldController.provisionDefaults);
 router.patch('/fields/:id/visibility', requirePermission('settings.manage'), requestFieldController.setVisibility);
+
+// --- Prêt des dossiers physiques (migration 025) ---
+// Le registre est déclaré AVANT `/:id/...` (voir la note sur `/fields`).
+// Remise et retour : gestes de l'archive (requests.process). Signaler et
+// confirmer : gestes de l'agent — la permission ne fait qu'ouvrir la porte,
+// le service vérifie qu'il est bien l'emprunteur.
+router.get('/loans', requirePermission('requests.process'), loanController.registre);
+router.post('/:id/loan', requirePermission('requests.process'), loanController.remettre);
+router.patch('/:id/loan/return', requirePermission('requests.process'), loanController.retourner);
+router.post('/:id/loan/report', requirePermission('requests.view'), loanController.signaler);
+router.post('/:id/loan/confirm', requirePermission('requests.view'), loanController.confirmer);
 
 // Voir mes demandes (requests.view)
 router.get('/my-requests', requirePermission('requests.view'), requestController.getUserRequests);

@@ -6,6 +6,8 @@ const requestFieldService = require('../services/requestFieldService');
 // la fiche de n'importe quelle demande : motif, NOTES INTERNES du personnel,
 // journal d'audit complet.
 const requestAccess = require('../services/requestAccessService');
+const loanService = require('../services/loanService');
+const settingsService = require('../services/settingsService');
 
 exports.getRequestDetails = async (req, res) => {
   const { id } = req.params;
@@ -141,7 +143,19 @@ exports.getRequestDetails = async (req, res) => {
       }
     }
 
+    // Prêt du dossier physique (migration 025) — null si aucun. Non bloquant.
+    let loan = null;
+    let loanRequireConfirmation = false;
+    try {
+      loan = await loanService.pretDeLaDemande(tenantId, id);
+      loanRequireConfirmation = (await settingsService.getAll(tenantId)).loan_require_confirmation === true;
+    } catch (loanErr) {
+      console.error('[requestDetails] prêt illisible :', loanErr.message);
+    }
+
     res.json({
+      loan,
+      loanRequireConfirmation,
       request,
       history: logsResult.rows,
       stateHistory: personnel ? stateResult.rows : stateResult.rows.map((h) => ({ ...h, comment: null })),

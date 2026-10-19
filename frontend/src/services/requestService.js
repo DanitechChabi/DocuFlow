@@ -13,6 +13,32 @@ export const requestService = {
     const response = await api.get('/requests/all');
     return response.data;
   },
+  // --- Prêt des dossiers physiques (migration 025) ---
+  /** Remise du dossier papier à l'auteur de la demande. */
+  remettreDossier: async (requestId, { date_retour_prevue, observation }) => {
+    const response = await api.post(`/requests/${requestId}/loan`, { date_retour_prevue, observation });
+    return response.data;
+  },
+  /** Retour du dossier aux archives (et rangement). */
+  retournerDossier: async (requestId, { observation }) => {
+    const response = await api.patch(`/requests/${requestId}/loan/return`, { observation });
+    return response.data;
+  },
+  /** L'agent conteste la remise (« je ne l'ai pas reçu »). */
+  signalerPret: async (requestId, message) => {
+    const response = await api.post(`/requests/${requestId}/loan/report`, { message });
+    return response.data;
+  },
+  /** L'agent confirme la réception (organisations qui l'exigent). */
+  confirmerPret: async (requestId) => {
+    const response = await api.post(`/requests/${requestId}/loan/confirm`);
+    return response.data;
+  },
+  /** Registre des prêts — `etat` : en_cours | en_retard | signale | retourne. */
+  getRegistrePrets: async (etat) => {
+    const response = await api.get('/requests/loans', { params: etat ? { etat } : {} });
+    return response.data;
+  },
   getMyTasks: async () => {
     const response = await api.get('/requests/my-tasks');
     return response.data;

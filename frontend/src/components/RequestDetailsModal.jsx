@@ -5,6 +5,7 @@ import {
   FolderOpen, Link2, Unlink, Loader2, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { libelleDemande, aDesReferences } from '../utils/demande';
+import LoanPanel from './LoanPanel';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { documentService } from '../services/documentService';
@@ -51,6 +52,9 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSearch, setLinkSearch] = useState('');
   const [linkResults, setLinkResults] = useState([]);
+  // Prêt du dossier physique (migration 025), servi par les détails.
+  const [pret, setPret] = useState({ loan: null, requireConfirmation: false });
+  const [versionDetails, setVersionDetails] = useState(0);
 
   const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
 
@@ -99,9 +103,12 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   useEffect(() => {
     if (!request?.id) { setDocumentsLies([]); return; }
     requestDetailsService.getDetails(request.id)
-      .then((d) => setDocumentsLies(d?.linkedDocuments || []))
+      .then((d) => {
+        setDocumentsLies(d?.linkedDocuments || []);
+        setPret({ loan: d?.loan || null, requireConfirmation: d?.loanRequireConfirmation === true });
+      })
       .catch(() => setDocumentsLies([]));
-  }, [request?.id]);
+  }, [request?.id, versionDetails]);
 
   // Recherche débouncée pour "lier un document"
   useEffect(() => {
@@ -329,6 +336,10 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                 </div>
               </div>
             )}
+
+            {/* Dossier physique : remise, retour, signalement (migration 025) */}
+            <LoanPanel request={request} loan={pret.loan} requireConfirmation={pret.requireConfirmation}
+              onDone={() => (pret.loan ? setVersionDetails((v) => v + 1) : onClose())} />
 
             {/* Machine à états : étapes horodatées */}
             {stateHistory && stateHistory.length > 0 && (

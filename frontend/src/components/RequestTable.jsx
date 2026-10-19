@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { libelleDemande, aDesReferences } from '../utils/demande';
+import { libelleDemande, aDesReferences, ETATS_PRET } from '../utils/demande';
 import { FileText, Clock, Hash, ChevronRight, Filter } from 'lucide-react';
 
 const statusConfig = {
@@ -155,6 +155,12 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
                     <span className={`status-badge ${status.cls}`}>
                       {status.label}
                     </span>
+                    {/* Dossier physique prêté (migration 025) */}
+                    {ETATS_PRET[req.loan_etat] && (
+                      <span className={`ml-1.5 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${ETATS_PRET[req.loan_etat].classe}`}>
+                        {ETATS_PRET[req.loan_etat].libelle}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-slate-600">

@@ -52,6 +52,9 @@ const EVENT_SETTING = {
   delivered: 'notify_on_status_change',
   assigned: 'notify_on_assignment',
   share: 'notify_on_share',
+  loan_handover: 'notify_on_status_change',
+  loan_returned: 'notify_on_status_change',
+  loan_overdue: 'notify_on_status_change',
 };
 
 /**
@@ -280,7 +283,64 @@ const TEMPLATES = {
       ${ctaButton('Traiter la demande', `${APP_URL}/dashboard`)}
     `, branding),
   }),
+
+  // --- Prêt des dossiers physiques (migration 025) ---
+  // `extra` : { dateRetour (AAAA-MM-JJ), par (nom de l'archiviste), requireConfirmation }
+
+  loan_handover: (r, branding, extra = {}) => ({
+    subject: `Dossier remis — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Le dossier vous a été remis</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        Le dossier physique demandé vous a été remis${extra.par ? ` par <b>${escapeHtml(extra.par)}</b>` : ''}.
+        Merci de le retourner aux archives avant le <b>${escapeHtml(dateFr(extra.dateRetour))}</b>.
+      </p>
+      ${requestBlock(r)}
+      <p style="font-size:13px;color:${COLORS.slate};line-height:1.6;margin:16px 0 0;">
+        ${extra.requireConfirmation
+          ? 'Merci de <b>confirmer la réception</b> depuis votre espace.'
+          : 'Vous n\'avez rien à faire. <b>Si vous n\'avez pas reçu ce dossier</b>, signalez-le depuis votre espace.'}
+      </p>
+      ${ctaButton(extra.requireConfirmation ? 'Confirmer la réception' : 'Voir ma demande', `${APP_URL}/dashboard`)}
+    `, branding),
+  }),
+
+  loan_returned: (r, branding, extra = {}) => ({
+    subject: `Retour enregistré — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour du dossier enregistré ✅</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        Le retour du dossier aux archives a été enregistré${extra.par ? ` par <b>${escapeHtml(extra.par)}</b>` : ''}.
+        Ce message vous décharge de sa garde : conservez-le comme preuve de restitution.
+      </p>
+      ${requestBlock(r)}
+    `, branding),
+  }),
+
+  loan_overdue: (r, branding, extra = {}) => ({
+    subject: `Dossier à retourner — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour de dossier en retard</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        Le dossier ci-dessous devait être retourné aux archives le <b>${escapeHtml(dateFr(extra.dateRetour))}</b>.
+        Merci de le rapporter dès que possible.
+      </p>
+      ${requestBlock(r)}
+      ${ctaButton('Voir ma demande', `${APP_URL}/dashboard`)}
+    `, branding),
+  }),
 };
+
+/** AAAA-MM-JJ (ou Date) → JJ/MM/AAAA, sans décalage de fuseau. */
+function dateFr(d) {
+  if (!d) return '—';
+  const s = d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
 
 /**
  * Envoie un e-mail transactionnel.
@@ -348,9 +408,10 @@ async function sendMail({ to, subject, html, tenantId = null, event = null, bran
  * Point d'entrée unique des e-mails de suivi de demande — les appelants n'ont
  * ainsi pas à connaître les réglages ni à composer le gabarit eux-mêmes.
  *
- * @param {Object} p - { tenantId, to, event, request, assigneeName }
+ * @param {Object} p - { tenantId, to, event, request, assigneeName, extra }
+ *        `extra` : données propres à l'événement (prêts : date de retour…)
  */
-async function notify({ tenantId, to, event, request, assigneeName = null }) {
+async function notify({ tenantId, to, event, request, assigneeName = null, extra = null }) {
   const template = TEMPLATES[event];
   if (!template) {
     console.error(`[mail] événement inconnu : « ${event} »`);
@@ -359,7 +420,7 @@ async function notify({ tenantId, to, event, request, assigneeName = null }) {
   if (!to) return { sent: false, skipped: true, reason: 'no_recipient' };
 
   const branding = await loadBranding(tenantId);
-  const { subject, html } = template(request, branding, assigneeName);
+  const { subject, html } = template(request, branding, extra ?? assigneeName);
   return sendMail({ to, subject, html, tenantId, event, branding });
 }
 

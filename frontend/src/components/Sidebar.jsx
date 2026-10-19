@@ -4,7 +4,7 @@ import {
   LayoutDashboard, FileSearch, PlusCircle, ClipboardList, History, Building2,
   FolderOpen, Wand2, Archive, Trash2, Bell,
   User as UserIcon, ChevronLeft, ChevronRight, X,
-  LogOut, ShieldCheck, Info, Compass,
+  LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -111,6 +111,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/demandes/a-traiter', 'À traiter', <ClipboardList size={18} />, { permission: 'requests.process' }),
     entree('/demandes/historique', 'Historique', <History size={18} />, { permission: 'requests.view_history' }),
     entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process' }),
+    entree('/demandes/prets', 'Registre des prêts', <BookOpenCheck size={18} />, { permission: 'requests.process' }),
   ];
   const vuesDocuments = [
     entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view', end: true }),

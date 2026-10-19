@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import DocumentsPage from './pages/DocumentsPage';
 import CorbeillePage from './pages/CorbeillePage';
+import PretsPage from './pages/PretsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
@@ -83,6 +84,7 @@ function App() {
           <Route path="/demandes/a-traiter" element={<Dashboard tab="my_tasks" />} />
           <Route path="/demandes/historique" element={<Dashboard tab="history" />} />
           <Route path="/demandes/toutes" element={<Dashboard tab="all_requests" />} />
+          <Route path="/demandes/prets" element={<PretsPage />} />
           <Route path="/dashboard" element={<Navigate to="/demandes" replace />} />
           <Route path="/dashboard/requests" element={<Navigate to="/demandes/mes-demandes" replace />} />
           <Route path="/dashboard/tasks" element={<Navigate to="/demandes/a-traiter" replace />} />
