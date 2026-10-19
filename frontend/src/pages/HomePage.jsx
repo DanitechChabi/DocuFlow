@@ -78,6 +78,7 @@ const HomePage = () => {
         {voitDemandes && (
           <Link
             to="/demandes"
+            data-tour="module-demandes"
             className="glass-card-premium p-8 hover:shadow-elevated transition-all group relative overflow-hidden animate-fade-in-up"
           >
             <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/[0.06] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-blue-500/[0.12] transition-colors" />
@@ -112,6 +113,7 @@ const HomePage = () => {
         {voitDocuments && (
           <Link
             to="/documents"
+            data-tour="module-documents"
             className="glass-card-premium p-8 hover:shadow-elevated transition-all group relative overflow-hidden animate-fade-in-up delay-75"
           >
             <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/[0.06] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-emerald-500/[0.12] transition-colors" />

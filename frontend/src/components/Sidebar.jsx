@@ -106,19 +106,19 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
   // Les vues propres à chaque module.
   const vuesDemandes = [
     entree('/demandes', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'requests.view', end: true }),
-    entree('/demandes/mes-demandes', 'Mes demandes', <FileSearch size={18} />, { permission: 'requests.view' }),
+    entree('/demandes/mes-demandes', 'Mes demandes', <FileSearch size={18} />, { permission: 'requests.view', tourId: 'mes-demandes' }),
     entree('/demandes/nouvelle', 'Nouvelle demande', <PlusCircle size={18} />, { permission: 'requests.create' }),
-    entree('/demandes/a-traiter', 'À traiter', <ClipboardList size={18} />, { permission: 'requests.process' }),
+    entree('/demandes/a-traiter', 'À traiter', <ClipboardList size={18} />, { permission: 'requests.process', tourId: 'a-traiter' }),
     entree('/demandes/historique', 'Historique', <History size={18} />, { permission: 'requests.view_history' }),
-    entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process' }),
-    entree('/demandes/prets', 'Registre des prêts', <BookOpenCheck size={18} />, { permission: 'requests.process' }),
+    entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process', tourId: 'toutes-demandes' }),
+    entree('/demandes/prets', 'Registre des prêts', <BookOpenCheck size={18} />, { permission: 'requests.process', tourId: 'registre-prets' }),
   ];
   const vuesDocuments = [
     entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view', end: true }),
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
-    entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index' }),
+    entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
-    entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view' }),
+    entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille' }),
   ];
 
   // Le changement de module : l'autre monde reste UN clic de distance.
@@ -263,8 +263,9 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
   const restartTour = () => {
     setUserMenuOpen(false);
     onDrawerChange(false);
-    navigate('/');
-    setTimeout(() => window.dispatchEvent(new CustomEvent(RESTART_TOUR_EVENT)), 400);
+    // La visite rejouée est celle de l'espace courant (VisiteGuidee, monté
+    // par le layout) : inutile de quitter la page.
+    setTimeout(() => window.dispatchEvent(new CustomEvent(RESTART_TOUR_EVENT)), 300);
   };
 
   const handleLogout = () => {

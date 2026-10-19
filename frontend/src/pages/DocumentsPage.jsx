@@ -396,7 +396,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                   <button onClick={() => setShowAssembly(true)} className="btn btn-secondary">
                     <Wand2 size={15} /> Assemblage de dossier
                   </button>
-                  <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn btn-primary">
+                  <button onClick={() => { setEditingDoc(null); setShowForm(true); }} className="btn btn-primary" data-tour="nouveau-document">
                     <Plus size={18} /> Nouveau document
                   </button>
                 </>
@@ -449,7 +449,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                 <option key={f.id} value={f.id}>{f.path || f.name}</option>
               ))}
             </select>
-            <button onClick={() => setFolderOpen((v) => !v)}
+            <button onClick={() => setFolderOpen((v) => !v)} data-tour="dossiers"
               className="btn btn-secondary" aria-pressed={folderOpen} title="Gérer l'arborescence des dossiers">
               <FolderTreeIcon size={16} /> Dossiers
             </button>

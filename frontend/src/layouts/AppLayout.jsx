@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import DocumentChatbot from '../components/DocumentChatbot';
 import GlobalSearch from '../components/GlobalSearch';
 import ContextualTooltips from '../components/ContextualTooltips';
+import VisiteGuidee from '../components/onboarding/VisiteGuidee';
 import NotificationBell from '../components/NotificationBell';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -30,6 +31,8 @@ const AppLayout = () => {
   const [search, setSearch] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOuvert, setDrawerOuvert] = useState(false);
+  // Une visite guidée en cours (ou imminente) fait taire les conseils.
+  const [visiteOccupe, setVisiteOccupe] = useState(false);
 
   useEffect(() => {
     const handler = (e) => setUnreadCount(e.detail?.count || 0);
@@ -82,7 +85,7 @@ const AppLayout = () => {
               Ctrl+K n'y existe pas (pas de clavier) — la loupe ouvre la
               recherche globale, tactile elle. */}
           <div className="w-full max-w-md flex items-center justify-center">
-            <form onSubmit={handleSearch} className="hidden md:flex w-full items-center relative">
+            <form onSubmit={handleSearch} data-tour="topbar-search" className="hidden md:flex w-full items-center relative">
               <Search size={15} className="absolute left-3 pointer-events-none text-white/50" />
               <input
                 value={search}
@@ -130,7 +133,8 @@ const AppLayout = () => {
 
       <DocumentChatbot />
       <GlobalSearch />
-      <ContextualTooltips />
+      <VisiteGuidee onOccupe={setVisiteOccupe} />
+      <ContextualTooltips enabled={!visiteOccupe} />
     </div>
   );
 };
