@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { X, Save, FileText, AlertCircle, Upload, File, Loader2 } from 'lucide-react';
+import { X, Save, FileText, AlertCircle, Upload, File, Loader2, Zap, ListChecks, ChevronDown } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -42,8 +42,47 @@ const CHAMPS_DE_REPLI = [
   { id: -7, name: 'priorite', label: 'Priorité', field_type: 'select', required: true, is_system: true, is_visible: true, options_setting: 'request_priorities', description: null },
 ];
 
-const RequestForm = ({ isOpen, onClose, onSuccess }) => {
+// Champs propres à la demande elle-même (migration 023), communs aux deux
+// modes. Décrits comme des définitions pour passer par DynamicRequestField
+// — même rendu, même accessibilité que les champs de l'organisation.
+const aujourdhui = () => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+const CHAMP_DESCRIPTION = {
+  name: 'description', label: 'Quel document cherchez-vous ?', field_type: 'textarea', is_visible: true,
+  placeholder: 'Ex. : le contrat de bail du local de Cotonou signé en 2022, ou le PV de l\'assemblée générale de mars…',
+  description: 'En quelques mots, comme vous le diriez à un collègue. Les références exactes sont facultatives.',
+  max_length: 5000,
+};
+const CHAMP_DATE = { name: 'date_souhaitee', label: 'Pour quand ?', field_type: 'date', is_visible: true, description: 'Facultatif — la date à laquelle vous en avez besoin.' };
+const CHAMP_BENEFICIAIRE = { name: 'beneficiaire', label: 'Pour le compte de', field_type: 'text', is_visible: true, placeholder: 'Facultatif — un collègue, un client, un service…', max_length: 255 };
+const CHAMPS_DEMANDE = [CHAMP_DESCRIPTION, CHAMP_DATE, CHAMP_BENEFICIAIRE];
+
+// Références documentaires : en mode rapide, regroupées sous « J'ai des
+// références » et toutes facultatives.
+const NOMS_REFERENCES = new Set(['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document']);
+
+// Dernier mode choisi — simple confort par utilisateur, jamais une donnée :
+// stockage indisponible (navigation privée) → mode rapide.
+const CLE_MODE = 'docuflow.requestForm.mode';
+const lireMode = () => {
+  try { return localStorage.getItem(CLE_MODE) === 'complet' ? 'complet' : 'rapide'; } catch { return 'rapide'; }
+};
+const ecrireMode = (mode) => {
+  try { localStorage.setItem(CLE_MODE, mode); } catch { /* stockage indisponible */ }
+};
+
+/**
+ * @param {object} [initialValues] valeurs de départ (« Redemander ») ; peut
+ *        porter `source_request_id`, la demande reprise.
+ */
+const RequestForm = ({ isOpen, onClose, onSuccess, initialValues = null }) => {
   const settings = useSettings();
+  const [mode, setMode] = useState(lireMode);
+  const [referencesOuvertes, setReferencesOuvertes] = useState(false);
+  const changerMode = (m) => { setMode(m); ecrireMode(m); setError(''); };
 
   // Listes de choix issues des réglages. Elles servent à deux titres : à garnir
   // les champs de repli, et à combler un champ dont le backend n'aurait pas
@@ -127,6 +166,12 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
     () => (definitions || []).filter((f) => f.is_visible !== false).map(resoudreOptions),
     [definitions, resoudreOptions]
   );
+  // Tous les champs dont le formulaire tient une valeur, ceux de la demande
+  // compris — la synchronisation plus bas ne conserve que ces clés.
+  const tousChamps = useMemo(
+    () => (champs.length ? [...champs, ...CHAMPS_DEMANDE.map((f) => (f.name === 'date_souhaitee' ? { ...f, min_date: aujourdhui() } : f))] : []),
+    [champs]
+  );
 
   /**
    * Valeurs initiales, dérivées des définitions.
@@ -169,11 +214,11 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
   // l'utilisateur a déjà saisi : elle ne remplace une valeur que si celle-ci ne
   // figure plus parmi les choix proposés.
   useEffect(() => {
-    if (!champs.length) return;
+    if (!tousChamps.length) return;
     setFormData((prev) => {
-      const defauts = valeursInitiales(champs);
+      const defauts = valeursInitiales(tousChamps);
       const suivant = { ...defauts };
-      for (const field of champs) {
+      for (const field of tousChamps) {
         const actuel = prev[field.name];
         if (actuel === undefined || actuel === '' || actuel === null) continue;
         if (field.field_type === 'select') {
@@ -185,9 +230,55 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
       }
       return suivant;
     });
-  }, [champs, valeursInitiales]);
+  }, [tousChamps, valeursInitiales]);
+
+  // « Redemander » : les valeurs de la demande reprise remplissent le
+  // formulaire à l'ouverture. Si elle portait des références, elles sont
+  // dépliées — l'utilisateur doit voir ce qu'il renvoie.
+  useEffect(() => {
+    if (!isOpen || !initialValues) return;
+    const propres = Object.fromEntries(
+      Object.entries(initialValues).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    );
+    setFormData((prev) => ({ ...prev, ...propres }));
+    if ([...NOMS_REFERENCES].some((n) => n !== 'type_document' && propres[n])) setReferencesOuvertes(true);
+  }, [isOpen, initialValues]);
 
   if (!isOpen) return null;
+
+  // Répartition des champs par mode.
+  //   * rapide  : la description d'abord ; priorité, échéance, bénéficiaire ;
+  //     les champs de l'organisation qu'elle a rendus OBLIGATOIRES (le serveur
+  //     les exige dans les deux modes) ; les références repliées, facultatives.
+  //   * complet : le formulaire de l'organisation tel quel, puis les champs de
+  //     la demande.
+  const parNom = (n) => tousChamps.find((f) => f.name === n);
+  const champsRapides = [parNom('description'), parNom('priorite'), parNom('date_souhaitee'), parNom('beneficiaire')].filter(Boolean)
+    .map((f) => (f.name === 'description' ? { ...f, required: true } : f));
+  const champsOrganisationRequis = champs.filter((f) => !f.is_system && f.required);
+  const champsReferences = champs.filter((f) => NOMS_REFERENCES.has(f.name) || f.name === 'motif')
+    .map((f) => ({ ...f, required: false }));
+  const champsComplets = [...champs, ...tousChamps.filter((f) => CHAMPS_DEMANDE.some((c) => c.name === f.name))]
+    .map((f) => (f.name === 'description'
+      ? { ...f, label: 'Précisions', description: 'Facultatif — ce que les références ne disent pas.' }
+      : f));
+
+  /** Corps envoyé : en mode rapide, les références repliées ne partent pas —
+   * l'année pré-remplie ne doit pas passer pour une référence saisie. */
+  const corpsDemande = () => {
+    const sourceId = initialValues?.source_request_id;
+    if (mode === 'complet') return { ...formData, mode: 'complet', ...(sourceId ? { source_request_id: sourceId } : {}) };
+    const corps = { mode: 'rapide' };
+    const envoyes = [...champsRapides, ...champsOrganisationRequis, ...(referencesOuvertes ? champsReferences : [])];
+    for (const f of envoyes) corps[f.name] = formData[f.name];
+    if (!referencesOuvertes && formData.motif) corps.motif = formData.motif;
+    if (sourceId) corps.source_request_id = sourceId;
+    return corps;
+  };
+
+  const rendre = (liste) => liste.map((field) => (
+    <DynamicRequestField key={field.name} field={field} value={formData[field.name]} onChange={handleFieldChange} />
+  ));
 
   const handleFieldChange = (name, value) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -205,7 +296,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
       //    colonne et les champs ajoutés sous leur clé technique : le backend les
       //    répartit d'après les définitions (requestFieldService.collectValues),
       //    seul endroit où le caractère système d'un champ est connu.
-      const response = await requestService.createRequest(formData);
+      const response = await requestService.createRequest(corpsDemande());
       const requestId = response.request?.id;
 
       // 2. Uploader les fichiers si la demande a été créée
@@ -215,7 +306,8 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
 
       if (onSuccess) onSuccess();
       onClose();
-      setFormData(valeursInitiales(champs));
+      setFormData(valeursInitiales(tousChamps));
+      setReferencesOuvertes(false);
       setFiles([]);
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la création de la demande');
@@ -249,8 +341,10 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
               <FileText size={20} />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-800">Nouvelle demande</h2>
-              <p className="text-[10px] sm:text-xs text-slate-400">Remplissez les informations du document</p>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800">{initialValues ? 'Redemander' : 'Nouvelle demande'}</h2>
+              <p className="text-[10px] sm:text-xs text-slate-400">
+                {mode === 'rapide' ? 'Décrivez le document, nous nous chargeons du reste' : 'Remplissez les informations du document'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors" aria-label="Fermer">
@@ -269,19 +363,45 @@ const RequestForm = ({ isOpen, onClose, onSuccess }) => {
               formulaire vide puis le voir se remplir donne l'impression d'un
               écran cassé, et l'utilisateur commence à saisir dans des champs qui
               vont être réinitialisés. */}
+          {/* Choix du mode : la demande rapide n'exige que la description. */}
+          <div className="sm:col-span-2 grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl" role="tablist" aria-label="Type de formulaire">
+            {[
+              { cle: 'rapide', libelle: 'Demande rapide', Icone: Zap },
+              { cle: 'complet', libelle: 'Formulaire complet', Icone: ListChecks },
+            ].map(({ cle, libelle, Icone }) => (
+              <button key={cle} type="button" role="tab" aria-selected={mode === cle} onClick={() => changerMode(cle)}
+                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  mode === cle ? 'bg-white text-docuflow-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <Icone size={16} /> {libelle}
+              </button>
+            ))}
+          </div>
+
           {chargementChamps && !champs.length ? (
             <div className="sm:col-span-2 space-y-4">
               {[...Array(4)].map((_, i) => <div key={i} className="h-14 rounded-xl skeleton" />)}
             </div>
+          ) : mode === 'complet' ? (
+            rendre(champsComplets)
           ) : (
-            champs.map((field) => (
-              <DynamicRequestField
-                key={field.name}
-                field={field}
-                value={formData[field.name]}
-                onChange={handleFieldChange}
-              />
-            ))
+            <>
+              {rendre(champsRapides)}
+              {rendre(champsOrganisationRequis)}
+              {champsReferences.length > 0 && (
+                <div className="sm:col-span-2 border border-slate-100 rounded-2xl">
+                  <button type="button" onClick={() => setReferencesOuvertes((o) => !o)} aria-expanded={referencesOuvertes}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-2xl">
+                    <span>J'ai des références <span className="font-normal text-slate-400">(facultatif — entreprise, n° de dossier, d'acte…)</span></span>
+                    <ChevronDown size={18} className={`transition-transform ${referencesOuvertes ? 'rotate-180' : ''}`} />
+                  </button>
+                  {referencesOuvertes && (
+                    <div className="p-4 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                      {rendre(champsReferences)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Pièces jointes */}

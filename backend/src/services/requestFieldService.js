@@ -92,6 +92,9 @@ const COLONNES_SYSTEME_REQUISES = new Set([
   'nom_entreprise', 'num_dossier', 'num_acte', 'annee',
 ]);
 
+/** Champs système dont createRequest comble l'absence (premier choix, défaut). */
+const SYSTEME_AVEC_REPLI = new Set(['motif', 'priorite']);
+
 /** Un champ dont ni le masquage ni le passage en facultatif n'est admissible. */
 function estIndispensable(field) {
   return field.is_system === true && COLONNES_SYSTEME_REQUISES.has(field.system_column);
@@ -617,15 +620,32 @@ function coerceValue(field, raw) {
  *
  * @param {number} tenantId
  * @param {object} body corps de la requête
+ * @param {object} [opts] { systemRequired } — contrôler aussi les champs
+ *        système obligatoires (formulaire complet)
  * @returns {Promise<{ customValues: Array<{fieldId: number, value: *}>, missing: string[] }>}
  */
-async function collectValues(tenantId, body = {}) {
+async function collectValues(tenantId, body = {}, { systemRequired = false } = {}) {
   const fields = await listFields(tenantId, { visibleOnly: true });
   const customValues = [];
   const missing = [];
 
   for (const field of fields) {
-    if (field.is_system) continue;
+    if (field.is_system) {
+      // Formulaire COMPLET : un champ système que l'organisation a voulu
+      // obligatoire l'est aussi côté serveur. Avant la migration 023, la
+      // contrainte NOT NULL de la colonne s'en chargeait (par une erreur 500) ;
+      // depuis, ces colonnes acceptent le vide pour la demande rapide, et rien
+      // d'autre ne ferait respecter le réglage. La demande rapide
+      // (systemRequired = false) s'en dispense : c'est sa raison d'être.
+      // `motif` et `priorite` ont un repli serveur (voir COLONNES_SYSTEME_REQUISES).
+      if (systemRequired && field.required && !SYSTEME_AVEC_REPLI.has(field.system_column)) {
+        const brut = body[field.system_column || field.name];
+        if (brut === undefined || brut === null || String(brut).trim() === '') {
+          missing.push(`Le champ « ${field.label} » est obligatoire.`);
+        }
+      }
+      continue;
+    }
 
     // La clé technique est ce que le formulaire envoie ; `field_<id>` couvre un
     // client qui préfère l'identifiant numérique.

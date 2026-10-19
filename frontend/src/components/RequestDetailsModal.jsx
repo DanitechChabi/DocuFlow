@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Clock, FileText, Search, CheckCircle,
   AlertCircle, Save, Shield, Paperclip, Download, Upload, File, UserCircle2,
-  FolderOpen, Link2, Unlink, Loader2, RefreshCw
+  FolderOpen, Link2, Unlink, Loader2, RefreshCw, RotateCcw
 } from 'lucide-react';
+import { libelleDemande, aDesReferences } from '../utils/demande';
+import LoanPanel from './LoanPanel';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { documentService } from '../services/documentService';
@@ -29,7 +31,7 @@ const STATUS_LABELS = {
 };
 const TERMINAL_STATUSES = new Set(['livré', 'rejete', 'annulé']);
 
-const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClose }) => {
+const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClose, onRedemander }) => {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [documentTrouve, setDocumentTrouve] = useState(null);
@@ -50,6 +52,9 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSearch, setLinkSearch] = useState('');
   const [linkResults, setLinkResults] = useState([]);
+  // Prêt du dossier physique (migration 025), servi par les détails.
+  const [pret, setPret] = useState({ loan: null, requireConfirmation: false });
+  const [versionDetails, setVersionDetails] = useState(0);
 
   const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
 
@@ -98,9 +103,12 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   useEffect(() => {
     if (!request?.id) { setDocumentsLies([]); return; }
     requestDetailsService.getDetails(request.id)
-      .then((d) => setDocumentsLies(d?.linkedDocuments || []))
+      .then((d) => {
+        setDocumentsLies(d?.linkedDocuments || []);
+        setPret({ loan: d?.loan || null, requireConfirmation: d?.loanRequireConfirmation === true });
+      })
       .catch(() => setDocumentsLies([]));
-  }, [request?.id]);
+  }, [request?.id, versionDetails]);
 
   // Recherche débouncée pour "lier un document"
   useEffect(() => {
@@ -288,14 +296,18 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                 <FileText size={22} />
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">{request.nom_entreprise}</h2>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                  Dossier <span className="font-bold text-slate-700">{request.num_dossier}</span>
-                  <span className="text-slate-300">·</span>
-                  Acte <span className="font-bold text-slate-700">{request.num_acte}</span>
-                  <span className="text-slate-300">·</span>
-                  {request.annee}
-                </p>
+                <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">{libelleDemande(request)}</h2>
+                {aDesReferences(request) ? (
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                    Dossier <span className="font-bold text-slate-700">{request.num_dossier || '—'}</span>
+                    <span className="text-slate-300">·</span>
+                    Acte <span className="font-bold text-slate-700">{request.num_acte || '—'}</span>
+                    <span className="text-slate-300">·</span>
+                    {request.annee || '—'}
+                  </p>
+                ) : (
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Demande sans référence — à identifier</p>
+                )}
               </div>
             </div>
             <button onClick={onClose} className="p-2.5 hover:bg-slate-100 rounded-full transition-colors">
@@ -307,6 +319,28 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
         <div className="p-5 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main info */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+            {/* Ce que le demandeur a écrit (migration 023) */}
+            {(request.description || request.date_souhaitee || request.beneficiaire) && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                {request.description && (
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Document recherché</h3>
+                    <p className="text-sm text-slate-700 whitespace-pre-line">{request.description}</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+                  {request.date_souhaitee && (
+                    <span>Souhaité pour le <b className="text-slate-700">{new Date(`${String(request.date_souhaitee).slice(0, 10)}T00:00:00`).toLocaleDateString('fr-FR')}</b></span>
+                  )}
+                  {request.beneficiaire && <span>Pour le compte de <b className="text-slate-700">{request.beneficiaire}</b></span>}
+                </div>
+              </div>
+            )}
+
+            {/* Dossier physique : remise, retour, signalement (migration 025) */}
+            <LoanPanel request={request} loan={pret.loan} requireConfirmation={pret.requireConfirmation}
+              onDone={() => (pret.loan ? setVersionDetails((v) => v + 1) : onClose())} />
+
             {/* Machine à états : étapes horodatées */}
             {stateHistory && stateHistory.length > 0 && (
               <div>
@@ -359,6 +393,16 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Reprendre une demande : mêmes informations, nouvelle demande. */}
+            {onRedemander && (
+              <div className="pt-6 border-t border-slate-100">
+                <button onClick={() => onRedemander(request)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-bold text-sm transition-all">
+                  <RotateCcw size={16} /> Redemander ce document
+                </button>
               </div>
             )}
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { libelleDemande, aDesReferences, ETATS_PRET } from '../utils/demande';
 import { FileText, Clock, Hash, ChevronRight, Filter } from 'lucide-react';
 
 const statusConfig = {
@@ -48,7 +49,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
     if (!searchTerm) return matchStatus;
     // Recherche sur entreprise, références, motif, type, statut, demandeur, priorité
     const haystack = [
-      r.nom_entreprise, r.num_dossier, r.num_acte, String(r.annee || ''),
+      r.nom_entreprise, r.description, r.beneficiaire, r.num_dossier, r.num_acte, String(r.annee || ''),
       r.type_document, r.motif, r.statut, r.requester_name, r.priorite,
     ].filter(Boolean).join(' ').toLowerCase();
     return matchStatus && haystack.includes(searchTerm);
@@ -117,7 +118,7 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
                 >
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-800 text-sm">{req.nom_entreprise}</span>
+                      <span className="font-bold text-slate-800 text-sm max-w-xs truncate" title={req.description || undefined}>{libelleDemande(req)}</span>
                       <span className="text-xs text-slate-400 mt-0.5">
                         <Clock size={11} className="inline mr-1" />
                         {req.created_at ? new Date(req.created_at).toLocaleDateString('fr-FR') : 'N/A'}
@@ -126,11 +127,17 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col space-y-0.5">
-                      <span className="text-sm font-medium text-slate-700">
-                        <Hash size={12} className="inline mr-1 text-slate-400" />
-                        {req.num_dossier}
-                      </span>
-                      <span className="text-xs text-slate-400">{req.num_acte} · {req.annee}</span>
+                      {aDesReferences(req) ? (
+                        <>
+                          <span className="text-sm font-medium text-slate-700">
+                            <Hash size={12} className="inline mr-1 text-slate-400" />
+                            {req.num_dossier || '—'}
+                          </span>
+                          <span className="text-xs text-slate-400">{req.num_acte || '—'} · {req.annee || '—'}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs italic text-slate-400">Sans référence</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -148,6 +155,12 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
                     <span className={`status-badge ${status.cls}`}>
                       {status.label}
                     </span>
+                    {/* Dossier physique prêté (migration 025) */}
+                    {ETATS_PRET[req.loan_etat] && (
+                      <span className={`ml-1.5 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${ETATS_PRET[req.loan_etat].classe}`}>
+                        {ETATS_PRET[req.loan_etat].libelle}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-slate-600">

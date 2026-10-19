@@ -1,12 +1,13 @@
 const tenantDb = require('../config/db-tenant');
 const requestFieldService = require('../services/requestFieldService');
-
-// Personnel de traitement : seuls ces rôles consultent une demande qui ne leur
-// appartient pas. Sans ce contrôle, tout utilisateur connecté de
-// l'organisation — donc un simple demandeur — ouvrait la fiche de n'importe
-// quelle demande : motif, NOTES INTERNES du personnel, journal d'audit
-// complet. Le demandeur reste maître de SES demandes, le personnel voit tout.
-const STAFF_ROLES = ['archiviste', 'admin', 'superadmin'];
+// Qui consulte une demande qui ne lui appartient pas : son assigné et le
+// personnel de traitement (voir requestAccessService). Sans ce contrôle, tout
+// utilisateur connecté de l'organisation — donc un simple demandeur — ouvrait
+// la fiche de n'importe quelle demande : motif, NOTES INTERNES du personnel,
+// journal d'audit complet.
+const requestAccess = require('../services/requestAccessService');
+const loanService = require('../services/loanService');
+const settingsService = require('../services/settingsService');
 
 exports.getRequestDetails = async (req, res) => {
   const { id } = req.params;
@@ -42,12 +43,18 @@ exports.getRequestDetails = async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
-    // Propriétaire ou personnel — voir STAFF_ROLES ci-dessus. Le 403 est renvoyé
-    // APRÈS le 404 pour ne pas révéler l'existence d'une demande d'un autre
-    // tenant : l'appelant sans droit sait seulement « rien pour lui ici ».
-    if (request.id_user !== req.user.id && !STAFF_ROLES.includes(req.user.role)) {
+    // Auteur, assigné ou personnel. Le 403 est renvoyé APRÈS le 404 pour ne
+    // pas révéler l'existence d'une demande d'un autre tenant : l'appelant
+    // sans droit sait seulement « rien pour lui ici ».
+    if (!(await requestAccess.peutConsulter(req.user, request))) {
       return res.status(403).json({ message: 'Accès refusé' });
     }
+    // Les notes internes sont celles du PERSONNEL : l'auteur qui consulte sa
+    // propre demande ne les voit pas, ni les commentaires de transition, qui
+    // en sont la copie (updateRequestStatus y consigne notes_internes).
+    const personnel = await requestAccess.peutVoirToutes(req.user)
+      || (request.assignee_id != null && request.assignee_id === req.user.id);
+    if (!personnel) delete request.notes_internes;
     // Requête avec tentative tenant_id, fallback si colonne absente
     let logsResult;
     try {
@@ -136,10 +143,22 @@ exports.getRequestDetails = async (req, res) => {
       }
     }
 
+    // Prêt du dossier physique (migration 025) — null si aucun. Non bloquant.
+    let loan = null;
+    let loanRequireConfirmation = false;
+    try {
+      loan = await loanService.pretDeLaDemande(tenantId, id);
+      loanRequireConfirmation = (await settingsService.getAll(tenantId)).loan_require_confirmation === true;
+    } catch (loanErr) {
+      console.error('[requestDetails] prêt illisible :', loanErr.message);
+    }
+
     res.json({
+      loan,
+      loanRequireConfirmation,
       request,
       history: logsResult.rows,
-      stateHistory: stateResult.rows,
+      stateHistory: personnel ? stateResult.rows : stateResult.rows.map((h) => ({ ...h, comment: null })),
       customFields,
       linkedDocuments
     });

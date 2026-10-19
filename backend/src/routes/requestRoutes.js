@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
+const loanController = require('../controllers/loanController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
+const { PERMISSIONS_VUE_GLOBALE } = require('../services/requestAccessService');
 
 // Toutes les routes de demandes nécessitent une authentification
 router.use(authMiddleware);
@@ -31,6 +33,17 @@ router.put('/fields', requirePermission('settings.manage'), requestFieldControll
 router.post('/fields/provision', requirePermission('settings.manage'), requestFieldController.provisionDefaults);
 router.patch('/fields/:id/visibility', requirePermission('settings.manage'), requestFieldController.setVisibility);
 
+// --- Prêt des dossiers physiques (migration 025) ---
+// Le registre est déclaré AVANT `/:id/...` (voir la note sur `/fields`).
+// Remise et retour : gestes de l'archive (requests.process). Signaler et
+// confirmer : gestes de l'agent — la permission ne fait qu'ouvrir la porte,
+// le service vérifie qu'il est bien l'emprunteur.
+router.get('/loans', requirePermission('requests.process'), loanController.registre);
+router.post('/:id/loan', requirePermission('requests.process'), loanController.remettre);
+router.patch('/:id/loan/return', requirePermission('requests.process'), loanController.retourner);
+router.post('/:id/loan/report', requirePermission('requests.view'), loanController.signaler);
+router.post('/:id/loan/confirm', requirePermission('requests.view'), loanController.confirmer);
+
 // Voir mes demandes (requests.view)
 router.get('/my-requests', requirePermission('requests.view'), requestController.getUserRequests);
 
@@ -39,12 +52,17 @@ router.get('/my-requests', requirePermission('requests.view'), requestController
 router.get('/my-tasks', requirePermission('requests.process'), requestController.getMyTasks);
 router.get('/stats', requirePermission('requests.process'), requestController.getStats);
 router.get('/history', requirePermission('requests.view_history'), requestController.getAuditLogs);
-router.get('/all', requireAnyPermission(['requests.process', 'requests.view']), requestController.getAllRequests);
+// Toutes les demandes : traiter OU affecter (requestAccessService). Autrefois
+// requests.view suffisait — permission du demandeur, qui listait alors toutes
+// les demandes de son organisation d'un appel API direct.
+router.get('/all', requireAnyPermission(PERMISSIONS_VUE_GLOBALE), requestController.getAllRequests);
 // Ancien chemin `/verify-mfile`, renommé : l'interface ne mentionne plus le nom
 // d'un logiciel tiers. Le comportement est inchangé — on cherche dans le
 // référentiel documentaire un document de mêmes numéros de dossier et d'acte.
 router.get('/:id/matching-document', requirePermission('requests.process'), requestController.findMatchingDocument);
-router.patch('/:id/status', requirePermission('requests.process'), requestController.updateRequestStatus);
+// requests.create admis pour l'annulation par l'auteur — le contrôleur borne
+// alors la transition (sa demande, vers « annulé » seulement).
+router.patch('/:id/status', requireAnyPermission(['requests.process', 'requests.create']), requestController.updateRequestStatus);
 router.patch('/:id/assign', requirePermission('requests.assign'), requestController.assignRequest);
 // Lier/délier un document GED : une action documentaire autant que de demande —
 // l'indexation elle-même exige documents.index ; le lien exige le côté demande.

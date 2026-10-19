@@ -158,6 +158,13 @@ const CATALOG = [
   { key: 'request_max_files', group: 'requests', label: 'Pièces jointes par demande',
     description: 'Nombre maximal de fichiers joints à une demande (5 au plus, limite du serveur).',
     type: 'number', default: '5', min: 1, max: 5 },
+  // Prêt des dossiers physiques (migration 025).
+  { key: 'loan_default_days', group: 'requests', label: 'Durée de prêt par défaut',
+    description: 'Nombre de jours proposés pour le retour d\'un dossier physique remis à un agent (modifiable à chaque remise).',
+    type: 'number', default: '7', min: 1, max: 365 },
+  { key: 'loan_require_confirmation', group: 'requests', label: 'Confirmation de réception obligatoire',
+    description: 'Si activé, l\'agent doit confirmer depuis son compte avoir reçu le dossier. Sinon, la remise vaut accusé de réception tacite : l\'agent est notifié et peut la signaler.',
+    type: 'boolean', default: 'false' },
 
   // ---------------------------------------------------------------- SÉCURITÉ
   { key: 'password_min_length',      group: 'security', label: 'Longueur minimale du mot de passe', description: 'Nombre minimal de caractères exigé.', type: 'number', default: '8', min: 6, max: 128 },
