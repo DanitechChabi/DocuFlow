@@ -2,7 +2,7 @@ const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
 const storage = require('../services/storageService');
 const { logHistory, addFileToDocument, setCanonicalReference, indexRequestToDocuments } = require('../services/documentIndexService');
-const { extractText, extractAutoTags } = require('../services/textExtractionService');
+const { extractAutoTags } = require('../services/textExtractionService');
 const metadataService = require('../services/metadataService');
 const documentAuditService = require('../services/documentAuditService');
 const relationService = require('../services/relationService');
@@ -198,8 +198,8 @@ exports.createDocument = async (req, res) => {
           const doc = docRes.rows[0];
           const reference_mfile = await setCanonicalReference(tenantId, doc.id);
 
-          await addFileToDocument(tenantId, doc.id, userId, file);
-          const text = await extractText(file.path, file.mimetype);
+          // Le texte est extrait par addFileToDocument, avant l'envoi au stockage.
+          const { texte: text } = await addFileToDocument(tenantId, doc.id, userId, file);
           if (text) {
             const autoTags = extractAutoTags(text, dbTags);
             const sanitizedAutoTags = autoTags.map(t => sanitizeTags(t)).filter(Boolean).flat();
@@ -252,8 +252,7 @@ exports.createDocument = async (req, res) => {
     let allText = '';
     if (req.files && req.files.length) {
       for (const file of req.files) {
-        await addFileToDocument(tenantId, doc.id, userId, file);
-        const text = await extractText(file.path, file.mimetype);
+        const { texte: text } = await addFileToDocument(tenantId, doc.id, userId, file);
         if (text) allText += ' ' + text;
       }
     }
@@ -841,7 +840,9 @@ exports.addFiles = async (req, res) => {
 
     const added = [];
     for (const file of req.files) {
-      added.push(await addFileToDocument(tenantId, id, req.user.id, file));
+      // Le texte extrait reste en base (index) : inutile de le renvoyer.
+      const { texte: _texte, ...ajout } = await addFileToDocument(tenantId, id, req.user.id, file);
+      added.push(ajout);
     }
     await logHistory(tenantId, id, req.user.id, "Ajout d'une version", null, null);
     res.status(201).json({ files: added });

@@ -3,6 +3,7 @@ const router = express.Router();
 const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
 const loanController = require('../controllers/loanController');
+const gedMatchController = require('../controllers/gedMatchController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
 const { PERMISSIONS_VUE_GLOBALE } = require('../services/requestAccessService');
@@ -43,6 +44,14 @@ router.post('/:id/loan', requirePermission('requests.process'), loanController.r
 router.patch('/:id/loan/return', requirePermission('requests.process'), loanController.retourner);
 router.post('/:id/loan/report', requirePermission('requests.view'), loanController.signaler);
 router.post('/:id/loan/confirm', requirePermission('requests.view'), loanController.confirmer);
+
+// --- Recherche automatique dans la GED (migration 027) ---
+// L'indicateur de saisie est ouvert à qui peut demander (il ne révèle rien
+// d'autre qu'un « probablement disponible ») ; candidats et transmission
+// exigent en plus documents.view, vérifié par le contrôleur.
+router.get('/ged-precheck', requirePermission('requests.create'), gedMatchController.precheck);
+router.get('/:id/ged-matches', requirePermission('requests.process'), gedMatchController.candidats);
+router.post('/:id/deliver-from-ged', requirePermission('requests.process'), gedMatchController.transmettre);
 
 // Voir mes demandes (requests.view)
 router.get('/my-requests', requirePermission('requests.view'), requestController.getUserRequests);

@@ -8,6 +8,8 @@ const path = require('path');
 const fs = require('fs');
 
 const { FILES_DIR } = require('../config/paths');
+const { extractText } = require('./textExtractionService');
+const { enregistrerTexte } = require('./contentIndexService');
 
 // Insère une ligne d'historique du cycle de vie documentaire.
 // client : optionnel — si fourni (transaction), les requêtes s'exécutent dessus.
@@ -24,6 +26,10 @@ async function logHistory(tenantId, documentId, userId, action, previousStatus, 
 // client : optionnel — si fourni (transaction), les requêtes s'exécutent dessus
 // et le scope tenant est explicite (WHERE tenant_id = $N).
 async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal = false, client } = {}) {
+  // Texte extrait AVANT l'envoi au stockage : en mode Cloudinary, saveFile
+  // supprime le fichier temporaire, et l'extraction faite après ne trouvait
+  // plus rien — le contenu n'était jamais indexé en production (voir 027).
+  const texte = await extractText(file.path, file.mimetype).catch(() => '');
   const info = await storage.saveFile(file, { keepLocal });
   const run = client || db;
   const ver = await run.query(
@@ -41,7 +47,10 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
     'UPDATE documents SET est_numerise = true, version = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tenant_id = $3',
     [version, documentId, tenantId]
   );
-  return result.rows[0];
+  // Conservé et versé dans l'index plein texte. `texte` est aussi rendu à
+  // l'appelant (auto-tags) : inutile de relire un fichier peut-être supprimé.
+  await enregistrerTexte(run, tenantId, documentId, result.rows[0].id, texte);
+  return { ...result.rows[0], texte };
 }
 
 // Génère la référence mfile canonique : DOC-<tenant>-<id>
