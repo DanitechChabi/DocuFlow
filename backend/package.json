@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans",
+    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans && npm run test:migrations",
     "test:license": "node src/desktop/licenseGuard.test.js",
     "test:rbac": "node src/rbac.test.js",
     "test:lifecycle": "node src/lifecycle.test.js",
     "test:acl": "node src/acl.test.js",
     "test:requests": "node src/requests.test.js",
-    "test:loans": "node src/loans.test.js"
+    "test:loans": "node src/loans.test.js",
+    "test:migrations": "node src/migrations.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",

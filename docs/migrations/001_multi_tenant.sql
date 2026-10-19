@@ -89,7 +89,15 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenan
 ALTER TABLE settings ALTER COLUMN tenant_id SET NOT NULL;
 
 -- Ajouter UNIQUE contrainte sur (tenant_id, key)
-ALTER TABLE settings ADD CONSTRAINT settings_tenant_key_unique UNIQUE (tenant_id, key);
+-- Gardée par une vérification : sans elle, rejouer cette migration (ce que
+-- fait désormais le serveur au démarrage sur une base migrée à la main)
+-- échouait sur « relation settings_tenant_key_unique already exists ».
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'settings_tenant_key_unique') THEN
+        ALTER TABLE settings ADD CONSTRAINT settings_tenant_key_unique UNIQUE (tenant_id, key);
+    END IF;
+END $$;
 
 -- 5. Index pour les performances
 CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);

@@ -16,31 +16,23 @@ Stratégie : **hybride** — frontend sur **Vercel** (gratuit), backend Express 
    - `DB_HOST` = HOST
    - `DB_PORT` = `5432`
    - `DB_NAME` = DBNAME (par défaut `neondb`)
-4. **Appliquer le schéma** : `docs/setup_db.sql`, puis TOUTES les migrations de
-   `docs/migrations/` dans l'ordre numérique (001 → 014). Elles sont idempotentes :
-   les réexécuter est sans effet.
+4. **Schéma et migrations : automatiques.** Au démarrage, le backend applique
+   lui-même le schéma de base (sur une base vierge) puis toutes les migrations de
+   `docs/migrations/` qui n'ont pas encore été exécutées
+   (`backend/src/services/migrationRunner.js`). **Il n'y a rien à faire sur Neon** :
+   chaque déploiement met la base à jour. Les journaux Render montrent
+   `[migrations] base à jour (N appliquée(s))`.
 
-   Via l'éditeur **SQL Editor** de Neon (coller le contenu de chaque fichier), ou
-   en ligne de commande :
-   ```bash
-   psql "postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f docs/setup_db.sql
-   for f in docs/migrations/*.sql; do
-     psql "postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require" -f "$f"
-   done
-   ```
-
-   Depuis `backend/`, avec `DATABASE_URL` déjà configurée dans `.env`, `run_sql.js`
-   cible la même base que l'application (SSL et Neon compris) :
-   ```bash
-   node run_sql.js ../docs/migrations/014_admin_deletion_rules.sql
-   ```
-
-   > N'utilisez PAS `backend/migrate.js` sur Neon : il ne lit que les variables
-   > `DB_*` et ignore `DATABASE_URL`, donc il viserait `localhost`.
-
-   Les migrations ne sont pas facultatives. Sans **014**, la suppression d'un
-   utilisateur ou d'une entreprise échoue en erreur de clé étrangère, et la purge
-   du journal d'audit est refusée par le trigger append-only.
+   - Une base déjà migrée à la main (sans table de suivi `migrations`) est
+     rattrapée sans risque : les migrations sont rejouables sans effet.
+   - Une migration en échec est signalée dans les journaux
+     (`[migrations] ÉCHEC de …`) ; les suivantes attendent, le serveur démarre quand
+     même.
+   - Pour désactiver ce mécanisme : variable d'environnement `AUTO_MIGRATE=false`.
+     Il faut alors appliquer les migrations à la main (éditeur SQL de Neon, ou
+     `node run_sql.js ../docs/migrations/NNN_….sql` depuis `backend/`).
+   - Les scripts de retour arrière (`docs/migrations/down/`) ne sont jamais
+     exécutés automatiquement.
 
 ---
 

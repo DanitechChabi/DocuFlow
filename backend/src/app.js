@@ -239,8 +239,25 @@ const server = app.listen(PORT, HOST, () => {
   // de configuration et la fonction SQL provision_tenant_defaults() disposent du
   // même référentiel. Échec sans conséquence : le catalogue reste servi depuis
   // le code, seule la copie en base est différée.
+  //
+  // Précédée de l'application des migrations manquantes (services/
+  // migrationRunner) : à chaque déploiement, la base rattrape le code sans
+  // intervention manuelle sur Neon. Après l'écoute, et non avant : l'app de
+  // bureau lit `server` dès le require de ce module, et le code tolère un
+  // schéma en retard pendant ces quelques secondes. L'app de bureau migre
+  // déjà dans son propre amorçage (desktop/bootstrap.js) : pas de second
+  // passage ici.
   const tenantProvisioningService = require('./services/tenantProvisioningService');
-  tenantProvisioningService.syncSettingDefinitions()
+  const migrer = process.env.SERVE_FRONTEND === 'true'
+    ? Promise.resolve()
+    : require('./services/migrationRunner').appliquerMigrations()
+      .then((r) => {
+        if (r.ignore) console.log(`[migrations] non exécutées : ${r.ignore}`);
+        else if (!r.echec) console.log(`[migrations] base à jour${r.appliquees.length ? ` (${r.appliquees.length} appliquée(s))` : ''}`);
+      })
+      .catch((err) => console.error('[migrations] impossible de vérifier les migrations :', err.message));
+  migrer
+    .then(() => tenantProvisioningService.syncSettingDefinitions())
     .then((result) => {
       if (result.synced) console.log(`[config] ${result.synced} définitions de paramètres synchronisées`);
     })
