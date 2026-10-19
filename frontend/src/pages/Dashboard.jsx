@@ -11,6 +11,8 @@ import PageHeader from '../components/PageHeader';
 import { requestService } from '../services/requestService';
 import { requestDetailsService } from '../services/requestDetailsService';
 import { authService } from '../services/authService';
+import { usePermissions } from '../hooks/usePermissions';
+import { valeursPourRedemander } from '../utils/demande';
 import { toast } from '../components/Toast';
 import {
   Plus, FileText, Package, Clock,
@@ -47,6 +49,9 @@ const OWNER_TOUR_STEPS = [...DEFAULT_TOUR_STEPS, ...SUPERADMIN_TOUR_STEPS];
 const Dashboard = ({ tab = 'dashboard' }) => {
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  // Valeurs de départ du formulaire : null pour une demande neuve, celles
+  // d'une demande antérieure pour « Redemander ».
+  const [valeursFormulaire, setValeursFormulaire] = useState(null);
   const [requests, setRequests] = useState([]);
   const [stats, setStats] = useState({});
   const [logs, setLogs] = useState([]);
@@ -57,6 +62,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
   const [search, setSearch] = useState('');
 
   const user = authService.getCurrentUser();
+  const { can } = usePermissions();
   const isAdmin = user?.role === 'archiviste' || user?.role === 'admin' || user?.role === 'superadmin';
 
   // Onglets réservés au staff : rediriger les demandeurs
@@ -251,7 +257,9 @@ const Dashboard = ({ tab = 'dashboard' }) => {
             <button onClick={refreshAll} className="btn btn-secondary btn-icon" title="Rafraîchir">
               <RefreshCw size={16} className={loading ? 'animate-spin' : undefined} />
             </button>
-            {user?.role === 'demandeur' && (
+            {/* Tout rôle qui porte requests.create — tous les rôles système depuis
+                la migration 023 : « n'importe qui doit pouvoir demander ». */}
+            {can('requests.create') && (
               <div className="relative">
                 {/* Halo pulsant derrière le bouton — le bouton reste net */}
                 <div
@@ -259,7 +267,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
                   aria-hidden="true"
                 ></div>
                 <button
-                  onClick={() => setIsFormOpen(true)}
+                  onClick={() => { setValeursFormulaire(null); setIsFormOpen(true); }}
                   className="relative btn btn-primary"
                   data-tour="new-request"
                 >
@@ -401,9 +409,17 @@ const Dashboard = ({ tab = 'dashboard' }) => {
           </div>
 
       {/* Modals */}
-      <RequestForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={refreshAll} />
+      <RequestForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={refreshAll} initialValues={valeursFormulaire} />
       {selectedRequest && (
-        <RequestDetailsModal request={details?.request} history={details?.history || []} stateHistory={details?.stateHistory || []} role={user?.role} onClose={handleCloseDetails} />
+        <RequestDetailsModal
+          request={details?.request} history={details?.history || []} stateHistory={details?.stateHistory || []} role={user?.role}
+          onClose={handleCloseDetails}
+          onRedemander={can('requests.create') ? (r) => {
+            handleCloseDetails();
+            setValeursFormulaire(valeursPourRedemander(r));
+            setIsFormOpen(true);
+          } : undefined}
+        />
       )}
 
       {/* Onboarding Tour — l'étape "Gestion système" n'apparaît que pour le

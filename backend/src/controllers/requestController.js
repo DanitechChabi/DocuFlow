@@ -247,8 +247,14 @@ exports.createRequest = async (req, res) => {
         throw err;
       }
     }
-    for (const admin of admins.rows) {
-      await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Nouvelle demande : ${libelleDemande(requestRow)}.`, 'request_created', requestId);
+    // La demande est enregistrée : un échec de notification ne doit pas la
+    // faire passer pour perdue (un 500 ici poussait le demandeur à la recréer).
+    try {
+      for (const admin of admins.rows) {
+        await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Nouvelle demande : ${libelleDemande(requestRow)}.`, 'request_created', requestId);
+      }
+    } catch (notifErr) {
+      console.error('[request] notifications de création non enregistrées :', notifErr.message);
     }
 
     // 4. Log l'action dans l'historique général

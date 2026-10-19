@@ -134,7 +134,7 @@ const DynamicRequestField = ({ field, value, onChange, users = [] }) => {
       controle = (
         <div className="relative">
           <Icone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input {...commun} type="date" className="input-premium pl-12" value={value ?? ''} />
+          <input {...commun} type="date" className="input-premium pl-12" value={value ?? ''} min={field.min_date ?? undefined} />
         </div>
       );
       break;
