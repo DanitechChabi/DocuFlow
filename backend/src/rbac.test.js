@@ -61,13 +61,22 @@ console.log('\n3. Sémantique des rôles — calque des pouvoirs d\'avant le RBA
   ok(par('responsable').includes('requests.validate') && par('responsable').includes('requests.assign'), 'responsable : supervision des demandes');
   ok(!par('responsable').includes('documents.upload'), 'responsable : lecture documentaire seule');
   ok(par('agent').includes('requests.process') && par('agent').includes('documents.upload'), 'agent : traiter et verser');
-  ok(!par('lecteur').includes('documents.upload') && !par('lecteur').includes('requests.create'), 'lecteur : consultation seule');
+  ok(!par('lecteur').includes('documents.upload') && !par('lecteur').includes('documents.edit'), 'lecteur : consultation documentaire seule');
+  // Migration 023 : « n'importe qui doit pouvoir demander un document ».
+  for (const role of ROLES_SYSTEME) {
+    ok(accorde(role.permissions, 'requests.create'), `${role.key} : peut créer une demande`);
+  }
   ok(par('admin').includes('users.create') && par('admin').includes('roles.edit') && par('admin').includes('settings.manage'),
     'admin : administration complète de l\'organisation');
 }
 
 console.log('\n4. Migration 019 — provisionne exactement les définitions du code');
+// Permissions accordées après 019 par une migration dédiée (qui doit les poser).
+const AJOUTS_POSTERIEURS = { archiviste: ['requests.create'], lecteur: ['requests.create'] };
 {
+  const sql023 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '023_request_quick.sql'), 'utf8');
+  ok(/array_append\(permissions, 'requests\.create'\)/.test(sql023) && sql023.includes("key IN ('archiviste', 'lecteur')"),
+    'migration 023 : requests.create ajoutée à archiviste et lecteur');
   const sql = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '019_rbac.sql'), 'utf8');
   for (const role of ROLES_SYSTEME) {
     // La section SQL du rôle : de sa clé à la clé du rôle suivant (ou la fin
@@ -80,7 +89,9 @@ console.log('\n4. Migration 019 — provisionne exactement les définitions du c
     if (role.permissions.includes('*')) {
       ok(section.includes("ARRAY['*']"), `migration : ${role.key} porte le joker`);
     } else {
-      const manquantes = role.permissions.filter((p) => !section.includes(`'${p}'`));
+      // Ajouts postérieurs à 019, livrés par leur propre migration.
+      const ajouts = AJOUTS_POSTERIEURS[role.key] || [];
+      const manquantes = role.permissions.filter((p) => !section.includes(`'${p}'`) && !ajouts.includes(p));
       const journal = section.match(/'[^']*'/g) || [];
       // Les permissions présentes dans le SQL mais pas dans le code sont un
       // désappariement tout aussi grave (la migration accorderait un droit que

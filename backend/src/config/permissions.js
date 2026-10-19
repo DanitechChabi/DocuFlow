@@ -166,7 +166,7 @@ const ROLES_SYSTEME = [
     name: 'Archiviste',
     description: 'Gestion documentaire : import, classement, métadonnées, versions, archivage.',
     permissions: [
-      'requests.view', 'requests.process', 'requests.view_history',
+      'requests.view', 'requests.create', 'requests.process', 'requests.view_history',
       'documents.view', 'documents.upload', 'documents.edit', 'documents.rename', 'documents.move',
       'documents.download', 'documents.share', 'documents.archive', 'documents.manage_versions',
       'documents.view_history', 'documents.index', 'documents.validate',
@@ -199,9 +199,9 @@ const ROLES_SYSTEME = [
   {
     key: 'lecteur',
     name: 'Lecteur',
-    description: 'Consultation seule des documents et demandes autorisés.',
+    description: 'Consultation des documents et demandes autorisés ; peut demander un document.',
     permissions: [
-      'requests.view',
+      'requests.view', 'requests.create',
       'documents.view', 'documents.download',
       'search.documents', 'search.requests',
     ],

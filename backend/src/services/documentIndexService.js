@@ -128,12 +128,20 @@ async function indexRequestToDocuments(tenantId, requestId, userId, { dossierId 
 
     // 3. Créer le document — statut « à indexer » (le livrable attend ses
     //    métadonnées), dossier cible si fourni.
+    //    Une demande rapide (migration 023) peut n'avoir aucune référence,
+    //    alors que ces colonnes de `documents` restent NOT NULL : le repli
+    //    est celui du versement en masse (« À indexer », année courante) — le
+    //    document naît « à indexer », l'archiviste complète. Sa description
+    //    reprend celle de la demande, pour qu'il reste retrouvable.
     const tempRef = `DOC-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const A_INDEXER = 'À indexer';
     const insertRes = await client.query(
-      `INSERT INTO documents (reference_mfile, num_dossier, num_acte, nom_entreprise, annee, type_document, statut, version, created_by, tenant_id, dossier_id, request_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 'à indexer', 1, $7, $8, $9, $10)
+      `INSERT INTO documents (reference_mfile, num_dossier, num_acte, nom_entreprise, annee, type_document, statut, version, created_by, tenant_id, dossier_id, request_id, description)
+       VALUES ($1, $2, $3, $4, $5, $6, 'à indexer', 1, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [tempRef, request.num_dossier, request.num_acte, request.nom_entreprise, request.annee, request.type_document || null, userId, tenantId, dossierId, requestId]
+      [tempRef, request.num_dossier || A_INDEXER, request.num_acte || A_INDEXER, request.nom_entreprise || A_INDEXER,
+        request.annee || new Date().getFullYear(), request.type_document || null, userId, tenantId, dossierId, requestId,
+        request.description || null]
     );
     const doc = insertRes.rows[0];
     const reference_mfile = await setCanonicalReference(tenantId, doc.id, client);

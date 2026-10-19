@@ -9,6 +9,9 @@ const settingsService = require('../services/settingsService');
 const requestFieldService = require('../services/requestFieldService');
 const catalog = require('../config/settingsCatalog');
 const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
+const { lireSaisie, libelleDemande } = require('../helpers/requestInput');
+const requestAccess = require('../services/requestAccessService');
+const roleService = require('../services/roleService');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
@@ -75,20 +78,30 @@ async function getUserEmail(tenantId, userId) {
 }
 
 exports.createRequest = async (req, res) => {
-  const {
-    nom_entreprise,
-    num_dossier,
-    num_acte,
-    annee,
-    type_document,
-    motif,
-    priorite
-  } = req.body;
+  const { type_document, motif, priorite } = req.body;
 
   const userId = req.user.id;
   const tenantId = req.user.tenant_id;
 
+  // Références, description, date souhaitée, bénéficiaire, reprise : lus et
+  // contrôlés par helpers/requestInput (règle « identifiable », migration 023).
+  const saisie = lireSaisie(req.body);
+  if (saisie.errors.length) {
+    return res.status(400).json({ message: saisie.errors.join(' ') });
+  }
+  const v = saisie.values;
+
   try {
+    // Reprise (« Redemander ») : la demande d'origine doit être visible de
+    // l'appelant — sinon l'identifiant servirait à sonder l'existence de
+    // demandes d'autrui.
+    if (v.source_request_id) {
+      const src = await tenantDb.query(tenantId, 'SELECT id, id_user, assignee_id FROM requests WHERE id = $1', [v.source_request_id]);
+      if (!src.rows[0] || !(await requestAccess.peutConsulter(req.user, src.rows[0]))) {
+        return res.status(400).json({ message: 'Demande d\'origine introuvable.' });
+      }
+    }
+
     // Les trois champs à choix sont vérifiés contre les listes de l'organisation.
     //
     // Deux cas à ne pas confondre :
@@ -148,7 +161,9 @@ exports.createRequest = async (req, res) => {
     // passée — déployer avant de migrer ne doit pas empêcher d'enregistrer.
     let champsPersonnalises = [];
     if (await requestFieldService.isAvailable()) {
-      const { customValues, missing } = await requestFieldService.collectValues(tenantId, req.body);
+      const { customValues, missing } = await requestFieldService.collectValues(tenantId, req.body, {
+        systemRequired: saisie.mode === 'complet',
+      });
       if (missing.length) {
         return res.status(400).json({ message: missing.join(' ') });
       }
@@ -156,12 +171,30 @@ exports.createRequest = async (req, res) => {
     }
 
     // 1. Enregistrement de la demande (Statut : en attente)
-    const newRequest = await tenantDb.insert(
-      tenantId,
-      'requests',
-      ['id_user', 'nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'motif', 'priorite', 'statut'],
-      [userId, nom_entreprise, num_dossier, num_acte, annee, typeFourni || null, motifRetenu, prioriteRetenue, 'en attente']
-    );
+    const colonnes = ['id_user', 'nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'motif', 'priorite', 'statut'];
+    const valeurs = [userId, v.nom_entreprise, v.num_dossier, v.num_acte, v.annee, typeFourni || null, motifRetenu, prioriteRetenue, 'en attente'];
+    const nouvelles = { description: v.description, date_souhaitee: v.date_souhaitee, beneficiaire: v.beneficiaire, source_request_id: v.source_request_id };
+    let newRequest;
+    try {
+      newRequest = await tenantDb.insert(
+        tenantId, 'requests',
+        [...colonnes, ...Object.keys(nouvelles)],
+        [...valeurs, ...Object.values(nouvelles)]
+      );
+    } catch (err) {
+      // Base pas encore migrée (023) : colonnes nouvelles absentes. La demande
+      // classique s'enregistre comme avant ; une demande qui n'a de sens
+      // qu'avec ces colonnes (sans aucune référence) est refusée en clair
+      // plutôt qu'amputée en silence.
+      if (err.code !== '42703') throw err;
+      if (!v.nom_entreprise || !v.num_dossier || !v.num_acte || !v.annee) {
+        return res.status(503).json({
+          message: 'La demande rapide n\'est pas encore disponible sur cette installation (migration 023 à appliquer). Renseignez toutes les références.',
+          code: 'MIGRATION_023_REQUISE',
+        });
+      }
+      newRequest = await tenantDb.insert(tenantId, 'requests', colonnes, valeurs);
+    }
 
     const requestId = newRequest.rows[0].id;
     const requestRow = newRequest.rows[0];
@@ -215,7 +248,7 @@ exports.createRequest = async (req, res) => {
       }
     }
     for (const admin of admins.rows) {
-      await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Une nouvelle demande a été créée pour l'entreprise ${nom_entreprise}.`, 'request_created', requestId);
+      await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Nouvelle demande : ${libelleDemande(requestRow)}.`, 'request_created', requestId);
     }
 
     // 4. Log l'action dans l'historique général
@@ -223,7 +256,7 @@ exports.createRequest = async (req, res) => {
       tenantId,
       'audit_logs',
       ['id_user', 'action', 'request_id'],
-      [userId, `A créé une demande pour ${nom_entreprise}`, requestId]
+      [userId, `A créé la demande ${libelleDemande(requestRow)}`, requestId]
     );
 
     // 5. Accusé de réception par e-mail au demandeur
@@ -517,11 +550,18 @@ exports.updateRequestStatus = async (req, res) => {
       return res.status(404).json({ message: 'Demande non trouvée' });
     }
 
-    // 2. Validation par la machine à états (transition + rôle)
+    // 2. Validation par la machine à états (transition + rôle).
+    //
+    // La route admet aussi les simples demandeurs (requests.create), pour
+    // qu'ils puissent ANNULER leur demande : elle exigeait requests.process,
+    // et le bouton « Annuler » de leur fiche se heurtait à un 403. Qui ne
+    // traite pas est donc soumis à la règle du demandeur — sa demande, et
+    // l'annulation seulement.
+    const estPersonnel = await roleService.possede(tenantId, role, 'requests.process');
     const check = requestStateMachine.canTransition({
       from: request.statut,
       to: status,
-      role,
+      role: estPersonnel ? role : 'demandeur',
       isOwner: request.id_user === userId,
     });
     if (!check.ok) {
@@ -533,7 +573,7 @@ exports.updateRequestStatus = async (req, res) => {
     let params = [status];
     let paramCount = 2;
 
-    if (notes_internes !== undefined) {
+    if (notes_internes !== undefined && estPersonnel) {
       query += `, notes_internes = $${paramCount++}`;
       params.push(notes_internes);
     }
@@ -595,8 +635,8 @@ exports.updateRequestStatus = async (req, res) => {
     // 5. Notification interne au demandeur
     const notificationTitle = status === 'annulé' ? 'Votre demande a été annulée' : 'Mise à jour de votre demande';
     const notificationMessage = status === 'annulé'
-      ? `La demande pour ${request.nom_entreprise} a été annulée.`
-      : `Le statut de la demande pour ${request.nom_entreprise} est maintenant : ${requestStateMachine.label(status)}.`;
+      ? `La demande ${libelleDemande(request)} a été annulée.`
+      : `Le statut de la demande ${libelleDemande(request)} est maintenant : ${requestStateMachine.label(status)}.`;
     await notifyUser(tenantId, request.id_user, notificationTitle, notificationMessage, 'status_update', id);
 
     // 6. Log dans l'historique général
@@ -604,7 +644,7 @@ exports.updateRequestStatus = async (req, res) => {
       tenantId,
       'audit_logs',
       ['id_user', 'action', 'request_id'],
-      [userId, `A changé le statut de la demande ${request.nom_entreprise} vers ${status}`, id]
+      [userId, `A changé le statut de la demande ${libelleDemande(request)} vers ${status}`, id]
     );
 
     // 7. E-mail au demandeur (template par événement, accusé à la livraison)
@@ -706,7 +746,7 @@ exports.assignRequest = async (req, res) => {
     });
 
     // 5. Notification interne à l'assigné
-    await notifyUser(tenantId, assignee_id, 'Nouvelle demande assignée', `La demande ${request.nom_entreprise} (${request.num_dossier || ''}) vous a été assignée.`, 'request_assigned', id);
+    await notifyUser(tenantId, assignee_id, 'Nouvelle demande assignée', `La demande ${libelleDemande(request)} vous a été assignée.`, 'request_assigned', id);
 
     // 6. E-mail à l'assigné
     try {

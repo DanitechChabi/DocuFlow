@@ -48,7 +48,9 @@ router.get('/all', requireAnyPermission(PERMISSIONS_VUE_GLOBALE), requestControl
 // d'un logiciel tiers. Le comportement est inchangé — on cherche dans le
 // référentiel documentaire un document de mêmes numéros de dossier et d'acte.
 router.get('/:id/matching-document', requirePermission('requests.process'), requestController.findMatchingDocument);
-router.patch('/:id/status', requirePermission('requests.process'), requestController.updateRequestStatus);
+// requests.create admis pour l'annulation par l'auteur — le contrôleur borne
+// alors la transition (sa demande, vers « annulé » seulement).
+router.patch('/:id/status', requireAnyPermission(['requests.process', 'requests.create']), requestController.updateRequestStatus);
 router.patch('/:id/assign', requirePermission('requests.assign'), requestController.assignRequest);
 // Lier/délier un document GED : une action documentaire autant que de demande —
 // l'indexation elle-même exige documents.index ; le lien exige le côté demande.

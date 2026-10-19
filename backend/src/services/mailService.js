@@ -13,6 +13,7 @@
  */
 const { Resend } = require('resend');
 const { escapeHtml, escapeOr, sanitizeHeader } = require('../helpers/htmlEscape');
+const { libelleDemande } = require('../helpers/requestInput');
 const settings = require('./settingsService');
 require('dotenv').config({ path: './.env' });
 
@@ -172,11 +173,18 @@ function layout(body, branding = {}) {
 // bruts : ils sont échappés ici, au point de rendu, et non à l'enregistrement —
 // la base garde la valeur saisie, seul le HTML est neutralisé.
 function requestBlock(r) {
+  // Demande rapide (migration 023) : sans entreprise, l'objet de la demande est
+  // sa description — « Entreprise : — » ne dirait rien au destinataire.
+  const titre = r.nom_entreprise ? 'Entreprise' : 'Document demandé';
+  const valeur = r.nom_entreprise || r.description;
+  const descriptionEnPlus = r.nom_entreprise && r.description
+    ? `<div style="margin-top:6px;font-size:13px;color:${COLORS.slate};">${escapeHtml(r.description)}</div>`
+    : '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${COLORS.border};border-radius:12px;margin:16px 0;">
     <tr>
       <td style="padding:16px 20px;font-size:14px;color:${COLORS.slate};">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${COLORS.slate};margin-bottom:4px;">Entreprise</div>
-        <div style="font-weight:700;color:${COLORS.primary};font-size:16px;">${escapeOr(r.nom_entreprise)}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${COLORS.slate};margin-bottom:4px;">${titre}</div>
+        <div style="font-weight:700;color:${COLORS.primary};font-size:16px;">${escapeOr(valeur)}</div>${descriptionEnPlus}
       </td>
     </tr>
     <tr>
@@ -212,7 +220,7 @@ function ctaButton(label, url) {
 
 const TEMPLATES = {
   request_created: (r, branding) => ({
-    subject: `Accusé de réception — demande ${sanitizeHeader(r.nom_entreprise)}`,
+    subject: `Accusé de réception — demande ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Demande bien reçue ✅</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -229,7 +237,7 @@ const TEMPLATES = {
   }),
 
   status_update: (r, branding) => ({
-    subject: `Mise à jour de votre demande — ${sanitizeHeader(r.nom_entreprise)}`,
+    subject: `Mise à jour de votre demande — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Mise à jour de votre demande</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -243,7 +251,7 @@ const TEMPLATES = {
   }),
 
   delivered: (r, branding) => ({
-    subject: `Votre document est disponible — ${sanitizeHeader(r.nom_entreprise)}`,
+    subject: `Votre document est disponible — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Votre document a été livré 🎉</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
@@ -260,7 +268,7 @@ const TEMPLATES = {
   }),
 
   assigned: (r, branding, assigneeName) => ({
-    subject: `Nouvelle demande assignée — ${sanitizeHeader(r.nom_entreprise)}`,
+    subject: `Nouvelle demande assignée — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
       <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Une demande vous a été assignée</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
