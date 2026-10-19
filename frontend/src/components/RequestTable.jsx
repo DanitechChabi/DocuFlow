@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { libelleDemande, aDesReferences, ETATS_PRET } from '../utils/demande';
+import { usePermissions } from '../hooks/usePermissions';
 import { FileText, Clock, Hash, ChevronRight, Filter } from 'lucide-react';
 
 const statusConfig = {
@@ -44,6 +45,10 @@ const SkeletonRows = ({ count = 5 }) => (
  *        document (liste « Mes demandes » d'un utilisateur qui peut demander).
  */
 const RequestTable = ({ requests, onOpenDetails, search = '', loading = false, onNouvelle }) => {
+  // Badge « Dans la GED » (migration 027) : réservé à qui consulte la GED —
+  // le score est calculé sur tous les documents, dossiers restreints compris.
+  const { can } = usePermissions();
+  const voitGed = can('documents.view');
   const [filter, setFilter] = useState('all');
 
   const searchTerm = String(search || '').trim().toLowerCase();
@@ -159,6 +164,12 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false, o
                     <span className={`status-badge ${status.cls}`}>
                       {status.label}
                     </span>
+                    {voitGed && req.ged_score >= 60 && !['livré', 'rejete', 'annulé'].includes(req.statut) && (
+                      <span className="ml-1.5 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200"
+                        title="Un document correspondant semble déjà numérisé : ouvrez la demande pour le transmettre.">
+                        Dans la GED
+                      </span>
+                    )}
                     {/* Dossier physique prêté (migration 025) */}
                     {ETATS_PRET[req.loan_etat] && (
                       <span className={`ml-1.5 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${ETATS_PRET[req.loan_etat].classe}`}>

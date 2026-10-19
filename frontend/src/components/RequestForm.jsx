@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { X, Save, FileText, AlertCircle, Upload, File, Loader2, Zap, ListChecks, ChevronDown } from 'lucide-react';
+import { X, Save, FileText, AlertCircle, Upload, File, Loader2, Zap, ListChecks, ChevronDown, Sparkles } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -115,6 +115,7 @@ const RequestForm = ({ isOpen, onClose, onSuccess, initialValues = null }) => {
   const [formData, setFormData] = useState({});
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
+  const [indiceGed, setIndiceGed] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -243,6 +244,30 @@ const RequestForm = ({ isOpen, onClose, onSuccess, initialValues = null }) => {
     setFormData((prev) => ({ ...prev, ...propres }));
     if ([...NOMS_REFERENCES].some((n) => n !== 'type_document' && propres[n])) setReferencesOuvertes(true);
   }, [isOpen, initialValues]);
+
+  // Recherche automatique dans la GED (migration 027) : pendant la saisie, le
+  // serveur dit seulement si un document correspondant existe PROBABLEMENT —
+  // jamais lequel. Une pause de frappe déclenche la vérification ; la réponse
+  // d'une saisie dépassée est ignorée.
+  const cleIndice = isOpen
+    ? ['description', 'nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document']
+      .map((k) => (k === 'description' || mode === 'complet' || referencesOuvertes ? formData[k] ?? '' : '')).join('\u0001')
+    : '';
+  useEffect(() => {
+    if (!cleIndice) { setIndiceGed(false); return undefined; }
+    const [description, nom, dossier, acte, annee, type] = cleIndice.split('\u0001');
+    if (String(description).trim().length < 12 && !dossier && !acte && String(nom).trim().length < 3) {
+      setIndiceGed(false);
+      return undefined;
+    }
+    let perime = false;
+    const t = setTimeout(() => {
+      requestService.gedPrecheck({ description, nom_entreprise: nom, num_dossier: dossier, num_acte: acte, annee, type_document: type })
+        .then((r) => { if (!perime) setIndiceGed(r?.probable === true); })
+        .catch(() => { if (!perime) setIndiceGed(false); });
+    }, 700);
+    return () => { perime = true; clearTimeout(t); };
+  }, [cleIndice]);
 
   if (!isOpen) return null;
 
@@ -402,6 +427,13 @@ const RequestForm = ({ isOpen, onClose, onSuccess, initialValues = null }) => {
                 </div>
               )}
             </>
+          )}
+
+          {indiceGed && (
+            <div className="sm:col-span-2 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex gap-2.5 animate-fade-in" role="status">
+              <Sparkles size={18} className="flex-shrink-0 mt-0.5" />
+              <span><b>Bonne nouvelle :</b> ce document semble déjà numérisé. Il pourra probablement vous être transmis rapidement, sans attendre la sortie du dossier papier.</span>
+            </div>
           )}
 
           {/* Pièces jointes */}

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, Clock, FileText, Search, CheckCircle,
-  AlertCircle, Save, Shield, Paperclip, Download, Upload, File, UserCircle2,
+  X, Clock, FileText,
+  Save, Shield, Paperclip, Download, Upload, File, UserCircle2,
   FolderOpen, Link2, Unlink, Loader2, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { libelleDemande, aDesReferences } from '../utils/demande';
 import LoanPanel from './LoanPanel';
+import GedMatchPanel from './GedMatchPanel';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
 import { documentService } from '../services/documentService';
@@ -34,9 +35,7 @@ const TERMINAL_STATUSES = new Set(['livré', 'rejete', 'annulé']);
 const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClose, onRedemander }) => {
   const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
-  const [documentTrouve, setDocumentTrouve] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [files, setFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -183,19 +182,6 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
       setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch (err) {
       toast.error('Erreur lors de la suppression');
-    }
-  };
-
-  const handleRechercherDocument = async () => {
-    setIsVerifying(true);
-    setDocumentTrouve(null);
-    try {
-      const res = await requestService.findMatchingDocument(request.id);
-      setDocumentTrouve(res);
-    } catch (err) {
-      toast.error('Erreur lors de la recherche dans le référentiel');
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -426,6 +412,13 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                   <Shield size={14} /> Traitement archiviste
                 </h3>
 
+                {/* Recherche automatique dans la GED (migration 027), en tête :
+                    c'est la première question — le document est-il déjà
+                    numérisé ? Remplace l'ancien bouton « Chercher dans le
+                    référentiel », qui ne trouvait que les numéros de dossier
+                    ET d'acte identiques. */}
+                <GedMatchPanel request={request} onDone={onClose} />
+
                 {/* Assignation */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 ml-1">Assignée à</label>
@@ -514,30 +507,7 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                     </button>
                   )}
 
-                  <button onClick={handleRechercherDocument} disabled={isVerifying}
-                    className="btn-secondary flex items-center justify-center gap-2 flex-1">
-                    {isVerifying ? (
-                      <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-                    ) : <Search size={18} />}
-                    {isVerifying ? 'Recherche…' : 'Chercher dans le référentiel'}
-                  </button>
                 </div>
-
-                {/* Résultat de la recherche dans le référentiel documentaire */}
-                {documentTrouve && (
-                  <div className={`p-4 rounded-xl border text-sm ${documentTrouve.exists ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-600'}`}>
-                    <div className="flex items-center gap-2 font-bold mb-1">
-                      {documentTrouve.exists ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-                      {documentTrouve.message || (documentTrouve.exists ? 'Document trouvé' : 'Document introuvable')}
-                    </div>
-                    {documentTrouve.fileUrl && (
-                      <a href={documentTrouve.fileUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-xs mt-1 underline opacity-75 hover:opacity-100">
-                        Ouvrir le document trouvé
-                      </a>
-                    )}
-                  </div>
-                )}
 
                 {/* Référentiel documentaire (GED) */}
                 <div className="space-y-2">

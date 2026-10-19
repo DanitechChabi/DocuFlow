@@ -13,6 +13,7 @@ const { lireSaisie, libelleDemande } = require('../helpers/requestInput');
 const requestAccess = require('../services/requestAccessService');
 const roleService = require('../services/roleService');
 const loanService = require('../services/loanService');
+const gedMatchService = require('../services/gedMatchService');
 require('dotenv').config({ path: './.env' });
 
 /* ===== Helpers ===== */
@@ -248,11 +249,18 @@ exports.createRequest = async (req, res) => {
         throw err;
       }
     }
+    // Recherche automatique dans la GED (027) : si le document semble déjà
+    // numérisé, l'archive le sait dès la notification — elle pourra le
+    // transmettre sans sortir le dossier papier. Jamais bloquant.
+    const scoreGed = await gedMatchService.noterDemande(tenantId, requestRow);
+    const indiceGed = scoreGed !== null && scoreGed >= gedMatchService.SEUIL_PROBABLE
+      ? ' Le document semble déjà dans la GED.'
+      : '';
     // La demande est enregistrée : un échec de notification ne doit pas la
     // faire passer pour perdue (un 500 ici poussait le demandeur à la recréer).
     try {
       for (const admin of admins.rows) {
-        await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Nouvelle demande : ${libelleDemande(requestRow)}.`, 'request_created', requestId);
+        await notifyUser(tenantId, admin.id, 'Nouvelle demande reçue', `Nouvelle demande : ${libelleDemande(requestRow)}.${indiceGed}`, 'request_created', requestId);
       }
     } catch (notifErr) {
       console.error('[request] notifications de création non enregistrées :', notifErr.message);

@@ -256,6 +256,9 @@ const server = app.listen(PORT, HOST, () => {
         else if (!r.echec) console.log(`[migrations] base à jour${r.appliquees.length ? ` (${r.appliquees.length} appliquée(s))` : ''}`);
       })
       .catch((err) => console.error('[migrations] impossible de vérifier les migrations :', err.message));
+  // Contenu des fichiers versés avant 027 : indexé en arrière-plan, après
+  // les migrations (les colonnes doivent exister).
+  migrer.then(() => require('./services/contentIndexService').demarrerRattrapage());
   migrer
     .then(() => tenantProvisioningService.syncSettingDefinitions())
     .then((result) => {

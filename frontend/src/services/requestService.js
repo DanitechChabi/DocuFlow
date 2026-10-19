@@ -13,6 +13,22 @@ export const requestService = {
     const response = await api.get('/requests/all');
     return response.data;
   },
+  // --- Recherche automatique dans la GED (migration 027) ---
+  /** Pendant la saisie : { probable } — rien d'autre n'est révélé. */
+  gedPrecheck: async (champs) => {
+    const response = await api.get('/requests/ged-precheck', { params: champs });
+    return response.data;
+  },
+  /** Documents qui correspondent à une demande (archive, ACL appliquées). */
+  getGedMatches: async (requestId) => {
+    const response = await api.get(`/requests/${requestId}/ged-matches`);
+    return response.data;
+  },
+  /** Joint la version courante d'un document à la demande et la livre. */
+  transmettreDepuisGed: async (requestId, documentId) => {
+    const response = await api.post(`/requests/${requestId}/deliver-from-ged`, { document_id: documentId });
+    return response.data;
+  },
   // --- Prêt des dossiers physiques (migration 025) ---
   /** Remise du dossier papier à l'auteur de la demande. */
   remettreDossier: async (requestId, { date_retour_prevue, observation }) => {
