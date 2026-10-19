@@ -39,7 +39,11 @@ const SkeletonRows = ({ count = 5 }) => (
   </>
 );
 
-const RequestTable = ({ requests, onOpenDetails, search = '', loading = false }) => {
+/**
+ * @param {Function} [onNouvelle] si fourni, l'état vide invite à demander un
+ *        document (liste « Mes demandes » d'un utilisateur qui peut demander).
+ */
+const RequestTable = ({ requests, onOpenDetails, search = '', loading = false, onNouvelle }) => {
   const [filter, setFilter] = useState('all');
 
   const searchTerm = String(search || '').trim().toLowerCase();
@@ -185,8 +189,15 @@ const RequestTable = ({ requests, onOpenDetails, search = '', loading = false })
                       ? `Aucune demande ne correspond à « ${search.trim()} »`
                       : filter !== 'all'
                         ? `Aucune demande avec le statut « ${filter} »`
-                        : 'Les nouvelles demandes apparaîtront ici'}
+                        : onNouvelle
+                          ? 'Besoin d\'un document ou d\'un dossier ? Une phrase suffit pour le demander.'
+                          : 'Les nouvelles demandes apparaîtront ici'}
                   </p>
+                  {onNouvelle && !searchTerm && filter === 'all' && (
+                    <button onClick={onNouvelle} className="btn btn-primary mt-4 inline-flex">
+                      <FileText size={16} /> Demander un document
+                    </button>
+                  )}
                 </td>
               </tr>
             )}

@@ -2,60 +2,11 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
-// Étapes par défaut pour tous les utilisateurs (Dashboard)
-export const DEFAULT_TOUR_STEPS = [
-  {
-    id: 'sidebar',
-    selector: '[data-tour="sidebar"]',
-    title: 'Navigation principale',
-    content: 'La barre de navigation vous donne accès à toutes les sections : Tableau de bord, Mes demandes, Documents, et plus selon votre rôle.',
-    position: 'bottom',
-  },
-  {
-    id: 'new_request',
-    selector: '[data-tour="new-request"]',
-    title: 'Nouvelle demande',
-    content: 'Cliquez ici pour créer une demande de document. Remplissez le formulaire : entreprise, dossier, type, motif, priorité.',
-    position: 'bottom',
-  },
-  {
-    id: 'notifications',
-    selector: '[data-tour="notifications"]',
-    title: 'Notifications',
-    content: 'La cloche affiche vos notifications en temps réel : nouvelles demandes assignées, changements de statut, messages.',
-    position: 'bottom',
-  },
-  {
-    id: 'documents',
-    selector: '[data-tour="documents"]',
-    title: 'Documents (GED)',
-    content: 'Le référentiel documentaire : créez des dossiers, uploadez des fichiers, gérez les versions et les statuts (Disponible / Prêt / Archivé).',
-    position: 'bottom',
-  },
-  {
-    id: 'profile',
-    selector: '[data-tour="profile"]',
-    title: 'Votre profil',
-    content: 'Modifiez vos informations, changez votre mot de passe, gérez vos préférences.',
-    position: 'left',
-    // La cible vit dans le menu avatar (fermé au départ) → le tour l'ouvre
-    inMenu: true,
-  },
-];
-
-// Étapes supplémentaires pour superadmin
-export const SUPERADMIN_TOUR_STEPS = [
-  {
-    id: 'super_admin',
-    selector: '[data-tour="super-admin"]',
-    title: 'Gestion système',
-    content: 'Accès au portail superadmin : gestion des utilisateurs, sections, branding, entreprises.',
-    position: 'bottom',
-    inMenu: true,
-  },
-];
-
-const STORAGE_KEY_PREFIX = 'docuflow_tour_done_';
+// Le contenu des visites vit dans ./onboarding/visites.js (une visite par
+// module, construite d'après les permissions). Ce composant ne fait que les
+// jouer : il ne décide ni QUAND une visite démarre, ni si elle a déjà été vue
+// — c'est VisiteGuidee qui pilote, avec la progression enregistrée sur le
+// compte (migration 026).
 
 // Événement permettant de rejouer le tour depuis le menu utilisateur. Sans lui,
 // le tour n'était visible qu'une fois par navigateur : `docuflow_tour_done_*`
@@ -166,19 +117,21 @@ function whenSettled(element, cb) {
   requestAnimationFrame(tick);
 }
 
-const OnboardingTour = ({
-  steps = DEFAULT_TOUR_STEPS,
-  userId,
-  onComplete,
-  autoStart = true,
-}) => {
+// Repère d'une étape sans cible : la bulle se centre à l'écran.
+const CENTRE = { centre: true, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+
+/**
+ * @param {Array}    steps    étapes ({ id, selector?, title, content, position?, inMenu? })
+ * @param {boolean}  actif    passe à true → la visite démarre à l'étape 1
+ * @param {Function} onFermer (terminee: boolean) → appelé à la fin ou à l'abandon
+ */
+const OnboardingTour = ({ steps = [], actif = false, onFermer }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [targetRect, setTargetRect] = useState(null);
   const [layout, setLayout] = useState({ top: 0, left: 0, placement: 'bottom', arrowOffset: 160 });
 
   const tooltipRef = useRef(null);
-  const startedRef = useRef(false);
 
   // `steps` est un littéral recréé à chaque rendu par Dashboard.jsx. S'en servir
   // comme dépendance recréait les rappels à chaque rendu, ce qui relançait
@@ -193,10 +146,8 @@ const OnboardingTour = ({
   const goToStepRef = useRef(null);
   const finishTourRef = useRef(null);
 
-  const markTourDone = useCallback(() => {
-    if (!userId) return;
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}`, 'true');
-  }, [userId]);
+  const onFermerRef = useRef(onFermer);
+  onFermerRef.current = onFermer;
 
   const findTargetElement = useCallback((selector) => {
     if (!selector) return null;
@@ -210,13 +161,12 @@ const OnboardingTour = ({
     return all[0] || null;
   }, []);
 
-  const closeTour = useCallback(() => {
+  const closeTour = useCallback((terminee = false) => {
     window.dispatchEvent(new CustomEvent('docuflow:set-user-menu', { detail: false }));
-    markTourDone();
     setIsOpen(false);
     setTargetRect(null);
-    onComplete?.();
-  }, [markTourDone, onComplete]);
+    onFermerRef.current?.(terminee);
+  }, []);
 
   finishTourRef.current = closeTour;
 
@@ -226,11 +176,19 @@ const OnboardingTour = ({
     if (stepIndex >= list.length) {
       // Plus aucune cible jusqu'à la fin : on termine proprement au lieu de
       // laisser la bulle figée sur l'étape précédente, bouton « Suivant » inerte.
-      finishTourRef.current?.();
+      finishTourRef.current?.(true);
       return;
     }
 
     const step = list[stepIndex];
+
+    // Étape sans cible : bulle centrée, rien à faire défiler ni à éclairer.
+    if (!step.selector) {
+      window.dispatchEvent(new CustomEvent('docuflow:set-user-menu', { detail: false }));
+      setTargetRect(CENTRE);
+      setCurrentStep(stepIndex);
+      return;
+    }
 
     const settle = (element) => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -263,49 +221,26 @@ const OnboardingTour = ({
 
   const nextStep = useCallback(() => {
     if (currentStep < stepsRef.current.length - 1) goToStep(currentStep + 1, 1);
-    else closeTour();
+    else closeTour(true);
   }, [currentStep, goToStep, closeTour]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 0) goToStep(currentStep - 1, -1);
   }, [currentStep, goToStep]);
 
-  const start = useCallback(() => {
-    const list = stepsRef.current;
-    if (!list.length) return;
-    const element = findTargetElement(list[0].selector);
-    if (!element) return;
+  // Démarrage piloté par le parent : chaque passage de `actif` à true rejoue
+  // la visite depuis le début. Une étape 1 dont la cible manque est sautée par
+  // goToStep, comme les autres.
+  useEffect(() => {
+    if (!actif || !stepsRef.current.length) return;
     setIsOpen(true);
     goToStep(0, 1);
-  }, [findTargetElement, goToStep]);
-
-  // Démarrage automatique — une seule fois par montage (`startedRef`).
-  useEffect(() => {
-    if (!autoStart || !userId || startedRef.current) return;
-    if (localStorage.getItem(`${STORAGE_KEY_PREFIX}${userId}`) === 'true') return;
-    const timer = setTimeout(() => {
-      startedRef.current = true;
-      start();
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [autoStart, userId, start]);
-
-  // Rejouer le tour à la demande (menu utilisateur → « Revoir le tour guidé »).
-  useEffect(() => {
-    const handler = () => {
-      if (userId) localStorage.removeItem(`${STORAGE_KEY_PREFIX}${userId}`);
-      startedRef.current = true;
-      setCurrentStep(0);
-      start();
-    };
-    window.addEventListener(RESTART_TOUR_EVENT, handler);
-    return () => window.removeEventListener(RESTART_TOUR_EVENT, handler);
-  }, [userId, start]);
+  }, [actif, goToStep]);
 
   // Position de la bulle : recalculée après le rendu, une fois sa hauteur
   // RÉELLE connue. La deviner décalait la flèche de plusieurs dizaines de pixels.
   useLayoutEffect(() => {
-    if (!isOpen || !targetRect) return;
+    if (!isOpen || !targetRect || targetRect.centre) return;
     const height = tooltipRef.current?.offsetHeight || FALLBACK_HEIGHT;
     setLayout(computeLayout(targetRect, stepsRef.current[currentStep]?.position, height));
   }, [isOpen, targetRect, currentStep]);
@@ -333,7 +268,7 @@ const OnboardingTour = ({
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => {
-      if (e.key === 'Escape') closeTour();
+      if (e.key === 'Escape') closeTour(false);
       else if (e.key === 'ArrowRight') nextStep();
       else if (e.key === 'ArrowLeft') prevStep();
     };
@@ -349,7 +284,8 @@ const OnboardingTour = ({
   const progress = ((currentStep + 1) / total) * 100;
   const { top, left, placement, arrowOffset } = layout;
 
-  const valid = targetRect.width > 0 && targetRect.height > 0;
+  const centre = targetRect.centre === true;
+  const valid = !centre && targetRect.width > 0 && targetRect.height > 0;
 
   // Masque sombre percé d'un « trou » sur la cible.
   const spotlightStyle = valid ? {
@@ -422,17 +358,24 @@ const OnboardingTour = ({
         </>
       )}
 
+      {/* Étape centrée : voile uni, sans trou ni anneau */}
+      {centre && (
+        <div className="fixed inset-0 z-[9997]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)' }} aria-hidden="true" />
+      )}
+
       {/* Bulle d'explication */}
       <div
         ref={tooltipRef}
         className="fixed z-[9999] pointer-events-auto animate-fade-in-up"
-        style={{ top, left, width: `${TOOLTIP_WIDTH}px` }}
+        style={centre
+          ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: `${TOOLTIP_WIDTH}px`, maxWidth: 'calc(100vw - 32px)' }
+          : { top, left, width: `${TOOLTIP_WIDTH}px` }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tour-title"
       >
         {/* Flèche pointant vers l'élément mis en avant */}
-        <div style={arrowStyle} aria-hidden="true" />
+        {!centre && <div style={arrowStyle} aria-hidden="true" />}
 
         <div className="relative bg-white rounded-2xl shadow-elevated border border-slate-200 overflow-hidden">
           {/* En-tête */}
@@ -442,7 +385,7 @@ const OnboardingTour = ({
               <p className="text-sm text-slate-500 mt-1 leading-relaxed">{step.content}</p>
             </div>
             <button
-              onClick={closeTour}
+              onClick={() => closeTour(false)}
               className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors flex-shrink-0"
               aria-label="Passer le tour"
             >
@@ -496,7 +439,7 @@ const OnboardingTour = ({
               </button>
               <div className="flex-1" />
               {currentStep === total - 1 ? (
-                <button onClick={closeTour} className="btn-primary flex-1 justify-center">
+                <button onClick={() => closeTour(true)} className="btn-primary flex-1 justify-center">
                   Terminer <Check size={16} className="ml-1" />
                 </button>
               ) : (

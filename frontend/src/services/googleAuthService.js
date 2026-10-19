@@ -1,4 +1,5 @@
 import api from './api';
+import { authService } from './authService';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
@@ -33,6 +34,7 @@ export const googleAuthService = {
     if (data.token) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      authService.signalerSession();
     }
     return data;
   },

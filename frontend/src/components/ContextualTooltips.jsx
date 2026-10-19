@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft, Lightbulb, Sparkles } from 'lucide-react';
-
-const TOOLTIP_STORAGE = 'docuflow_tooltips_seen';
+import { usePermissions } from '../hooks/usePermissions';
 
 /**
  * Système de tooltips contextuels amélioré.
@@ -27,25 +26,23 @@ const TOOLTIP_CONFIGS = [
     id: 'new-request',
     selector: '[data-tour="new-request"]',
     title: 'Créer une demande',
-    content: 'Créez une nouvelle demande de document en remplissant le formulaire. L\'archiviste sera notifié.',
+    content: 'Une phrase suffit : décrivez le document ou le dossier, les archives s\'occupent du reste. Vous serez prévenu à chaque étape.',
     position: 'bottom',
+    permission: 'requests.create',
   },
 ];
 
+/**
+ * @param {boolean} enabled false pendant une visite guidée (ou juste avant
+ *        qu'elle démarre) : un seul guide à la fois. Les conseils lus sont
+ *        enregistrés sur le compte (migration 026), comme les visites.
+ */
 const ContextualTooltips = ({ enabled = true }) => {
   const [activeTooltip, setActiveTooltip] = useState(null);
-  const [seen, setSeen] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(TOOLTIP_STORAGE) || '[]'); } catch { return []; }
-  });
+  const { can, charge, conseilVu, marquerConseil } = usePermissions();
   const timeoutsRef = useRef([]);
 
-  const markSeen = useCallback((id) => {
-    setSeen(prev => {
-      const next = [...prev, id];
-      localStorage.setItem(TOOLTIP_STORAGE, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const markSeen = useCallback((id) => { marquerConseil(id); }, [marquerConseil]);
 
   const showTooltip = useCallback((config) => {
     setActiveTooltip(config);
@@ -69,15 +66,19 @@ const ContextualTooltips = ({ enabled = true }) => {
   }, [activeTooltip, dismiss]);
 
   // Afficher les tooltips non vus après un délai
+  // Une visite qui démarre ferme le conseil en cours (sans le marquer lu).
+  useEffect(() => { if (!enabled) setActiveTooltip(null); }, [enabled]);
+
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !charge) return;
 
     // Nettoyer les timeouts précédents
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
 
     TOOLTIP_CONFIGS.forEach((config, index) => {
-      if (seen.includes(config.id)) return;
+      if (conseilVu(config.id)) return;
+      if (config.permission && !can(config.permission)) return;
 
       const timeout = setTimeout(() => {
         const el = document.querySelector(config.selector);
@@ -90,7 +91,7 @@ const ContextualTooltips = ({ enabled = true }) => {
     });
 
     return () => timeoutsRef.current.forEach(clearTimeout);
-  }, [enabled, seen, activeTooltip, showTooltip]);
+  }, [enabled, charge, conseilVu, can, activeTooltip, showTooltip]);
 
   if (!activeTooltip) return null;
 

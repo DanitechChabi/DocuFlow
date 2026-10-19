@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import RequestForm from '../components/RequestForm';
 import RequestTable from '../components/RequestTable';
 import HistoryTable from '../components/HistoryTable';
-import OnboardingTour from '../components/OnboardingTour';
-import { DEFAULT_TOUR_STEPS, SUPERADMIN_TOUR_STEPS } from '../components/OnboardingTour';
 import RequestDetailsModal from '../components/RequestDetailsModal';
 import DashboardAnalytics from '../components/DashboardAnalytics';
 import PageHeader from '../components/PageHeader';
@@ -40,11 +38,6 @@ const SkeletonCard = ({ delay = 0 }) => (
 const STAFF_TABS = ['my_tasks', 'history', 'all_requests'];
 const TAB_AVEC_OVERVIEW = ['dashboard', 'overview'];
 
-// Étapes du tour guidé, calculées une fois pour toutes hors du composant. Un
-// littéral construit dans le corps du rendu produisait un tableau d'identité
-// différente à chaque passe : le tour se réinitialisait à l'étape 1 dès le
-// moindre rafraîchissement du tableau de bord.
-const OWNER_TOUR_STEPS = [...DEFAULT_TOUR_STEPS, ...SUPERADMIN_TOUR_STEPS];
 
 const Dashboard = ({ tab = 'dashboard' }) => {
   const navigate = useNavigate();
@@ -403,6 +396,9 @@ const Dashboard = ({ tab = 'dashboard' }) => {
                   onOpenDetails={handleOpenDetails}
                   search={search}
                   loading={loading}
+                  onNouvelle={tab === 'requests' && can('requests.create')
+                    ? () => { setValeursFormulaire(null); setIsFormOpen(true); }
+                    : undefined}
                 />
               )}
             </div>
@@ -422,16 +418,6 @@ const Dashboard = ({ tab = 'dashboard' }) => {
         />
       )}
 
-      {/* Onboarding Tour — l'étape "Gestion système" n'apparaît que pour le
-          propriétaire de la plateforme (tenant 1). Les superadmins d'entreprise
-          ont leur propre portail scoped, pas le tour du portail global. */}
-      <OnboardingTour
-        steps={user?.role === 'superadmin' && user?.tenant_id === 1
-          ? OWNER_TOUR_STEPS
-          : DEFAULT_TOUR_STEPS}
-        userId={user?.id}
-        autoStart={true}
-      />
     </div>
   );
 };

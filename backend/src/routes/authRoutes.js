@@ -13,5 +13,6 @@ router.get('/company/:slug', authController.getCompanyPublic);
 // Rôle effectif de l'utilisateur courant — la question « que puis-je faire ? ».
 // C'est ce que l'interface consomme pour n'afficher que ce que l'API acceptera.
 router.get('/me', authMiddleware, authController.me);
+router.patch('/me/onboarding', authMiddleware, authController.updateOnboarding);
 
 module.exports = router;

@@ -470,7 +470,13 @@ exports.me = async (req, res) => {
   try {
     const roleService = require('../services/roleService');
     const role = await roleService.getRole(req.user.tenant_id, req.user.role);
+    // Progression de la prise en main (migration 026) — null si non migrée :
+    // l'interface retombe alors sur le stockage du navigateur.
+    const onboarding = await require('../services/onboardingService')
+      .lire(req.user.tenant_id, req.user.id)
+      .catch((err) => { console.error('[auth/me] onboarding illisible :', err.message); return null; });
     res.json({
+      onboarding,
       user: {
         id: req.user.id,
         role: req.user.role,
@@ -489,5 +495,21 @@ exports.me = async (req, res) => {
   } catch (err) {
     console.error('[auth/me]', err.message);
     res.status(500).json({ message: 'Erreur lors de la récupération du profil.' });
+  }
+};
+
+/**
+ * Enregistre la progression de la prise en main de l'utilisateur connecté :
+ * { visite: 'demandes', action: 'vue' | 'revoir' } ou { conseil: 'recherche' }.
+ * Chacun n'écrit que la sienne (req.user.id) — aucune permission requise.
+ */
+exports.updateOnboarding = async (req, res) => {
+  try {
+    const onboarding = await require('../services/onboardingService').enregistrer(req.user.tenant_id, req.user.id, req.body || {});
+    res.json({ onboarding });
+  } catch (err) {
+    if (err.statut) return res.status(err.statut).json({ message: err.message });
+    console.error('[auth/me/onboarding]', err.message);
+    res.status(500).json({ message: 'Erreur lors de l\'enregistrement de la progression.' });
   }
 };
