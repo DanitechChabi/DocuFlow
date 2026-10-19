@@ -258,7 +258,12 @@ const server = app.listen(PORT, HOST, () => {
       .catch((err) => console.error('[migrations] impossible de vérifier les migrations :', err.message));
   // Contenu des fichiers versés avant 027 : indexé en arrière-plan, après
   // les migrations (les colonnes doivent exister).
-  migrer.then(() => require('./services/contentIndexService').demarrerRattrapage());
+  migrer.then(() => {
+    const contenu = require('./services/contentIndexService');
+    contenu.demarrerRattrapage();
+    // Scans (PDF sans texte, photos) : OCR en arrière-plan (migration 028).
+    contenu.demarrerOcr();
+  });
   migrer
     .then(() => tenantProvisioningService.syncSettingDefinitions())
     .then((result) => {

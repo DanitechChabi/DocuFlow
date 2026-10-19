@@ -484,8 +484,12 @@ exports.getDocument = async (req, res) => {
        ORDER BY df.version DESC`,
       [id, tenantId]
     );
-    const files = filesRes.rows.map((f) => ({
+    // Le texte extrait (027, jusqu'à 50 000 caractères par version) reste en
+    // base pour l'index : la fiche n'en reçoit que l'indication — disponible
+    // ou non, et sa provenance (couche texte, ou OCR d'un scan, 028).
+    const files = filesRes.rows.map(({ texte_extrait: texte, ...f }) => ({
       ...f,
+      texte_disponible: Boolean(texte),
       url: storage.secureFileUrl(req, { kind: 'document', ownerId: id, fileRow: f }),
     }));
 
