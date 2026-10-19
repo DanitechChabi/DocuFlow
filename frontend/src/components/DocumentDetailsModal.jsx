@@ -453,6 +453,13 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                           <div className="min-w-0">
                             <p className="text-sm font-bold text-slate-700 truncate">{f.original_name}</p>
                             <p className="text-[11px] text-slate-400">v{f.version} · {formatSize(f.file_size)} · {f.uploaded_by_name || ''}</p>
+                            {/* Provenance du texte cherchable (migrations 027-028) */}
+                            {f.texte_source === 'ocr' && (
+                              <p className="text-[10px] text-emerald-700 mt-0.5" title="Texte lu automatiquement sur le scan : il peut contenir des erreurs de reconnaissance.">Texte reconnu par OCR · cherchable</p>
+                            )}
+                            {f.texte_source !== 'ocr' && !f.texte_disponible && f.ocr_tente_at === null && /^(image\/|application\/pdf)/.test(f.mime_type || '') && f.texte_extrait_at && (
+                              <p className="text-[10px] text-slate-400 mt-0.5">Lecture du scan en cours…</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">

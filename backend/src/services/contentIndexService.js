@@ -39,17 +39,38 @@ function colonnesTexte() {
   return colonnesPromesse;
 }
 
+// Migration 028 (OCR) passée ? Même précaution que colonnesTexte.
+let colonnesOcrPromesse = null;
+function colonnesOcr() {
+  if (!colonnesOcrPromesse) {
+    colonnesOcrPromesse = db.query(
+      `SELECT COUNT(*)::int AS n FROM information_schema.columns
+        WHERE table_name = 'document_files' AND column_name IN ('texte_source', 'ocr_tente_at')`
+    ).then((r) => r.rows[0].n === 2).catch(() => { colonnesOcrPromesse = null; return false; });
+  }
+  return colonnesOcrPromesse;
+}
+
 /**
  * Conserve le texte d'une version et met à jour celui du document.
  * @param {object} run  client de transaction ou db
- * @param {string} texte '' si rien d'extractible (la tentative est notée)
+ * @param {string} texte '' si rien d'extractible (la tentative est notée ;
+ *        un scan entre alors dans la file de l'OCR, migration 028)
+ * @param {object} [opts] { source: 'texte' | 'ocr' }
  */
-async function enregistrerTexte(run, tenantId, documentId, fileId, texte) {
+async function enregistrerTexte(run, tenantId, documentId, fileId, texte, { source = 'texte' } = {}) {
   if (!(await colonnesTexte())) return;
-  await run.query(
-    'UPDATE document_files SET texte_extrait = $2, texte_extrait_at = now() WHERE id = $1',
-    [fileId, texte || null]
-  );
+  if (await colonnesOcr()) {
+    await run.query(
+      'UPDATE document_files SET texte_extrait = $2, texte_extrait_at = now(), texte_source = $3 WHERE id = $1',
+      [fileId, texte || null, texte ? source : null]
+    );
+  } else {
+    await run.query(
+      'UPDATE document_files SET texte_extrait = $2, texte_extrait_at = now() WHERE id = $1',
+      [fileId, texte || null]
+    );
+  }
   await run.query(
     `UPDATE documents SET contenu_texte = left((
         SELECT string_agg(texte_extrait, E'\\n' ORDER BY version DESC)
@@ -60,27 +81,77 @@ async function enregistrerTexte(run, tenantId, documentId, fileId, texte) {
   );
 }
 
-/** Texte d'un fichier stocké (disque local ou Cloudinary). */
-async function lireTexteStocke(fichier) {
-  if (!TYPES_EXTRACTIBLES.has(fichier.mime_type)) return '';
-  if (Number(fichier.file_size) > TAILLE_MAX_FICHIER_RATTRAPAGE) return '';
+/**
+ * Contenu binaire d'un fichier stocké (disque local, ou Cloudinary par URL
+ * signée) ; null si introuvable (disque éphémère) ou trop volumineux.
+ */
+async function lireBinaire(fichier) {
+  if (Number(fichier.file_size) > TAILLE_MAX_FICHIER_RATTRAPAGE) return null;
   const { FILES_DIR } = require('../config/paths');
   const local = fichier.stored_name && !fichier.cloudinary_public_id && path.join(FILES_DIR, fichier.stored_name);
-  if (local && fs.existsSync(local)) return extractText(local, fichier.mime_type);
-  if (!fichier.cloudinary_public_id) return ''; // fichier local perdu (disque éphémère)
-
-  const storage = require('./storageService');
-  const url = storage.signedCloudinaryUrl(fichier);
-  if (!url) return '';
+  if (local && fs.existsSync(local)) return fs.readFileSync(local);
+  if (!fichier.cloudinary_public_id) return null;
+  const url = require('./storageService').signedCloudinaryUrl(fichier);
+  if (!url) return null;
   const axios = require('axios');
   const rep = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, maxContentLength: TAILLE_MAX_FICHIER_RATTRAPAGE });
+  return Buffer.from(rep.data);
+}
+
+/** Texte d'un fichier stocké (couche texte seulement — l'OCR est à part). */
+async function lireTexteStocke(fichier) {
+  if (!TYPES_EXTRACTIBLES.has(fichier.mime_type)) return '';
+  const binaire = await lireBinaire(fichier);
+  if (!binaire) return '';
   const tmp = path.join(os.tmpdir(), `docuflow-rattrapage-${process.pid}-${fichier.id}`);
-  fs.writeFileSync(tmp, Buffer.from(rep.data));
+  fs.writeFileSync(tmp, binaire);
   try {
     return await extractText(tmp, fichier.mime_type);
   } finally {
     fs.rmSync(tmp, { force: true });
   }
+}
+
+/**
+ * Passe à l'OCR les scans en attente (extraction faite, rien trouvé), en
+ * respectant le réglage ocr_enabled de chaque organisation. Chaque fichier
+ * est RÉSERVÉ (ocr_tente_at) avant traitement : un fichier qui ferait tomber
+ * le processus ne serait pas repris en boucle au redémarrage.
+ * @returns {Promise<number>} nombre de fichiers traités
+ */
+async function ocrEnAttente({ lot = 1 } = {}) {
+  if (!(await colonnesOcr())) return 0;
+  const r = await db.query(
+    `UPDATE document_files f SET ocr_tente_at = now()
+      WHERE f.id IN (
+        SELECT f2.id FROM document_files f2 JOIN documents d ON d.id = f2.document_id
+         WHERE f2.texte_extrait IS NULL AND f2.texte_extrait_at IS NOT NULL AND f2.ocr_tente_at IS NULL
+           AND d.deleted_at IS NULL
+           AND (f2.mime_type = 'application/pdf' OR f2.mime_type LIKE 'image/%')
+           AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.tenant_id = d.tenant_id AND s.key = 'ocr_enabled' AND s.value = 'false')
+         ORDER BY f2.id DESC LIMIT $1
+         FOR UPDATE OF f2 SKIP LOCKED
+      )
+      RETURNING f.*, (SELECT tenant_id FROM documents WHERE id = f.document_id) AS tenant_id`,
+    [lot]
+  );
+  const ocr = require('./ocrService');
+  const settingsService = require('./settingsService');
+  for (const f of r.rows) {
+    try {
+      const binaire = await lireBinaire(f);
+      if (!binaire) continue;
+      const { ocr_max_pages: maxPages } = await settingsService.getAll(f.tenant_id);
+      const texte = await ocr.lireScan(binaire, f.mime_type, { maxPages });
+      if (texte) {
+        await enregistrerTexte(db, f.tenant_id, f.document_id, f.id, require('./textExtractionService').tronquer(texte), { source: 'ocr' });
+        console.log(`[ocr] fichier ${f.id} : ${texte.length} caractères reconnus`);
+      }
+    } catch (err) {
+      console.warn(`[ocr] fichier ${f.id} non reconnu : ${err.message}`);
+    }
+  }
+  return r.rows.length;
 }
 
 /**
@@ -131,4 +202,27 @@ function demarrerRattrapage() {
   setTimeout(tour, 60000).unref();
 }
 
-module.exports = { enregistrerTexte, rattraperContenu, demarrerRattrapage, lireTexteStocke, colonnesTexte, TYPES_EXTRACTIBLES };
+/**
+ * File de l'OCR en arrière-plan : un scan à la fois, toutes les 20 s tant
+ * qu'il en reste, puis une vérification toutes les 5 min. Un nouveau scan
+ * versé est donc lu dans les minutes qui suivent.
+ */
+function demarrerOcr() {
+  let delai = 20000;
+  const tour = async () => {
+    try {
+      const n = await ocrEnAttente();
+      delai = n ? 20000 : 5 * 60000;
+    } catch (err) {
+      console.warn('[ocr] file différée :', err.message);
+      delai = 10 * 60000;
+    }
+    setTimeout(tour, delai).unref();
+  };
+  setTimeout(tour, 90000).unref();
+}
+
+module.exports = {
+  enregistrerTexte, rattraperContenu, demarrerRattrapage, ocrEnAttente, demarrerOcr,
+  lireTexteStocke, lireBinaire, colonnesTexte, TYPES_EXTRACTIBLES,
+};

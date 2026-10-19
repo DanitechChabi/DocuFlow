@@ -97,6 +97,13 @@ const CATALOG = [
       { value: 'auteur', label: 'Auteur' },
     ] },
   { key: 'page_size',           group: 'documents', label: 'Documents par page',          description: 'Nombre de documents affichés par page.', type: 'number', default: '20', min: 1, max: 100 },
+  // Reconnaissance de caractères des scans (migration 028) — en arrière-plan.
+  { key: 'ocr_enabled', group: 'documents', label: 'Reconnaissance des scans (OCR)',
+    description: 'Lire le texte des documents scannés (PDF sans texte, photos) pour qu\'ils soient retrouvés par leur contenu. Traitement en arrière-plan, quelques secondes par page.',
+    type: 'boolean', default: 'true' },
+  { key: 'ocr_max_pages', group: 'documents', label: 'Pages lues par l\'OCR',
+    description: 'Nombre maximal de pages reconnues par document scanné (les premières). Au-delà, le document reste trouvable par ces pages et par ses métadonnées.',
+    type: 'number', default: '20', min: 1, max: 200 },
   { key: 'reference_prefix',    group: 'documents', label: 'Préfixe des références',      description: 'Préfixe de la référence canonique immuable des documents.', type: 'string', default: 'DOC' },
   { key: 'max_upload_size_mb',  group: 'documents', label: 'Taille maximale par fichier', description: 'Limite de téléversement en mégaoctets.', type: 'number', default: '50', min: 1, max: 500 },
   { key: 'allowed_file_types',  group: 'documents', label: 'Types de fichiers autorisés', description: 'Extensions acceptées, séparées par des virgules.', type: 'string', default: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg,txt' },

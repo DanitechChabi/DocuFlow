@@ -142,4 +142,4 @@ function extractAutoTags(text, existingTags = []) {
   return Array.from(found).slice(0, 10);
 }
 
-module.exports = { extractText, extractAutoTags };
+module.exports = { extractText, extractAutoTags, tronquer: truncate };
