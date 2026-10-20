@@ -53,6 +53,8 @@ const TYPES = ['Arrêté', 'Attestation', 'Contrat', 'PV', 'Autre'];
   ok(val(p, 'nom_entreprise') === 'SCI Akpakpa' && val(p, 'type_document') === 'Contrat', 'bail : nom derrière son libellé, type');
   ok(p.every((x) => x.extrait && ['haute', 'moyenne'].includes(x.confiance)), 'chaque proposition a son extrait et sa confiance');
   ok(proposer('', { types: TYPES }).length === 0, 'texte vide : aucune proposition');
+  ok(val(proposer('Décision de prorogation\nBénéficiaire : BÉNIN AGRO SARL', { types: TYPES }), 'nom_entreprise') === 'BÉNIN AGRO SARL', 'nom accentué derrière « Bénéficiaire » : entier');
+  ok(val(proposer('Contrat conclu avec ÉTOILE DU GOLFE SARL pour la fourniture', { types: TYPES }), 'nom_entreprise') === 'ÉTOILE DU GOLFE SARL', 'forme sociale avec lettres accentuées : nom entier');
   const jumeau = proposer(ARRETE, { types: TYPES, champs: [{ id: 9, label: 'Type de document', type: 'select', options: [{ value: 'contrat', label: 'Contrat' }, { value: 'arrete', label: 'Arrêté' }] }] });
   ok(val(jumeau, 'meta:9') === 'arrete', 'propriété « Type de document » : même proposition que la fiche, en valeur de liste');
   ok(val(proposer('', { types: TYPES, nomFichier: 'contrat_location_2021.pdf' }), 'type_document') === 'Contrat', 'sans texte : type tiré du nom du fichier');

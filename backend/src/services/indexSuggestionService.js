@@ -207,11 +207,13 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
   reference('num_acte', 'N° d\'acte', /\b(?:acte|arr[êe]t[ée]|d[ée]cision|d[ée]lib[ée]ration|contrat)[^\n]{0,30}?\bn[°o]\.?\s*[:.]?\s*([A-Z0-9][A-Z0-9/\-.]{1,30})/i);
 
   // --- Nom (entreprise, sujet) : derrière son libellé, ou une forme sociale.
-  const libelleNom = /\b(?:soci[ée]t[ée]|entreprise|raison sociale|d[ée]nomination|bailleur|preneur|employeur|fournisseur)\s*:\s*([^\n,;]{2,60})/i.exec(texte);
+  const libelleNom = /\b(?:soci[ée]t[ée]|entreprise|raison sociale|d[ée]nomination|bailleur|preneur|employeur|fournisseur|b[ée]n[ée]ficiaire|soumissionnaire|cocontractant|demandeur)\s*:\s*([^\n,;]{2,60})/i.exec(texte);
   if (libelleNom) {
     proposerUne({ champ: 'nom_entreprise', libelle: 'Entreprise / sujet', valeur: libelleNom[1].replace(/[.]+$/, ''), confiance: 'haute', extrait: extrait(texte, libelleNom.index, libelleNom.index + libelleNom[0].length) });
   } else {
-    const forme = /\b((?:[A-Z][\w&'.-]*\s+){0,3}[A-Z][\w&'.-]*)\s+(SARL|SA|SAS|SASU|GIE|SCI|SNC|ETS)\b/.exec(texte);
+    // Classes Unicode : \w et \b ignorent les lettres accentuées, et
+    // « BÉNIN AGRO SARL » devenait « NIN AGRO SARL ».
+    const forme = /(?<![\p{L}\d])((?:\p{Lu}[\p{L}\d&'.-]*\s+){0,3}\p{Lu}[\p{L}\d&'.-]*)\s+(SARL|SA|SAS|SASU|GIE|SCI|SNC|ETS)(?![\p{L}\d])/u.exec(texte);
     if (forme) proposerUne({ champ: 'nom_entreprise', libelle: 'Entreprise / sujet', valeur: `${forme[1]} ${forme[2]}`, confiance: 'moyenne', extrait: extrait(texte, forme.index, forme.index + forme[0].length) });
   }
 
