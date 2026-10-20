@@ -52,6 +52,7 @@ exports.updateSchema = async (req, res) => {
 exports.deleteSchema = async (req, res) => {
   try {
     const success = await metadataService.deleteSchema(req.user.tenant_id, parseInt(req.params.id));
+    if (success && success.refus) return res.status(409).json({ error: success.refus, message: success.refus });
     if (!success) {
       return res.status(404).json({ error: 'Schéma non trouvé' });
     }
@@ -125,7 +126,10 @@ exports.setDocumentMetadata = async (req, res) => {
       parseInt(req.params.documentId),
       values
     );
-    res.status(200).json({ message: 'Métadonnées mises à jour avec succès' });
+    // Le titre calculé par la charte de la classe suit les propriétés.
+    const classement = await classeService.appliquer(req.user.tenant_id, parseInt(req.params.documentId), req.user.id)
+      .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
+    res.status(200).json({ message: 'Métadonnées mises à jour avec succès', classement });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -176,5 +180,56 @@ exports.syncSchema = async (req, res) => {
   } catch (error) {
     console.error('[metadata] syncSchema:', error);
     res.status(400).json({ error: error.message });
+  }
+};
+
+// ----------------------------------------------------------------------------
+// Classes : modèles DocuFlow, plan de classement, charte de nommage.
+// ----------------------------------------------------------------------------
+const classeService = require('../services/classeService');
+
+exports.getModeles = async (req, res) => {
+  try {
+    res.json(await classeService.catalogue(req.user.tenant_id));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.installerClasses = async (req, res) => {
+  const codes = Array.isArray(req.body?.codes) ? req.body.codes.filter((c) => typeof c === 'string') : null;
+  if (!codes || !codes.length) return res.status(400).json({ message: 'Choisissez au moins une classe.' });
+  try {
+    res.status(201).json(await classeService.installerClasses(req.user.tenant_id, codes));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Installation des classes impossible.' });
+  }
+};
+
+exports.installerPlan = async (req, res) => {
+  try {
+    const r = await classeService.installerPlan(req.user.tenant_id, req.params.code, req.user.id);
+    if (!r) return res.status(404).json({ message: 'Plan de classement inconnu.' });
+    res.status(201).json(r);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Installation du plan impossible.' });
+  }
+};
+
+exports.apercuNom = async (req, res) => {
+  const { modele, classe_id: classeId, valeurs, fiche } = req.body || {};
+  if (typeof modele !== 'string') return res.status(400).json({ message: 'Modèle de nom requis.' });
+  try {
+    const nom = await classeService.apercu(req.user.tenant_id, {
+      modele: modele.slice(0, 300),
+      classe_id: classeId ? Number(classeId) : null,
+      valeurs: valeurs && typeof valeurs === 'object' ? valeurs : {},
+      fiche: fiche && typeof fiche === 'object' ? fiche : {},
+    });
+    res.json({ nom });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

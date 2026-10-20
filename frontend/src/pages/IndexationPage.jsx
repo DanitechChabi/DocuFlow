@@ -50,7 +50,10 @@ const IndexationPage = () => {
   const [fiche, setFiche] = useState({});
   const [dossierId, setDossierId] = useState('');
   const [meta, setMeta] = useState({});            // fieldId → valeur
-  const [champsMeta, setChampsMeta] = useState([]);
+  const [communes, setCommunes] = useState([]);    // propriétés communes
+  const [classes, setClasses] = useState([]);      // classes de documents
+  const [classeId, setClasseId] = useState('');
+  const [titreCalcule, setTitreCalcule] = useState('');
   const [dossiers, setDossiers] = useState([]);
   const [props, setProps] = useState({ texte: null, propositions: [] });
   const [acceptes, setAcceptes] = useState(new Set());
@@ -69,15 +72,18 @@ const IndexationPage = () => {
         setFile([]);
       }
       metadataApi.getSchemas().then((s) => {
-        const defaut = (s || []).find((x) => x.is_default) || (s || [])[0];
         // Choix normalisés { value, label } : on affiche le libellé, on
         // enregistre la valeur (c'est elle que le serveur valide).
-        setChampsMeta((defaut?.fields || []).map((f) => ({
+        const prepare = (fields) => (fields || []).map((f) => ({
           ...f,
           choix: (Array.isArray(f.options_json) && f.options_json.length ? f.options_json : (f.options || []))
             .map((o) => (typeof o === 'string' ? { value: o, label: o } : { value: o.value ?? o.label, label: o.label ?? o.value })),
-        })));
-      }).catch(() => setChampsMeta([]));
+        }));
+        const liste = s || [];
+        const defaut = liste.find((x) => x.is_default) || (liste.some((x) => x.code) ? null : liste[0]);
+        setCommunes(prepare(defaut?.fields));
+        setClasses(liste.filter((x) => x !== defaut).map((c) => ({ ...c, fields: prepare(c.fields) })));
+      }).catch(() => { setCommunes([]); setClasses([]); });
       documentService.getFolders().then((f) => setDossiers(f.folders || f || [])).catch(() => setDossiers([]));
     })();
   }, []);
@@ -109,6 +115,7 @@ const IndexationPage = () => {
         setDoc(d);
         setFiche(ficheDepuis(d));
         setDossierId(d.dossier_id ? String(d.dossier_id) : '');
+        setClasseId(d.classe_id ? String(d.classe_id) : '');
         setMeta(Object.fromEntries((valeurs || []).map((v) => [v.field_id, v.value ?? ''])));
         await chargerPropositions(idCourant);
       } catch (err) {
@@ -120,21 +127,68 @@ const IndexationPage = () => {
     return () => { annule = true; };
   }, [idCourant, chargerPropositions]);
 
+  // Classe choisie : ses propriétés s'ajoutent aux propriétés communes.
+  const avecClasses = classes.length > 0;
+  const classe = classes.find((c) => String(c.id) === String(classeId)) || null;
+  // L'ancienne propriété commune « Type de document » fait doublon avec la
+  // classe (M-Files : la classe EST le type) : masquée dès qu'il y a des classes.
+  const champsMeta = useMemo(
+    () => [...communes.filter((c) => !(avecClasses && c.name === 'document_type')), ...(classe?.fields || [])],
+    [communes, classe, avecClasses],
+  );
+  const titreAuto = Boolean(classe?.modele_nom);
+  const champsFiche = useMemo(() => CHAMPS_FICHE.filter((c) => !(avecClasses && c.cle === 'type_document')), [avecClasses]);
+  const visible = (champ) => {
+    if (champ === 'classe_id') return avecClasses;
+    if (champ.startsWith('meta:')) return champsMeta.some((c) => String(c.id) === champ.slice(5));
+    if (champ === 'description') return !titreAuto;
+    return champsFiche.some((c) => c.cle === champ);
+  };
+
   const proposition = (champ) => props.propositions.find((p) => p.champ === champ);
-  const valeurDe = (champ) => (champ.startsWith('meta:') ? meta[champ.slice(5)] : fiche[champ]);
+  const valeurDe = (champ) => {
+    if (champ === 'classe_id') return classeId;
+    return champ.startsWith('meta:') ? meta[champ.slice(5)] : fiche[champ];
+  };
   const enAttente = useMemo(
-    () => props.propositions.filter((p) => String(valeurDe(p.champ) ?? '') !== String(p.valeur)),
+    () => props.propositions.filter((p) => visible(p.champ) && String(valeurDe(p.champ) ?? '') !== String(p.valeur)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props, fiche, meta],
+    [props, fiche, meta, classeId, champsMeta, titreAuto],
   );
 
+  // Titre calculé par la charte de nommage de la classe, en direct.
+  useEffect(() => {
+    if (!titreAuto) { setTitreCalcule(''); return undefined; }
+    const t = setTimeout(async () => {
+      try {
+        setTitreCalcule(await metadataApi.apercuNom({
+          modele: classe.modele_nom,
+          classe_id: classe.id,
+          valeurs: Object.fromEntries(champsMeta.filter((c) => !vide(meta[c.id])).map((c) => [c.id, meta[c.id]])),
+          fiche: { ...fiche, reference_mfile: doc?.reference_mfile },
+        }));
+      } catch { setTitreCalcule(''); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [titreAuto, classe, champsMeta, meta, fiche, doc]);
+
   const appliquer = (p) => {
-    if (p.champ.startsWith('meta:')) setMeta((m) => ({ ...m, [p.champ.slice(5)]: p.valeur }));
+    if (p.champ === 'classe_id') setClasseId(String(p.valeur));
+    else if (p.champ.startsWith('meta:')) setMeta((m) => ({ ...m, [p.champ.slice(5)]: p.valeur }));
     else setFiche((f) => ({ ...f, [p.champ]: String(p.valeur) }));
     setAcceptes((s) => new Set(s).add(p.champ));
     setErreurs((e) => ({ ...e, [p.champ]: undefined }));
   };
-  const toutAccepter = () => enAttente.forEach(appliquer);
+  const toutAccepter = () => {
+    // La classe d'abord : ses propriétés n'apparaissent qu'avec elle.
+    const pc = proposition('classe_id');
+    const cls = pc && String(classeId) !== String(pc.valeur) ? classes.find((c) => c.id === pc.valeur) : classe;
+    const ids = new Set([...communes, ...(cls?.fields || [])].map((c) => String(c.id)));
+    props.propositions
+      .filter((p) => (p.champ === 'classe_id' ? avecClasses : p.champ.startsWith('meta:') ? ids.has(p.champ.slice(5)) : visible(p.champ)))
+      .filter((p) => String(valeurDe(p.champ) ?? '') !== String(p.valeur))
+      .forEach(appliquer);
+  };
 
   const types = useMemo(() => {
     // Les types de l'organisation (servis avec les propositions) d'abord.
@@ -156,7 +210,8 @@ const IndexationPage = () => {
   const valider = async ({ indexer }) => {
     const manquants = {};
     if (indexer) {
-      if (vide(fiche.description)) manquants.description = 'Obligatoire pour retrouver le document.';
+      if (avecClasses && !classeId) manquants.classe_id = 'Choisissez la classe du document.';
+      if (!titreAuto && vide(fiche.description)) manquants.description = 'Obligatoire pour retrouver le document.';
       champsMeta.filter((c) => c.required && vide(meta[c.id])).forEach((c) => { manquants[`meta:${c.id}`] = 'Champ obligatoire.'; });
     }
     setErreurs(manquants);
@@ -170,14 +225,18 @@ const IndexationPage = () => {
     }
     setEnvoi(true);
     try {
-      const corps = {};
-      for (const { cle } of CHAMPS_FICHE) if (!vide(fiche[cle])) corps[cle] = fiche[cle];
-      if (dossierId !== String(doc?.dossier_id || '')) corps.dossier_id = dossierId ? Number(dossierId) : null;
-      if (Object.keys(corps).length) await documentService.updateDocument(idCourant, corps);
-      const metadata = champsMeta.filter((c) => !vide(meta[c.id])).map((c) => ({ fieldId: c.id, value: meta[c.id] }));
+      // Propriétés d'abord : la fiche, enregistrée ensuite avec la classe,
+      // déclenche côté serveur le titre (charte), le numéro et le rangement.
+      const metadata = champsMeta.filter((c) => !vide(meta[c.id])).map((c) => ({ fieldId: c.id, value: c.type === 'number' ? Number(meta[c.id]) : meta[c.id] }));
       if (metadata.length) await documentService.setDocumentMetadata(idCourant, metadata);
+      const corps = {};
+      for (const { cle } of champsFiche) if (!vide(fiche[cle]) && !(cle === 'description' && titreAuto)) corps[cle] = fiche[cle];
+      if (dossierId !== String(doc?.dossier_id || '')) corps.dossier_id = dossierId ? Number(dossierId) : null;
+      if (classeId !== String(doc?.classe_id || '')) corps.classe_id = classeId ? Number(classeId) : null;
+      let classement = null;
+      if (Object.keys(corps).length) classement = (await documentService.updateDocument(idCourant, corps))?.classement;
       if (indexer && doc?.statut === 'à indexer') await documentService.setStatus(idCourant, 'disponible', 'Indexé depuis le poste d\'indexation');
-      toast.success(indexer ? 'Document indexé' : 'Fiche enregistrée');
+      toast.success(`${indexer ? 'Document indexé' : 'Fiche enregistrée'}${classement?.nom ? ` : ${classement.nom}` : ''}`);
       if (indexer) {
         // Le document quitte la file : le suivant prend sa place.
         setFile((f) => f.filter((id) => id !== idCourant));
@@ -311,7 +370,24 @@ const IndexationPage = () => {
             </div>
 
             <form className="p-5 grid grid-cols-2 gap-x-4 gap-y-4" onSubmit={(e) => { e.preventDefault(); valider({ indexer: true }); }}>
-              {CHAMPS_FICHE.map((c) => (
+              {avecClasses && (
+                <div className="col-span-2">
+                  <label htmlFor="idx-classe_id" className="block text-xs font-bold text-slate-500 mb-1">Classe<span className="text-red-400"> *</span></label>
+                  <select id="idx-classe_id" className={`${champClasse('classe_id')} font-semibold`} value={classeId}
+                    onChange={(e) => { setClasseId(e.target.value); setErreurs((er) => ({ ...er, classe_id: undefined })); }}>
+                    <option value="">— Choisir la classe du document —</option>
+                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ''}</option>)}
+                  </select>
+                  {erreurs.classe_id && <p className="text-[11px] text-red-500 mt-1">{erreurs.classe_id}</p>}
+                  <Proposition champ="classe_id" />
+                </div>
+              )}
+              {champsFiche.map((c) => (c.cle === 'description' && titreAuto ? (
+                <div key={c.cle} className="col-span-2">
+                  <span className="block text-xs font-bold text-slate-500 mb-1">Titre <span className="font-normal text-slate-400">— calculé par la charte de nommage</span></span>
+                  <p className="input-premium bg-slate-50 text-slate-800 font-semibold min-h-[2.6rem]" data-testid="titre-calcule">{titreCalcule || '…'}</p>
+                </div>
+              ) : (
                 <div key={c.cle} className={c.large ? 'col-span-2' : 'col-span-2 sm:col-span-1'}>
                   <label htmlFor={`idx-${c.cle}`} className="block text-xs font-bold text-slate-500 mb-1">
                     {c.libelle}{c.requis && <span className="text-red-400"> *</span>}
@@ -328,24 +404,30 @@ const IndexationPage = () => {
                   {erreurs[c.cle] && <p className="text-[11px] text-red-500 mt-1">{erreurs[c.cle]}</p>}
                   <Proposition champ={c.cle} />
                 </div>
-              ))}
+              )))}
 
               <div className="col-span-2">
                 <label htmlFor="idx-dossier" className="block text-xs font-bold text-slate-500 mb-1">Classer dans le dossier</label>
                 <select id="idx-dossier" className="input-premium" value={dossierId} onChange={(e) => setDossierId(e.target.value)}>
-                  <option value="">Non classé</option>
+                  <option value="">
+                    {classe?.dossier_defaut_id
+                      ? `Automatique : ${(dossiers.find((f) => f.id === classe.dossier_defaut_id)?.path || dossiers.find((f) => f.id === classe.dossier_defaut_id)?.name || 'dossier de la classe')}${classe.sous_dossier_annee ? ' / année' : ''}`
+                      : 'Non classé'}
+                  </option>
                   {dossiers.map((f) => <option key={f.id} value={f.id}>{f.path || f.name}</option>)}
                 </select>
               </div>
 
-              {champsMeta.length > 0 && (
-                <h3 className="col-span-2 text-xs font-bold text-slate-500 uppercase tracking-widest pt-2 border-t border-slate-100">Propriétés</h3>
-              )}
-              {champsMeta.map((c) => {
+              {champsMeta.map((c, i) => {
                 const cle = `meta:${c.id}`;
                 const v = meta[c.id] ?? '';
+                const nbCommunes = champsMeta.length - (classe?.fields?.length || 0);
+                const entete = i === 0 || (classe && i === nbCommunes)
+                  ? (classe && i >= nbCommunes ? `Propriétés — ${classe.name}` : 'Propriétés communes') : null;
                 return (
-                  <div key={c.id} className="col-span-2 sm:col-span-1">
+                  <React.Fragment key={c.id}>
+                  {entete && <h3 className="col-span-2 text-xs font-bold text-slate-500 uppercase tracking-widest pt-2 border-t border-slate-100">{entete}</h3>}
+                  <div className="col-span-2 sm:col-span-1">
                     <label htmlFor={`idx-${cle}`} className="block text-xs font-bold text-slate-500 mb-1">
                       {c.label}{c.required && <span className="text-red-400"> *</span>}
                     </label>
@@ -365,6 +447,7 @@ const IndexationPage = () => {
                     {erreurs[cle] && <p className="text-[11px] text-red-500 mt-1">{erreurs[cle]}</p>}
                     <Proposition champ={cle} />
                   </div>
+                  </React.Fragment>
                 );
               })}
               <p className="col-span-2 text-[11px] text-slate-400 pt-2">Ctrl+Entrée : valider et passer au suivant · Ctrl+→ : passer</p>

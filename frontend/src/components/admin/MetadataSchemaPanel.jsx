@@ -3,7 +3,7 @@ import { Database, Loader2, PackagePlus } from 'lucide-react';
 import { documentService } from '../../services/documentService';
 import { settingsService } from '../../services/settingsService';
 import { toast } from '../Toast';
-import MetadataSchemaEditor from './MetadataSchemaEditor';
+import ClassesPanel from './ClassesPanel';
 
 /**
  * MetadataSchemaPanel — chargement, enregistrement et cas « aucun schéma » de
@@ -33,22 +33,6 @@ const MetadataSchemaPanel = () => {
   useEffect(() => {
     fetchSchema();
   }, [fetchSchema]);
-
-  // L'éditeur affiche lui-même le succès et l'échec : on ne notifie pas ici, et
-  // on laisse remonter l'erreur pour qu'il ne puisse pas annoncer un
-  // enregistrement réussi alors que la requête a échoué.
-  const handleSave = async (newFields) => {
-    if (!schema) return;
-    const res = await documentService.updateMetadataSchema(schema.id, newFields);
-    // On repart des champs renvoyés par le backend plutôt que de `newFields` :
-    // un champ ajouté dans l'éditeur porte un id temporaire (Date.now()) que la
-    // base ne connaît pas. Le conserver rendrait un second enregistrement
-    // destructeur — syncSchemaFields ne reconnaîtrait pas ce champ comme
-    // existant, le supprimerait puis le recréerait, et le ON DELETE CASCADE de
-    // metadata_values effacerait au passage toutes les valeurs déjà saisies sur
-    // les documents.
-    setSchema((prev) => ({ ...prev, fields: res?.fields || newFields }));
-  };
 
   // Aucun schéma : les organisations créées avant le provisionnement automatique
   // n'en ont pas. Plutôt qu'un cul-de-sac, on propose de le créer sur place.
@@ -100,7 +84,8 @@ const MetadataSchemaPanel = () => {
     );
   }
 
-  return <MetadataSchemaEditor initialSchema={schema.fields} onSave={handleSave} />;
+  // Classes et propriétés (modèle M-Files) : propriétés communes + classes.
+  return <ClassesPanel />;
 };
 
 export default MetadataSchemaPanel;

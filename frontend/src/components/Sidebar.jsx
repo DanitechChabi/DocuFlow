@@ -5,6 +5,7 @@ import {
   FolderOpen, Wand2, Archive, Trash2, Bell,
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
+  Layers,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -118,6 +119,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
+    entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
     entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille' }),
   ];
 

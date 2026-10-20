@@ -9,6 +9,7 @@ const relationService = require('../services/relationService');
 const retentionService = require('../services/retentionService');
 const stateMachine = require('../services/documentStateMachine');
 const aclService = require('../services/aclService');
+const classeService = require('../services/classeService');
 const roleService = require('../services/roleService');
 const { ROLES_SYSTEME } = require('../config/permissions');
 const { verifyFileTicket } = require('../helpers/fileTicket');
@@ -451,10 +452,11 @@ exports.getDocument = async (req, res) => {
   try {
     // Utiliser des JOINs qualifiés pour éviter l'ambiguïté tenant_id
     const docRes = await db.query(
-      `SELECT d.*, f.name AS dossier_name, u.full_name AS created_by_name
+      `SELECT d.*, f.name AS dossier_name, u.full_name AS created_by_name, c.name AS classe_nom
        FROM documents d
        LEFT JOIN document_folders f ON f.id = d.dossier_id AND f.tenant_id = d.tenant_id
        LEFT JOIN users u ON u.id = d.created_by AND u.tenant_id = d.tenant_id
+       LEFT JOIN metadata_schemas c ON c.id = d.classe_id AND c.tenant_id = d.tenant_id
        WHERE d.id = $1 AND d.tenant_id = $2`,
       [id, tenantId]
     );
@@ -623,10 +625,17 @@ exports.updateDocument = async (req, res) => {
     });
   }
 
-  const allowed = ['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'description', 'auteur', 'date_document', 'dossier_id'];
+  // CLASSE : doit être une classe de l'organisation (pas les propriétés
+  // communes). null retire la classe.
+  if (req.body.classe_id !== undefined && req.body.classe_id !== null && req.body.classe_id !== ''
+    && !(await classeService.classe(tenantId, req.body.classe_id))) {
+    return res.status(400).json({ message: 'Classe de document inconnue.' });
+  }
+
+  const allowed = ['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'description', 'auteur', 'date_document', 'dossier_id', 'classe_id'];
   // Colonnes numériques : une chaîne vide y provoquerait une erreur 22P02
   // (invalid input syntax for type integer) et donc un 500 opaque.
-  const numericFields = new Set(['annee', 'dossier_id']);
+  const numericFields = new Set(['annee', 'dossier_id', 'classe_id']);
   const fields = [];
   const vals = [];
   for (const [k, v] of Object.entries(req.body)) {
@@ -666,7 +675,10 @@ exports.updateDocument = async (req, res) => {
     const result = await db.query(sql, vals);
     if (!result.rowCount) return res.status(404).json({ message: 'Document non trouvé' });
     await logHistory(tenantId, id, req.user.id, 'Modification du document', null, null);
-    res.json({ message: 'Document mis à jour' });
+    // Classe : titre selon la charte, numéro, rangement dans le plan.
+    const classement = await classeService.appliquer(tenantId, Number(id), req.user.id)
+      .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
+    res.json({ message: 'Document mis à jour', classement });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la mise à jour du document" });
@@ -1263,6 +1275,9 @@ exports.createFolder = async (req, res) => {
       ['name', 'parent_id', 'created_by'],
       [String(name).trim(), parentId, req.user.id]
     );
+    // Le cache des périmètres ne connaît pas encore ce dossier : sans
+    // invalidation, il serait « inconnu » (donc refusé) jusqu'à 60 s.
+    aclService.invalidate();
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -1362,6 +1377,7 @@ exports.renameFolder = async (req, res) => {
       vals
     );
     if (!result.rowCount) return res.status(404).json({ message: 'Dossier non trouvé' });
+    if (deplacement) aclService.invalidate(); // l'héritage des périmètres change avec le parent
     res.json({ message: deplacement && name === undefined ? 'Dossier déplacé' : 'Dossier renommé' });
   } catch (err) {
     console.error(err);
@@ -1426,6 +1442,7 @@ exports.deleteFolder = async (req, res) => {
       [ids, tenantId]
     );
     if (!result.rowCount) return res.status(404).json({ message: 'Dossier non trouvé' });
+    aclService.invalidate();
     res.json({
       message: result.rowCount > 1 ? `${result.rowCount} dossiers supprimés` : 'Dossier supprimé',
       dossiers_supprimes: result.rowCount,
@@ -2107,7 +2124,10 @@ exports.setDocumentMetadata = async (req, res) => {
       details: { fields: values.map((v) => v.fieldId) },
       ipAddress: req.ip,
     });
-    res.json({ message: 'Métadonnées mises à jour avec succès' });
+    // Le titre calculé par la charte suit les propriétés.
+    const classement = await classeService.appliquer(tenantId, parseInt(id, 10), req.user.id)
+      .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
+    res.json({ message: 'Métadonnées mises à jour avec succès', classement });
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: err.message || 'Erreur lors de la mise à jour des métadonnées' });

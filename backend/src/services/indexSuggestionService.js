@@ -89,7 +89,7 @@ function dateDans(valeur) {
  * @param {object} ctx   { nomFichier, types: string[], champs: [{ id, label, type, options }] }
  * @returns {Array<{ champ, libelle, valeur, confiance, extrait }>}
  */
-function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = [] } = {}) {
+function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = [], classes = [] } = {}) {
   const texte = String(brut || '').slice(0, LONGUEUR_ANALYSEE);
   const norm = normaliser(texte);
   const props = [];
@@ -128,6 +128,33 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
       champ: 'type_document', libelle: 'Type de document', valeur: meilleur.type,
       confiance: meilleur.source === 'texte' && meilleur.index < 300 ? 'haute' : 'moyenne',
       extrait: meilleur.source === 'texte' ? extrait(texte, meilleur.index, meilleur.fin) : `Nom du fichier : ${nomFichier}`,
+    });
+  }
+
+  // --- Classe : son nom ou un de ses mots de reconnaissance, le plus tôt dans
+  // le texte ; à égalité, la forme la plus longue (« facture client » l'emporte
+  // sur « facture »). À défaut, le nom du fichier.
+  let classe = null;
+  for (const c of classes) {
+    const formes = [c.nom, ...String(c.mots_cles || '').split(',')].map((f) => normaliser(f.trim())).filter((f) => f.length >= 3);
+    for (const f of formes) {
+      const re = new RegExp(`(^|[^a-z0-9])${echapper(f)}s?(?![a-z0-9])`);
+      const m = re.exec(norm.slice(0, 1500));
+      if (m) {
+        const index = m.index + m[1].length;
+        if (!classe || classe.source !== 'texte' || index < classe.index || (index === classe.index && f.length > classe.longueur)) {
+          classe = { c, index, fin: index + f.length, longueur: f.length, source: 'texte' };
+        }
+      } else if (!classe && re.test(fichierNorm)) {
+        classe = { c, index: -1, longueur: f.length, source: 'fichier' };
+      }
+    }
+  }
+  if (classe) {
+    proposerUne({
+      champ: 'classe_id', libelle: 'Classe', valeur: classe.c.id, affichage: classe.c.nom,
+      confiance: classe.source === 'texte' && classe.index < 300 ? 'haute' : 'moyenne',
+      extrait: classe.source === 'texte' ? extrait(texte, classe.index, classe.fin) : `Nom du fichier : ${nomFichier}`,
     });
   }
 
@@ -280,14 +307,28 @@ async function propositionsPour(tenantId, documentId) {
        FROM metadata_fields f JOIN metadata_schemas s ON s.id = f.schema_id
       WHERE s.tenant_id = $1 ORDER BY s.is_default DESC, f.display_order`, [tenantId])).rows;
 
+  // Classes de l'organisation (migration 029 : code, mots de reconnaissance).
+  const classes = (await db.query(
+    `SELECT id, name AS nom, ${await colonneClasse() ? 'mots_cles' : 'NULL AS mots_cles'}
+       FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE ORDER BY name`, [tenantId])).rows;
+
   const texte = doc.contenu_texte || '';
   return {
     texte: texte ? 'disponible' : enAttente ? 'en_attente' : 'aucun',
-    propositions: proposer(texte, { nomFichier: fichiers[0]?.original_name || '', types, champs }),
+    propositions: proposer(texte, { nomFichier: fichiers[0]?.original_name || '', types, champs, classes }),
     // La liste que la fiche propose : la même que celle dont l'assistant tire
     // ses propositions — une proposition est toujours choisissable.
     types,
   };
+}
+
+let colonneClassePromesse = null;
+function colonneClasse() {
+  if (!colonneClassePromesse) {
+    colonneClassePromesse = db.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'metadata_schemas' AND column_name = 'mots_cles'")
+      .then((r) => r.rows.length > 0).catch(() => { colonneClassePromesse = null; return false; });
+  }
+  return colonneClassePromesse;
 }
 
 let colonneOcrPromesse = null;

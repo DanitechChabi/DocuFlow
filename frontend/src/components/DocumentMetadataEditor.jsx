@@ -3,7 +3,7 @@ import { X, Save, AlertCircle, Info } from 'lucide-react';
 import { metadataApi } from '../services/metadataApi';
 import { toast } from './Toast';
 
-const DocumentMetadataEditor = ({ documentId, onClose, onSuccess }) => {
+const DocumentMetadataEditor = ({ documentId, classeId = null, onClose, onSuccess }) => {
   const [schemas, setSchemas] = useState([]);
   const [metadata, setMetadata] = useState([]);
   const [values, setValues] = useState({});
@@ -39,6 +39,13 @@ const DocumentMetadataEditor = ({ documentId, onClose, onSuccess }) => {
     loadData();
   }, [documentId]);
 
+  // Propriétés communes + propriétés de la classe du document (modèle M-Files).
+  const champsDe = (liste) => {
+    const communes = liste.find(s => s.is_default) || liste[0];
+    const classe = classeId ? liste.find(s => s.id === classeId && s !== communes) : null;
+    return [...(communes?.fields || []), ...(classe?.fields || [])];
+  };
+
   const handleValueChange = (fieldId, value) => {
     setValues(prev => ({ ...prev, [fieldId]: value }));
   };
@@ -62,7 +69,7 @@ const DocumentMetadataEditor = ({ documentId, onClose, onSuccess }) => {
       const defaultSchema = schemas.find(s => s.is_default) || schemas[0];
       if (!defaultSchema) throw new Error('Aucun schéma disponible');
 
-      defaultSchema.fields.forEach(field => {
+      champsDe(schemas).forEach(field => {
         const val = values[field.id];
         if (val !== undefined) {
           metadataToSave.push({ fieldId: field.id, value: val });
@@ -83,6 +90,7 @@ const DocumentMetadataEditor = ({ documentId, onClose, onSuccess }) => {
   if (loading) return null; // Handled by parent loading state usually
 
   const defaultSchema = schemas.find(s => s.is_default) || schemas[0];
+  const champs = champsDe(schemas);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}>
@@ -109,7 +117,7 @@ const DocumentMetadataEditor = ({ documentId, onClose, onSuccess }) => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              {defaultSchema.fields.map(field => (
+              {champs.map(field => (
                 <div key={field.id} className={`space-y-1.5 ${field.required ? 'border-l-2 border-docuflow-secondary pl-3' : ''}`}>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">
                     {field.label} {field.required && <span className="text-red-500">*</span>}

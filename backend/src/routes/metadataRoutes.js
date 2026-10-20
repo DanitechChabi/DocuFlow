@@ -21,6 +21,13 @@ router.put('/schemas/:id', adminOrArchivist, metadataController.updateSchema);
 router.put('/schemas/:id/sync', adminOrArchivist, metadataController.syncSchema);
 router.delete('/schemas/:id', adminOrArchivist, metadataController.deleteSchema);
 
+// Classes : modèles DocuFlow (copiés puis adaptés), plan de classement,
+// aperçu de la charte de nommage.
+router.get('/modeles', adminOrArchivist, metadataController.getModeles);
+router.post('/modeles/classes', adminOrArchivist, metadataController.installerClasses);
+router.post('/modeles/plans/:code', requirePermission('folders.create'), metadataController.installerPlan);
+router.post('/nom-apercu', adminOrArchivist, metadataController.apercuNom);
+
 router.post('/schemas/:schemaId/fields', adminOrArchivist, metadataController.createField);
 router.put('/fields/:id', adminOrArchivist, metadataController.updateField);
 router.delete('/fields/:id', adminOrArchivist, metadataController.deleteField);
