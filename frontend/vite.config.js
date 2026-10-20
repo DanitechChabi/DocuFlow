@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
+  // Commit de l'interface, affiché dans « À propos » (Vercel fournit
+  // VERCEL_GIT_COMMIT_SHA à la compilation).
+  define: {
+    __VERSION_INTERFACE__: JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT || '').slice(0, 7)),
+  },
   plugins: [
     react(),
     tailwindcss(),

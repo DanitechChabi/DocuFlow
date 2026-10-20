@@ -11,6 +11,7 @@ import {
 import { RESTART_TOUR_EVENT } from '../components/OnboardingTour';
 import { authService } from '../services/authService';
 import { useTitrePage } from '../hooks/useTitrePage';
+import EtatPlateforme from '../components/EtatPlateforme';
 
 // Date de dernière révision de cette page. Écrite en clair : une date calculée
 // à l'affichage prétendrait que le contenu est à jour du jour même.
@@ -236,6 +237,9 @@ const AboutPage = () => {
             <span>Mise à jour : {LAST_UPDATED}</span>
           </div>
         </div>
+
+        {/* Versions en ligne, base, migrations, stockage */}
+        <EtatPlateforme />
 
         {/* Présentation */}
         <div className="glass-card-premium p-6 md:p-8 animate-fade-in-up">

@@ -188,6 +188,37 @@ app.get('/', (req, res) => {
   res.send('DocuFlow API is running...');
 });
 
+// État de la plateforme — public, sans donnée d'organisation : il sert à
+// vérifier un déploiement (« la nouvelle version est-elle en ligne ? ») et à
+// diagnostiquer une liste vide (base injoignable, migration en échec,
+// stockage des fichiers non persistant).
+//   version  — commit déployé (Render fournit RENDER_GIT_COMMIT)
+//   stockage — 'cloudinary' (persistant) ou 'local' : sur Render sans disque,
+//              les fichiers locaux sont EFFACÉS à chaque redéploiement.
+let etatMigrations = { echec: null };
+const DEMARRE_LE = new Date().toISOString();
+app.get('/api/health', async (req, res) => {
+  const etat = {
+    api: 'ok',
+    version: (process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || '').slice(0, 7) || null,
+    demarre_le: DEMARRE_LE,
+    base: 'ok',
+    derniere_migration: null,
+    migration_en_echec: etatMigrations.echec,
+    stockage: require('./services/storageService').USE_CLOUDINARY ? 'cloudinary' : 'local',
+  };
+  try {
+    const db = require('./config/db');
+    const m = await db.query('SELECT filename FROM migrations ORDER BY filename DESC LIMIT 1').catch(() => ({ rows: [] }));
+    etat.derniere_migration = m.rows[0]?.filename || null;
+    await db.query('SELECT 1');
+  } catch (err) {
+    etat.base = 'injoignable';
+    etat.base_erreur = err.message;
+  }
+  res.status(etat.base === 'ok' ? 200 : 503).json(etat);
+});
+
 // Global error handler — prevents unhandled errors from crashing the process
 app.use((err, req, res, _next) => {
   console.error('[global] Unhandled error:', err);
@@ -252,6 +283,7 @@ const server = app.listen(PORT, HOST, () => {
     ? Promise.resolve()
     : require('./services/migrationRunner').appliquerMigrations()
       .then((r) => {
+        etatMigrations = r.echec ? { echec: r.echec.fichier, message: r.echec.message } : { echec: null };
         if (r.ignore) console.log(`[migrations] non exécutées : ${r.ignore}`);
         else if (!r.echec) console.log(`[migrations] base à jour${r.appliquees.length ? ` (${r.appliquees.length} appliquée(s))` : ''}`);
       })
