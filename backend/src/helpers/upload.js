@@ -17,6 +17,8 @@ const ALLOWED_MIMES = {
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/gif': 'gif',
+  // Format de sortie courant des scanners (dossier surveillé, versement).
+  'image/tiff': 'tif',
   'application/msword': 'doc',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.ms-excel': 'xls',

@@ -52,4 +52,11 @@ export const metadataApi = {
     const response = await api.delete(`/metadata/documents/${documentId}/values/${fieldId}`);
     return response.data;
   },
+
+  // Classes : modèles DocuFlow, plan de classement, charte de nommage.
+  getModeles: async () => (await api.get('/metadata/modeles')).data,
+  installerClasses: async (codes) => (await api.post('/metadata/modeles/classes', { codes })).data,
+  installerPlan: async (code) => (await api.post(`/metadata/modeles/plans/${code}`)).data,
+  apercuNom: async (corps) => (await api.post('/metadata/nom-apercu', corps)).data.nom,
+  syncSchema: async (id, fields) => (await api.put(`/metadata/schemas/${id}/sync`, { fields })).data,
 };

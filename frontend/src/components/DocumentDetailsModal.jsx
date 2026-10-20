@@ -252,7 +252,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   <Meta icon={Building2} label="Entreprise" value={doc.nom_entreprise} />
                   <Meta icon={FileText} label="N° dossier / acte" value={`${doc.num_dossier} / ${doc.num_acte}`} />
                   <Meta icon={Calendar} label="Année" value={doc.annee} />
-                  {doc.type_document && <Meta icon={File} label="Type" value={doc.type_document} />}
+                  {doc.classe_nom
+                    ? <Meta icon={File} label="Classe" value={doc.classe_nom} />
+                    : doc.type_document && <Meta icon={File} label="Type" value={doc.type_document} />}
                   {doc.auteur && <Meta icon={User} label="Auteur" value={doc.auteur} />}
                   {doc.date_document && <Meta icon={Calendar} label="Date du document" value={new Date(doc.date_document).toLocaleDateString('fr-FR')} />}
                   {doc.dossier_name && <Meta icon={FolderOpen} label="Dossier" value={doc.dossier_name} />}
@@ -526,6 +528,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
       {showIndexing && doc && (
         <DocumentMetadataEditor
           documentId={doc.id}
+          classeId={doc.classe_id || null}
           onClose={() => setShowIndexing(false)}
           onSuccess={() => { if (onChanged) onChanged(); }}
         />

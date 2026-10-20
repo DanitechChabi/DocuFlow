@@ -106,7 +106,7 @@ const CATALOG = [
     type: 'number', default: '20', min: 1, max: 200 },
   { key: 'reference_prefix',    group: 'documents', label: 'Préfixe des références',      description: 'Préfixe de la référence canonique immuable des documents.', type: 'string', default: 'DOC' },
   { key: 'max_upload_size_mb',  group: 'documents', label: 'Taille maximale par fichier', description: 'Limite de téléversement en mégaoctets.', type: 'number', default: '50', min: 1, max: 500 },
-  { key: 'allowed_file_types',  group: 'documents', label: 'Types de fichiers autorisés', description: 'Extensions acceptées, séparées par des virgules.', type: 'string', default: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg,txt' },
+  { key: 'allowed_file_types',  group: 'documents', label: 'Types de fichiers autorisés', description: 'Extensions acceptées, séparées par des virgules.', type: 'string', default: 'pdf,doc,docx,xls,xlsx,png,jpg,jpeg,tif,tiff,txt' },
   { key: 'enable_ocr',              group: 'documents', label: 'Extraction de texte (OCR)', description: 'Extraire le texte des fichiers au téléversement pour la recherche.', type: 'boolean', default: 'true' },
   { key: 'enable_auto_tagging',     group: 'documents', label: 'Étiquetage automatique',    description: 'Proposer des mots-clés métier à partir du contenu extrait.', type: 'boolean', default: 'true' },
   { key: 'enable_checkin_checkout', group: 'documents', label: 'Verrouillage des documents', description: 'Activer le check-in / check-out anticollision.', type: 'boolean', default: 'true' },

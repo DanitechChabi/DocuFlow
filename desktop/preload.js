@@ -35,4 +35,31 @@ contextBridge.exposeInMainWorld('desktopApp', {
   /** Version de l'application, affichée à l'écran « À propos » et au support. */
   getVersion: () => ipcRenderer.invoke('desktop:version'),
   setTitle: (title) => ipcRenderer.invoke('desktop:set-title', title),
+
+  /**
+   * Dossier surveillé (dossier de dépôt du scanner) — voir dossierSurveille.js.
+   * Fonctions nommées, une par geste : pas d'accès générique au disque. La
+   * lecture ne porte que sur les fichiers signalés par le guetteur.
+   */
+  dossierSurveille: {
+    config: () => ipcRenderer.invoke('dossier:config'),
+    enregistrer: (config) => ipcRenderer.invoke('dossier:enregistrer', config),
+    choisir: () => ipcRenderer.invoke('dossier:choisir'),
+    armer: (oui) => ipcRenderer.invoke('dossier:armer', oui === true),
+    lire: (chemin) => ipcRenderer.invoke('dossier:lire', chemin),
+    confirmer: (chemin, resultat) => ipcRenderer.invoke('dossier:confirmer', chemin, resultat),
+    ouvrir: () => ipcRenderer.invoke('dossier:ouvrir'),
+    /** Abonnements : renvoient la fonction de désabonnement. L'objet
+     * `event` d'Electron n'est jamais transmis à la page. */
+    surFichier: (cb) => {
+      const h = (_e, f) => cb(f);
+      ipcRenderer.on('dossier:fichier', h);
+      return () => ipcRenderer.removeListener('dossier:fichier', h);
+    },
+    surEtat: (cb) => {
+      const h = (_e, etat) => cb(etat);
+      ipcRenderer.on('dossier:etat', h);
+      return () => ipcRenderer.removeListener('dossier:etat', h);
+    },
+  },
 });

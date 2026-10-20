@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
@@ -22,6 +22,9 @@ import PageHeader from '../components/PageHeader';
 import GEDOverview from '../components/GEDOverview';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { usePermissions } from '../hooks/usePermissions';
+import { estBureau } from '../utils/plateforme';
+import DossierSurveilleCarte from '../components/desktop/DossierSurveilleCarte';
+import { SCANS_IMPORTES_EVENT } from '../components/desktop/DossierSurveilleAgent';
 import { STATUS_CLASSES, STATUS_LABELS, STATUS_VALUES } from '../utils/documentStatuses';
 
 // Étiquette produite par le COALESCE de getDynamicViewData pour les documents
@@ -224,6 +227,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadFolders(); }, [loadFolders]);
+  // Scans versés par le dossier surveillé : la liste se met à jour seule.
+  useEffect(() => {
+    window.addEventListener(SCANS_IMPORTES_EVENT, load);
+    return () => window.removeEventListener(SCANS_IMPORTES_EVENT, load);
+  }, [load]);
 
   // Debounce de la recherche
   useEffect(() => {
@@ -372,6 +380,13 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
           ]}
           actions={
             <>
+              {/* Poste d'indexation : la file « À indexer », document par
+                  document, avec aperçu et propositions de métadonnées. */}
+              {statutFiltre === 'à indexer' && can('documents.edit') && (
+                <Link to="/documents/a-indexer/poste" className="btn btn-primary" data-tour="poste-indexation">
+                  <Wand2 size={16} /> Ouvrir le poste d'indexation
+                </Link>
+              )}
               {/* La primitive .segmented porte l'état sur aria-pressed : le mode
                   actif est ainsi annoncé aux lecteurs d'écran, alors qu'un simple
                   fond blanc ne l'était que visuellement. */}
@@ -404,6 +419,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
             </>
           }
         />
+
+        {/* Bureau : réglages du dossier surveillé (sortie du scanner). */}
+        {statutFiltre === 'à indexer' && estBureau() && can('documents.upload') && (
+          <DossierSurveilleCarte dossiers={folders} />
+        )}
 
         {/* Toolbar */}
         <div className="glass-card-premium p-4 mb-6 space-y-4">

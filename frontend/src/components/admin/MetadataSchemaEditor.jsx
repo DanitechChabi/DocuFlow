@@ -102,7 +102,12 @@ const SortableFieldRow = ({ field, typeInfo, handleEditFieldClick, handleDeleteF
   );
 };
 
-const MetadataSchemaEditor = ({ initialSchema = [], onSave }) => {
+const MetadataSchemaEditor = ({
+  initialSchema = [], onSave,
+  titre = 'Configuration des Métadonnées',
+  sousTitre = 'Définissez les champs obligatoires et optionnels pour vos documents.',
+  libelleEnregistrer = 'Enregistrer le schéma',
+}) => {
   const [schema, setSchema] = useState(initialSchema);
   const [isAdding, setIsAdding] = useState(false);
   const [editingField, setEditingField] = useState(null);
@@ -189,7 +194,7 @@ const MetadataSchemaEditor = ({ initialSchema = [], onSave }) => {
     setSaving(true);
     try {
       if (onSave) await onSave(schema);
-      toast.success('Schéma des métadonnées enregistré avec succès');
+      toast.success('Propriétés enregistrées');
     } catch (err) {
       // `metadataController.syncSchema` répond `{ error }` là où le reste de
       // l'API répond `{ message }` : on lit les deux, sinon l'admin ne voyait
@@ -220,8 +225,8 @@ const MetadataSchemaEditor = ({ initialSchema = [], onSave }) => {
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-black text-slate-900">Configuration des Métadonnées</h3>
-          <p className="text-sm text-slate-500">Définissez les champs obligatoires et optionnels pour vos documents.</p>
+          <h3 className="text-lg font-black text-slate-900">{titre}</h3>
+          <p className="text-sm text-slate-500">{sousTitre}</p>
         </div>
         {!isAdding && !editingField && (
           <button
@@ -371,7 +376,7 @@ const MetadataSchemaEditor = ({ initialSchema = [], onSave }) => {
             disabled={saving}
             className="btn-primary flex items-center gap-2 px-8"
           >
-            {saving ? 'Enregistrement…' : <><Save size={18} /> Enregistrer le schéma</>}
+            {saving ? 'Enregistrement…' : <><Save size={18} /> {libelleEnregistrer}</>}
           </button>
         </div>
       )}

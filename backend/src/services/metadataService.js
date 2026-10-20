@@ -204,14 +204,49 @@ function validateValue(field, value) {
 // SCHEMAS
 // ============================================================================
 
-async function createSchema(tenantId, { name, description, isDefault = false }) {
-  const result = await db.query(
-    `INSERT INTO metadata_schemas (tenant_id, name, description, is_default)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [tenantId, name, description, isDefault]
-  );
-  return result.rows[0];
+/**
+ * Réglages de CLASSE d'un schéma (migration 029) : code, mots de
+ * reconnaissance, charte de nommage, rangement. Seules les clés présentes
+ * sont renvoyées ; le dossier de rangement doit appartenir à l'organisation.
+ */
+async function reglagesClasse(tenantId, body = {}) {
+  const r = {};
+  if (body.code !== undefined) {
+    const code = String(body.code || '').trim().toUpperCase();
+    if (code && !/^[A-Z0-9][A-Z0-9_-]{0,11}$/.test(code)) {
+      throw new Error('Le code de classe : 12 caractères au plus, lettres, chiffres, « - » ou « _ ».');
+    }
+    r.code = code || null;
+  }
+  if (body.mots_cles !== undefined) r.mots_cles = String(body.mots_cles || '').slice(0, 500) || null;
+  if (body.modele_nom !== undefined) r.modele_nom = String(body.modele_nom || '').slice(0, 300) || null;
+  if (body.sous_dossier_annee !== undefined) r.sous_dossier_annee = Boolean(body.sous_dossier_annee);
+  if (body.dossier_defaut_id !== undefined) {
+    const id = body.dossier_defaut_id === null || body.dossier_defaut_id === '' ? null : Number(body.dossier_defaut_id);
+    if (id !== null) {
+      const { rows } = await db.query('SELECT id FROM document_folders WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+      if (!rows[0]) throw new Error('Dossier de rangement introuvable.');
+    }
+    r.dossier_defaut_id = id;
+  }
+  return r;
+}
+
+async function createSchema(tenantId, { name, description, isDefault = false, ...classe }) {
+  if (!name || !String(name).trim()) throw new Error('Le nom de la classe est obligatoire.');
+  const extra = await reglagesClasse(tenantId, classe);
+  const cols = ['tenant_id', 'name', 'description', 'is_default', ...Object.keys(extra)];
+  const vals = [tenantId, String(name).trim(), description || null, isDefault, ...Object.values(extra)];
+  try {
+    const result = await db.query(
+      `INSERT INTO metadata_schemas (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *`,
+      vals
+    );
+    return { ...result.rows[0], fields: [] };
+  } catch (err) {
+    if (err.code === '23505') throw new Error('Une classe porte déjà ce nom.');
+    throw err;
+  }
 }
 
 async function getSchemas(tenantId) {
@@ -237,7 +272,18 @@ async function getSchemas(tenantId) {
     if (bucket) bucket.push(decorateField(row));
   });
 
-  return schemas.map((s) => ({ ...s, fields: bySchema.get(s.id) || [] }));
+  // Nombre de documents de chaque classe (affichage, garde de suppression).
+  let usage = new Map();
+  try {
+    const u = await db.query(
+      `SELECT classe_id, COUNT(*)::int AS n FROM documents
+        WHERE tenant_id = $1 AND classe_id IS NOT NULL AND deleted_at IS NULL GROUP BY classe_id`,
+      [tenantId]
+    );
+    usage = new Map(u.rows.map((r) => [r.classe_id, r.n]));
+  } catch { /* migration 029 pas encore appliquée */ }
+
+  return schemas.map((s) => ({ ...s, nb_documents: usage.get(s.id) || 0, fields: bySchema.get(s.id) || [] }));
 }
 
 async function getSchemaById(tenantId, schemaId) {
@@ -259,21 +305,47 @@ async function getSchemaById(tenantId, schemaId) {
   };
 }
 
-async function updateSchema(tenantId, schemaId, { name, description, isDefault }) {
-  const result = await db.query(
-    `UPDATE metadata_schemas
-     SET name = COALESCE($2, name),
-         description = COALESCE($3, description),
-         is_default = COALESCE($4, is_default),
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1 AND tenant_id = $5
-     RETURNING *`,
-    [schemaId, name, description, isDefault, tenantId]
-  );
-  return result.rows[0];
+async function updateSchema(tenantId, schemaId, { name, description, isDefault, ...classe }) {
+  const extra = await reglagesClasse(tenantId, classe);
+  const sets = Object.keys(extra).map((k, i) => `${k} = $${i + 6}`);
+  try {
+    const result = await db.query(
+      `UPDATE metadata_schemas
+       SET name = COALESCE($2, name),
+           description = COALESCE($3, description),
+           is_default = COALESCE($4, is_default),
+           ${sets.length ? `${sets.join(', ')},` : ''}
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND tenant_id = $5
+       RETURNING *`,
+      [schemaId, name ? String(name).trim() : null, description, isDefault, tenantId, ...Object.values(extra)]
+    );
+    return result.rows[0];
+  } catch (err) {
+    if (err.code === '23505') throw new Error('Une classe porte déjà ce nom.');
+    throw err;
+  }
 }
 
+/**
+ * Suppression d'une classe. Refusée tant que des documents la portent ou ont
+ * des valeurs dans ses propriétés : la cascade effacerait ces valeurs sans
+ * trace. Le schéma des propriétés communes ne se supprime pas.
+ * @returns {Promise<boolean|{ refus: string }>}
+ */
 async function deleteSchema(tenantId, schemaId) {
+  const s = await db.query('SELECT is_default FROM metadata_schemas WHERE id = $1 AND tenant_id = $2', [schemaId, tenantId]);
+  if (!s.rows[0]) return false;
+  if (s.rows[0].is_default) return { refus: 'Les propriétés communes ne peuvent pas être supprimées.' };
+  const usage = await db.query(
+    `SELECT (SELECT COUNT(*) FROM documents WHERE tenant_id = $2 AND classe_id = $1)::int
+          + (SELECT COUNT(*) FROM metadata_values v JOIN metadata_fields f ON f.id = v.field_id WHERE f.schema_id = $1)::int AS n`,
+    [schemaId, tenantId]
+  ).catch(() => db.query(
+    'SELECT COUNT(*)::int AS n FROM metadata_values v JOIN metadata_fields f ON f.id = v.field_id WHERE f.schema_id = $1', [schemaId]));
+  if (usage.rows[0].n > 0) {
+    return { refus: 'Des documents utilisent cette classe : reclassez-les avant de la supprimer.' };
+  }
   const result = await db.query(
     'DELETE FROM metadata_schemas WHERE id = $1 AND tenant_id = $2 RETURNING id',
     [schemaId, tenantId]
