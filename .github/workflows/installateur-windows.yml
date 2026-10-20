@@ -1,0 +1,117 @@
+# ============================================================================
+# Installateur Windows de l'application de bureau — compilé par GitHub.
+#
+# Déclenchement :
+#   - pousser une étiquette de version :  git tag v2.1.0 && git push origin v2.1.0
+#   - ou à la main : onglet Actions › « Installateur Windows » › Run workflow
+#
+# Résultat : une release GitHub « DocuFlow <version> » portant
+#   DocuFlow-Setup-<version>.exe   (nom versionné)
+#   DocuFlow-Setup.exe             (nom stable : le lien
+#     https://github.com/DanitechChabi/DocuFlow/releases/latest/download/DocuFlow-Setup.exe
+#     pointe toujours sur la dernière version — c'est celui du site vitrine)
+#
+# Même chaîne que desktop/scripts/build-desktop.bat : PostgreSQL portable,
+# marque, frontend en mode bureau, electron-builder (NSIS). L'installateur
+# n'est pas signé : Windows affiche « éditeur inconnu » au premier lancement.
+# ============================================================================
+name: Installateur Windows
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numéro de version (ex. 2.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: installateur-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      GIT_COMMIT: ${{ github.sha }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          V="${V#v}"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Version invalide : $V (attendu : 2.1.0)"; exit 1; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      # PostgreSQL portable (~330 Mo) : téléchargé une fois, puis gardé en cache.
+      - name: Cache PostgreSQL portable
+        uses: actions/cache@v4
+        with:
+          path: desktop/vendor/pgsql
+          key: pgsql-17.6-1-${{ hashFiles('desktop/scripts/fetch-postgres.js') }}
+
+      - name: Dépendances du serveur
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Dépendances de l'interface
+        working-directory: frontend
+        run: npm ci
+
+      - name: Dépendances de l'application de bureau
+        working-directory: desktop
+        run: npm ci
+
+      - name: Tests du dossier surveillé
+        working-directory: desktop
+        run: npm test
+
+      - name: PostgreSQL portable
+        working-directory: desktop
+        run: node scripts/fetch-postgres.js
+
+      - name: Marque (icônes, visuels de l'installateur)
+        working-directory: desktop
+        run: node scripts/make-brand.js
+
+      - name: Interface (mode bureau)
+        working-directory: frontend
+        run: npm run build -- --mode desktop
+
+      - name: Installateur NSIS
+        working-directory: desktop
+        shell: bash
+        run: |
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          npx electron-builder --win --publish never
+          cp "release/DocuFlow-Setup-$VERSION.exe" release/DocuFlow-Setup.exe
+          ls -la release
+
+      - name: Release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: DocuFlow ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          make_latest: 'true'
+          body: |
+            Installateur Windows de DocuFlow ${{ env.VERSION }}.
+
+            **Installation** : téléchargez `DocuFlow-Setup.exe` et lancez-le.
+            L'installateur n'est pas encore signé : si Windows affiche « Windows a protégé votre ordinateur »,
+            cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
+          files: |
+            desktop/release/DocuFlow-Setup-${{ env.VERSION }}.exe
+            desktop/release/DocuFlow-Setup.exe
