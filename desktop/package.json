@@ -8,6 +8,7 @@
   "license": "ISC",
   "scripts": {
     "start": "electron .",
+    "test": "node dossierSurveille.test.js",
     "build:frontend": "cd ../frontend && npm run build -- --mode desktop",
     "icon": "node scripts/make-icon.js",
     "brand": "node scripts/make-brand.js",
@@ -24,6 +25,12 @@
     "appId": "com.docuflow.app",
     "productName": "DocuFlow",
     "asar": true,
+    "asarUnpack": [
+      "backend/node_modules/tesseract.js/**",
+      "backend/node_modules/tesseract.js-core/**",
+      "backend/node_modules/@tesseract.js-data/**",
+      "backend/node_modules/@napi-rs/**"
+    ],
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -31,6 +38,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "dossierSurveille.js",
       "splash.html",
       {
         "from": "../backend/src",

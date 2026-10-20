@@ -8,6 +8,9 @@ import ContextualTooltips from '../components/ContextualTooltips';
 import VisiteGuidee from '../components/onboarding/VisiteGuidee';
 import NotificationBell from '../components/NotificationBell';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePermissions } from '../hooks/usePermissions';
+import { estBureau } from '../utils/plateforme';
+import DossierSurveilleAgent from '../components/desktop/DossierSurveilleAgent';
 
 /**
  * Layout partagé de la plateforme à deux modules :
@@ -28,6 +31,7 @@ const AppLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSettings();
+  const { charge, can } = usePermissions();
   const [search, setSearch] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOuvert, setDrawerOuvert] = useState(false);
@@ -135,6 +139,8 @@ const AppLayout = () => {
       <GlobalSearch />
       <VisiteGuidee onOccupe={setVisiteOccupe} />
       <ContextualTooltips enabled={!visiteOccupe} />
+      {/* Bureau : verse les scans du dossier surveillé au nom de l'utilisateur. */}
+      {estBureau() && charge && can('documents.upload') && <DossierSurveilleAgent />}
     </div>
   );
 };

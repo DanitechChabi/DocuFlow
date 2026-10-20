@@ -94,6 +94,92 @@ ipcMain.handle('desktop:set-title', async (_event, title) => {
 });
 
 // ----------------------------------------------------------------------------
+// Dossier surveillé (dossier de dépôt du scanner) — voir dossierSurveille.js.
+//
+// Le processus principal SURVEILLE et RANGE ; la fenêtre VERSE, avec la
+// session de l'utilisateur connecté (traçabilité : chaque scan est versé à son
+// nom). La surveillance n'est armée que pendant qu'une fenêtre connectée,
+// autorisée à verser, le demande (`dossier:armer`) : personne de connecté,
+// rien n'est importé — les fichiers attendent, intacts.
+//
+// La fenêtre ne lit QUE les fichiers que le guetteur lui a signalés, dans le
+// dossier configuré : le canal ne devient pas un lecteur de disque.
+// ----------------------------------------------------------------------------
+const { DossierSurveille } = require('./dossierSurveille');
+
+const CONFIG_DOSSIER = () => path.join(app.getPath('userData'), 'dossier-surveille.json');
+let guetteur = null;
+let arme = false;
+
+function lireConfigDossier() {
+  try {
+    return { actif: false, dossier: '', dossierGedId: null, ...JSON.parse(fs.readFileSync(CONFIG_DOSSIER(), 'utf8')) };
+  } catch {
+    return { actif: false, dossier: '', dossierGedId: null };
+  }
+}
+
+function appliquerConfigDossier() {
+  const config = lireConfigDossier();
+  const actif = arme && config.actif && config.dossier;
+  // Même dossier, toujours actif : on garde le guetteur — un fichier signalé
+  // en cours de versement doit pouvoir être confirmé (sinon il serait versé
+  // une seconde fois), et les compteurs du jour sont conservés.
+  if (guetteur && actif && guetteur.dossier === config.dossier) return;
+  if (guetteur) { guetteur.arreter(); guetteur.removeAllListeners(); guetteur = null; }
+  if (!actif) return;
+  guetteur = new DossierSurveille({ dossier: config.dossier });
+  guetteur.on('pret', (f) => mainWindow?.webContents.send('dossier:fichier', { chemin: f.chemin, nom: f.nom, taille: f.taille }));
+  guetteur.on('etat', (e) => mainWindow?.webContents.send('dossier:etat', e));
+  guetteur.demarrer();
+}
+
+ipcMain.handle('dossier:config', () => ({ ...lireConfigDossier(), etat: guetteur ? guetteur.etat() : null, arme }));
+
+ipcMain.handle('dossier:enregistrer', (_event, config = {}) => {
+  const suivant = { ...lireConfigDossier() };
+  if (typeof config.actif === 'boolean') suivant.actif = config.actif;
+  if (config.dossierGedId === null || Number.isInteger(config.dossierGedId)) suivant.dossierGedId = config.dossierGedId;
+  if (typeof config.dossier === 'string') {
+    if (config.dossier && !(fs.existsSync(config.dossier) && fs.statSync(config.dossier).isDirectory())) {
+      return { ok: false, message: 'Ce dossier est introuvable sur le poste.' };
+    }
+    suivant.dossier = config.dossier;
+  }
+  fs.writeFileSync(CONFIG_DOSSIER(), JSON.stringify(suivant, null, 2));
+  appliquerConfigDossier();
+  return { ok: true, config: suivant };
+});
+
+ipcMain.handle('dossier:choisir', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: 'Dossier à surveiller (sortie du scanner)',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return r.canceled ? null : r.filePaths[0];
+});
+
+ipcMain.handle('dossier:armer', (_event, oui) => {
+  arme = oui === true;
+  appliquerConfigDossier();
+  return arme;
+});
+
+ipcMain.handle('dossier:lire', (_event, chemin) => {
+  if (!guetteur) throw new Error('Aucun dossier surveillé actif.');
+  const { nom, type, donnees } = guetteur.lire(chemin);
+  return { nom, type, donnees: new Uint8Array(donnees) };
+});
+
+ipcMain.handle('dossier:confirmer', (_event, chemin, resultat) => (guetteur ? guetteur.confirmer(chemin, resultat || {}) : null));
+
+ipcMain.handle('dossier:ouvrir', async () => {
+  const { dossier } = lireConfigDossier();
+  if (dossier && fs.existsSync(dossier)) await shell.openPath(dossier);
+  return Boolean(dossier);
+});
+
+// ----------------------------------------------------------------------------
 // Écran d'attente
 //
 // Nécessaire parce que la création du cluster au premier lancement prend
