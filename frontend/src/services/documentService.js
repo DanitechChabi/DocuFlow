@@ -198,6 +198,16 @@ export const documentService = {
     const response = await api.post(`/documents/${id}/relations`, { target_document_id: targetDocId, relation_type: relationType });
     return response.data;
   },
+  /** Indexation assistée : valeurs proposées d'après le texte du document. */
+  getSuggestions: async (id) => {
+    const response = await api.get(`/documents/${id}/suggestions`);
+    return response.data;
+  },
+  /** Métadonnées typées d'un document : [{ fieldId, value }]. */
+  setDocumentMetadata: async (id, metadata) => {
+    const response = await api.post(`/documents/${id}/metadata`, { metadata });
+    return response.data;
+  },
   getMetadataSchema: async () => {
     const response = await api.get('/metadata/schemas');
     // Return the default schema

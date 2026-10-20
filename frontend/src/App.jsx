@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage';
 import DocumentsPage from './pages/DocumentsPage';
 import CorbeillePage from './pages/CorbeillePage';
 import PretsPage from './pages/PretsPage';
+import IndexationPage from './pages/IndexationPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
@@ -96,6 +97,7 @@ function App() {
           <Route path="/documents" element={<DocumentsPage vue="ensemble" />} />
           <Route path="/documents/liste" element={<DocumentsPage />} />
           <Route path="/documents/a-indexer" element={<DocumentsPage statutFiltre="à indexer" />} />
+          <Route path="/documents/a-indexer/poste" element={<IndexationPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

@@ -14,6 +14,7 @@ const { ROLES_SYSTEME } = require('../config/permissions');
 const { verifyFileTicket } = require('../helpers/fileTicket');
 const { FILES_DIR } = require('../config/paths');
 const path = require('path');
+const { typeContenu } = require('../helpers/contentType');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -580,7 +581,7 @@ exports.downloadDocumentFile = async (req, res) => {
     }
 
     const diskPath = path.join(FILES_DIR, file.stored_name || '');
-    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Type', typeContenu(file.mime_type));
     res.setHeader(
       'Content-Disposition',
       `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`

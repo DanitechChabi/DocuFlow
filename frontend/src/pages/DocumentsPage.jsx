@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
@@ -372,6 +372,13 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
           ]}
           actions={
             <>
+              {/* Poste d'indexation : la file « À indexer », document par
+                  document, avec aperçu et propositions de métadonnées. */}
+              {statutFiltre === 'à indexer' && can('documents.edit') && (
+                <Link to="/documents/a-indexer/poste" className="btn btn-primary" data-tour="poste-indexation">
+                  <Wand2 size={16} /> Ouvrir le poste d'indexation
+                </Link>
+              )}
               {/* La primitive .segmented porte l'état sur aria-pressed : le mode
                   actif est ainsi annoncé aux lecteurs d'écran, alors qu'un simple
                   fond blanc ne l'était que visuellement. */}

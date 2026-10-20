@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const indexSuggestionController = require('../controllers/indexSuggestionController');
 const documentController = require('../controllers/documentController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/requirePermission');
@@ -77,6 +78,9 @@ router.get('/:id/requests', lireDocuments, documentController.getDocumentRequest
 
 // Métadonnées et journal d'audit
 router.get('/:id/metadata', lireDocuments, documentController.getDocumentMetadata);
+// Indexation assistée : propositions de métadonnées tirées du texte du
+// document (lecture seule ; réservé à qui peut corriger la fiche).
+router.get('/:id/suggestions', requirePermission('documents.edit'), indexSuggestionController.propositions);
 // L'écriture des métadonnées est l'INDEXATION (statut « à indexer ») comme la
 // correction de fiche : permission documents.edit.
 router.post('/:id/metadata', requirePermission('documents.edit'), documentController.setDocumentMetadata);

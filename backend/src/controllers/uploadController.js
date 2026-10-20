@@ -12,6 +12,7 @@ const { verifyFileTicket } = require('../helpers/fileTicket');
 // la même organisation, n'importe quel compte pouvait lire, verser ou
 // supprimer les pièces jointes d'une demande qui ne lui appartient pas.
 const requestAccess = require('../services/requestAccessService');
+const { typeContenu } = require('../helpers/contentType');
 
 /**
  * La demande appartient-elle au tenant ET l'appelant a-t-il le droit d'y
@@ -200,7 +201,7 @@ exports.downloadRequestFile = async (req, res) => {
     }
 
     const diskPath = path.join(FILES_DIR, file.stored_name || '');
-    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Type', typeContenu(file.mime_type));
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`);
     return res.sendFile(diskPath, (err) => {
       if (err && !res.headersSent) res.status(404).json({ message: 'Fichier introuvable sur le disque' });
@@ -446,7 +447,7 @@ exports.downloadMessageFile = async (req, res) => {
     }
 
     const diskPath = path.join(FILES_DIR, file.stored_name || '');
-    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Type', typeContenu(file.mime_type));
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.original_name || file.stored_name || 'fichier')}"`);
     return res.sendFile(diskPath, (err) => {
       if (err && !res.headersSent) res.status(404).json({ message: 'Fichier introuvable sur le disque' });
