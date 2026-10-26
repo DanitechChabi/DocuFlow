@@ -3,6 +3,10 @@ const tenantDb = require('../config/db-tenant');
 const storage = require('../services/storageService');
 const { logHistory, addFileToDocument, setCanonicalReference, indexRequestToDocuments } = require('../services/documentIndexService');
 const integrite = require('../services/integriteService');
+// Circuits de validation (034) : démarrage automatique, nouvelle version,
+// statut réservé au circuit pendant qu'il court. Appels après la réponse,
+// qui ne lèvent jamais (voir circuitService).
+const circuits = require('../services/circuitService');
 const { extractAutoTags } = require('../services/textExtractionService');
 const metadataService = require('../services/metadataService');
 const documentAuditService = require('../services/documentAuditService');
@@ -280,6 +284,7 @@ exports.createDocument = async (req, res) => {
 
     await logHistory(tenantId, doc.id, userId, 'Création du document', null, doc.statut || 'disponible');
     res.status(201).json({ ...doc, reference_mfile, doublons });
+    await circuits.demarrageAutomatique(tenantId, doc.id, req.user, { ip: req.ip });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la création du document' });
@@ -881,6 +886,7 @@ exports.addFiles = async (req, res) => {
     }
     await logHistory(tenantId, id, req.user.id, "Ajout d'une version", null, null);
     res.status(201).json({ files: added });
+    await circuits.surNouvelleVersion(tenantId, Number(id), req.user, { ip: req.ip });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de l\'ajout des fichiers' });
@@ -1063,10 +1069,15 @@ exports.setStatus = async (req, res) => {
     if (!transition.ok) {
       return res.status(400).json({ message: transition.reason, code: 'TRANSITION_REFUSEE' });
     }
+    // Un circuit en cours tient le statut : c'est lui qui le fera évoluer.
+    if (await circuits.instanceActive(tenantId, doc.id).catch(() => null)) {
+      return res.status(409).json({ message: 'Un circuit de validation est en cours : le statut évoluera avec lui (ou annulez le circuit).', code: 'CIRCUIT_EN_COURS' });
+    }
 
     await tenantDb.query(tenantId, 'UPDATE documents SET statut = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [statut, id]);
     await logHistory(tenantId, id, req.user.id, stateMachine.TRANSITIONS_LABELS[`${doc.statut}>${statut}`] || 'Changement de statut', doc.statut, statut, comment);
     res.json({ message: 'Statut mis à jour', statut });
+    if (doc.statut === 'à indexer') await circuits.demarrageAutomatique(tenantId, doc.id, req.user, { ip: req.ip });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du changement de statut' });
@@ -2150,6 +2161,8 @@ exports.setDocumentMetadata = async (req, res) => {
     const classement = await classeService.appliquer(tenantId, parseInt(id, 10), req.user.id)
       .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
     res.json({ message: 'Métadonnées mises à jour avec succès', classement });
+    // Indexation achevée (sortie de « à indexer ») : circuit automatique de la classe.
+    await circuits.demarrageAutomatique(tenantId, parseInt(id, 10), req.user, { ip: req.ip });
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: err.message || 'Erreur lors de la mise à jour des métadonnées' });
