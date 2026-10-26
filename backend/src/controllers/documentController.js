@@ -296,7 +296,7 @@ exports.createDocument = async (req, res) => {
 
 exports.listDocuments = async (req, res) => {
   const tenantId = req.user.tenant_id;
-  const { q, type_document, annee, statut, dossier_id, tag, auteur, page = 1, page_size = 20 } = req.query;
+  const { q, type_document, annee, statut, dossier_id, tag, auteur, mes_documents, page = 1, page_size = 20 } = req.query;
 
   // La corbeille n'apparaît pas dans le référentiel : sa page dédiée la liste.
   // (listCorbeille, plus bas)
@@ -376,6 +376,11 @@ exports.listDocuments = async (req, res) => {
   if (auteur) {
     vals.push(`%${auteur}%`);
     conds.push(`d.auteur ILIKE $${vals.length}`);
+  }
+  // « Mon espace » : les documents déposés par l'utilisateur lui-même.
+  if (mes_documents === '1') {
+    vals.push(req.user.id);
+    conds.push(`d.created_by = $${vals.length}`);
   }
 
   const where = conds.join(' AND ');

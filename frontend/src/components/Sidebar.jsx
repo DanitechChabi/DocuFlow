@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -170,7 +170,10 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         {
           titre: null,
           cle: 'accueil',
-          items: [entree('/', 'Accueil', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
+          items: [
+            entree('/', 'Accueil', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' }),
+            entree('/mon-espace', 'Mon espace', <UserCircle size={18} />, { tourId: 'sidebar-mon-espace' }),
+          ],
         },
         {
           titre: 'Demandes',

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Loader2, Save, Bell, BellOff, Trash2, Share2, Package, X, Gavel, ShieldAlert, SlidersHorizontal,
 } from 'lucide-react';
@@ -91,6 +91,13 @@ const RecherchePage = () => {
     setCourante(r);
     lancer(form, 1);
   };
+  // « Mon espace » ouvre une recherche enregistrée par /documents/recherche?r=<id>.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get('r');
+    const r = id && enregistrees.find((x) => String(x.id) === id);
+    if (r) { ouvrir(r); setParams({}, { replace: true }); }
+  }, [enregistrees]); // eslint-disable-line react-hooks/exhaustive-deps
   const enregistrer = async () => {
     const nom = window.prompt('Nom de la recherche :', courante?.proprietaire ? courante.nom : '');
     if (!nom) return;
