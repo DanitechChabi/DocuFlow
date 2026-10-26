@@ -16,6 +16,7 @@
 const db = require('../config/db');
 const aclService = require('./aclService');
 const { CLASSES, PLANS } = require('../config/modelesClasses');
+const { CONSERVATION, COMMUNICABILITE, AVERTISSEMENT } = require('../config/referentielBenin');
 
 /** Clé de comparaison d'un libellé : sans accents, sans casse, « N° » → « n ». */
 function cle(s) {
@@ -266,6 +267,17 @@ async function apercu(tenantId, { modele, classe_id: classeId, valeurs = {}, fic
 // Modèles DocuFlow
 // ---------------------------------------------------------------------------
 
+/**
+ * Règle de conservation proposée pour un code de classe (référentiel béninois),
+ * avec le libellé de sa communicabilité — null si le référentiel n'en a pas.
+ */
+function regleConservation(code) {
+  const r = CONSERVATION[code];
+  if (!r) return null;
+  const comm = COMMUNICABILITE[r.communicabilite] || null;
+  return { ...r, communicabilite_libelle: comm?.libelle || null };
+}
+
 /** Catalogue présenté à l'organisation, avec ce qu'elle a déjà installé. */
 async function catalogue(tenantId) {
   const { rows } = await db.query('SELECT lower(name) AS n, code FROM metadata_schemas WHERE tenant_id = $1', [tenantId]);
@@ -275,8 +287,10 @@ async function catalogue(tenantId) {
     classes: CLASSES.map((c) => ({
       code: c.code, nom: c.nom, categorie: c.categorie, modele_nom: c.modele_nom,
       champs: c.champs.map(([label, type, requis]) => ({ label, type, requis: Boolean(requis) })),
+      conservation: regleConservation(c.code),
       installee: noms.has(c.nom.toLowerCase()),
     })),
+    avertissement_conservation: AVERTISSEMENT,
     plans: PLANS.map((p) => ({
       code: p.code, nom: p.nom, arbre: p.arbre,
       installe: p.arbre.every(([racine]) => dossiers.includes(racine)),
@@ -316,6 +330,15 @@ async function installerClasses(tenantId, codes) {
          VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7, $8, $9) RETURNING id`,
         [tenantId, c.nom, `Modèle DocuFlow — ${c.categorie}`, c.code, c.mots_cles, c.modele_nom, dossier, Boolean(c.annee && dossier), c.nature || null]
       );
+      // Règle de conservation proposée (référentiel béninois) : posée d'office,
+      // l'archiviste l'ajuste et la fait valider par la DAN (D. 2007-532, art. 40).
+      const regle = CONSERVATION[c.code];
+      if (regle) {
+        await client.query(
+          `UPDATE metadata_schemas SET dua_annees = $2, dua_point_depart = $3, sort_final = $4, dua_reference = $5 WHERE id = $1`,
+          [s.rows[0].id, regle.dua, regle.depart, regle.sort, regle.ref]
+        );
+      }
       const pris = new Set();
       let ordre = 0;
       for (const [label, type, requis, options] of c.champs) {
@@ -396,6 +419,33 @@ async function installerPlan(tenantId, code, userId) {
   return { crees, classesRattachees };
 }
 
+/**
+ * Pose la règle de conservation du référentiel sur les classes de
+ * l'organisation qui n'en ont PAS encore (reconnues par leur code, à défaut
+ * leur nom). Une règle déjà saisie n'est jamais écrasée.
+ * @returns {Promise<{ appliquees: string[], deja: string[], inconnues: string[] }>}
+ */
+async function appliquerReferentiel(tenantId, user) {
+  // Chargé ici : archivageService journalise la règle (DUA_MODIFIEE) comme
+  // une saisie à la main, et n'importe pas ce module.
+  const archivage = require('./archivageService');
+  const { rows } = await db.query(
+    'SELECT id, name, code, dua_annees FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE ORDER BY name', [tenantId]);
+  const appliquees = []; const deja = []; const inconnues = [];
+  for (const r of rows) {
+    const modele = CLASSES.find((c) => (r.code && c.code === r.code) || c.nom.toLowerCase() === String(r.name).toLowerCase());
+    const regle = modele && CONSERVATION[modele.code];
+    if (!regle) { inconnues.push(r.name); continue; }
+    if (r.dua_annees != null) { deja.push(r.name); continue; }
+    await archivage.definirDua(tenantId, r.id, {
+      dua_annees: regle.dua, dua_point_depart: regle.depart, sort_final: regle.sort, dua_reference: regle.ref,
+    }, user);
+    appliquees.push(r.name);
+  }
+  return { appliquees, deja, inconnues };
+}
+
 module.exports = {
+  appliquerReferentiel, regleConservation,
   cle, rendreNom, lisible, classe, appliquer, apercu, catalogue, installerClasses, installerPlan, trouverDossier,
 };

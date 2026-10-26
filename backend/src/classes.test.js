@@ -61,7 +61,29 @@ const ok = (cond, nom) => { verifs += 1; console.log(`${cond ? '  ok  ' : '  ÉC
     const dossier310 = (await db.query("SELECT id FROM document_folders WHERE tenant_id = $1 AND name = '310 Factures fournisseurs'", [t])).rows[0].id;
     ok(facf.code === 'FACF' && facf.fields.length === 8 && facf.dossier_defaut_id === dossier310 && facf.sous_dossier_annee,
       'classe installée : code, 8 propriétés, rangée dans « 310 Factures fournisseurs », par année');
+    // Référentiel béninois : règle de conservation posée à l'installation.
+    ok(facf.dua_annees === 10 && facf.sort_final === 'elimination' && /OHADA/.test(facf.dua_reference),
+      'classe installée : DUA 10 ans, élimination, justifiée par l\'Acte uniforme OHADA');
+    const ca0 = schemas.find((x) => x.code === 'CA');
+    ok(ca0.dua_annees === 5 && ca0.sort_final === 'tri', 'courrier arrivé : 5 ans puis tri (décret 2007-532, art. 38)');
+    // Appliquer le référentiel : seulement aux classes sans règle, jamais d'écrasement.
+    const sansRegle = await metadataService.createSchema(t, { name: 'Acte de naissance', code: 'ECN' });
+    const inconnue = await metadataService.createSchema(t, { name: 'Classe maison', code: 'MAI' });
+    const admin = { id: null, tenant_id: t, username: 'test', full_name: 'Test', role: 'admin' };
+    const ref = await classeService.appliquerReferentiel(t, admin);
+    ok(ref.appliquees.includes('Acte de naissance') && ref.deja.includes('Facture fournisseur') && ref.inconnues.includes('Classe maison'),
+      'référentiel appliqué aux seules classes sans règle et reconnues');
+    const ecn = (await db.query('SELECT dua_annees, sort_final FROM metadata_schemas WHERE id = $1', [sansRegle.id])).rows[0];
+    ok(ecn.dua_annees === 10 && ecn.sort_final === 'conservation', 'acte de naissance : conservation définitive (art. 44, établit un droit)');
+    ok((await db.query('SELECT dua_annees FROM metadata_schemas WHERE id = $1', [inconnue.id])).rows[0].dua_annees === null, 'classe inconnue : aucune durée inventée');
+    ok((await classeService.appliquerReferentiel(t, admin)).appliquees.length === 0, 'réappliquer : rien ne change');
+    const journal = await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action = 'DUA_MODIFIEE'", [t]);
+    ok(journal.rows[0].n === 1, 'la règle proposée est journalisée comme une saisie');
+    const commune = await classeService.installerPlan(t2, 'commune', null);
+    ok(commune.crees === 28, `plan « Commune (Bénin) » : 28 dossiers créés (${commune.crees})`);
     const catal = await classeService.catalogue(t);
+    ok(catal.classes.find((c) => c.code === 'ECN').conservation.communicabilite === 'etat_civil' && /Archives Nationales/.test(catal.avertissement_conservation),
+      'catalogue : règle et communicabilité proposées, avec l\'avertissement de validation par la DAN');
     ok(catal.classes.find((c) => c.code === 'FACF').installee && catal.plans.find((p) => p.code === 'entreprise').installe, 'catalogue : installé signalé');
 
     // Document de la classe

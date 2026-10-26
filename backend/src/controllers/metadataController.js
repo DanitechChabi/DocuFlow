@@ -212,6 +212,16 @@ exports.installerClasses = async (req, res) => {
   }
 };
 
+/** POST /metadata/modeles/conservation — référentiel de conservation sur les classes qui n'ont pas de règle. */
+exports.appliquerReferentiel = async (req, res) => {
+  try {
+    res.json(await classeService.appliquerReferentiel(req.user.tenant_id, req.user));
+  } catch (err) {
+    console.error('[classes] référentiel de conservation :', err.message);
+    res.status(500).json({ message: 'Application du référentiel impossible' });
+  }
+};
+
 exports.installerPlan = async (req, res) => {
   try {
     const r = await classeService.installerPlan(req.user.tenant_id, req.params.code, req.user.id);
