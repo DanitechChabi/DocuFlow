@@ -16,6 +16,7 @@ import ConformitePage from './pages/ConformitePage';
 import FournisseursPage from './pages/FournisseursPage';
 import ArchivagePage from './pages/ArchivagePage';
 import CertificatPage from './pages/CertificatPage';
+import ProcesVerbalPage from './pages/ProcesVerbalPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -108,6 +109,7 @@ function App() {
           <Route path="/documents/fournisseurs" element={<FournisseursPage />} />
           <Route path="/documents/archivage" element={<ArchivagePage />} />
           <Route path="/documents/certificat/:id" element={<CertificatPage />} />
+          <Route path="/documents/archivage/bordereaux/:id/pv" element={<ProcesVerbalPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

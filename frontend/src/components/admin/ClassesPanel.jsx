@@ -7,6 +7,7 @@ import { documentService } from '../../services/documentService';
 import { toast } from '../Toast';
 import ConfirmDialog from '../ConfirmDialog';
 import MetadataSchemaEditor from './MetadataSchemaEditor';
+import RegleConservation from '../archives/RegleConservation';
 
 /**
  * Classes et propriétés — la configuration documentaire, sur le modèle de
@@ -437,6 +438,8 @@ const ClassesPanel = () => {
           ) : (
             <>
               <FicheClasse classe={courant} communes={communes} dossiers={dossiers} onEnregistree={charger} onSupprimer={() => setASupprimer(courant)} />
+              {/* Règle de conservation (032) : DUA et sort final de la classe. */}
+              <RegleConservation classe={courant} onEnregistree={charger} />
               <MetadataSchemaEditor key={`classe-${courant.id}`} initialSchema={courant.fields} onSave={enregistrerProprietes}
                 titre={`Propriétés de la classe « ${courant.name} »`} sousTitre="Affichées quand on indexe un document de cette classe."
                 libelleEnregistrer="Enregistrer les propriétés" />

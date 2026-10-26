@@ -759,7 +759,7 @@ exports.restoreDocument = async (req, res) => {
     const result = await db.query(
       `UPDATE documents
           SET deleted_at = NULL, deleted_by = NULL
-        WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL
+        WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL AND elimine_at IS NULL
         RETURNING id, reference_mfile, statut`,
       [id, tenantId]
     );
@@ -791,6 +791,8 @@ exports.listCorbeille = async (req, res) => {
           FROM documents d
           LEFT JOIN users u ON u.id = d.deleted_by
          WHERE d.tenant_id = $1 AND d.deleted_at IS NOT NULL
+           -- Un document éliminé (032) porte deleted_at mais n'est pas « en corbeille ».
+           AND d.elimine_at IS NULL
            AND (d.dossier_id IS NULL OR d.dossier_id = ANY($2::int[]))
          ORDER BY d.deleted_at DESC`,
       [tenantId, [...lisibles]]
@@ -813,7 +815,7 @@ exports.purgeDocument = async (req, res) => {
 
     // La purge ne vise QUE la corbeille (voir l'en-tête du bloc).
     const check = await client.query(
-      'SELECT id FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL',
+      'SELECT id FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NOT NULL AND elimine_at IS NULL',
       [id, tenantId]
     );
     if (!check.rows[0]) {

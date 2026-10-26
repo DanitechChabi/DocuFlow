@@ -7,6 +7,7 @@ import {
   archivesService, STATUTS_INTEGRITE, empreinteCourte, dateHeure, dateCourte,
 } from '../../services/archivesService';
 import { usePermissions } from '../../hooks/usePermissions';
+import { archivageService, SORTS, dateFr } from '../../services/archivageService';
 import { toast } from '../Toast';
 
 /**
@@ -41,8 +42,10 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
   const [reference, setReference] = useState('');
   const [envoi, setEnvoi] = useState(false);
 
+  const [dua, setDua] = useState(null);
   const charger = useCallback(() => {
     archivesService.etatDocument(documentId).then(setEtat).catch(() => setEtat({ fichiers: [], gel: null, indisponible: true }));
+    archivageService.echeanceDocument(documentId).then(setDua).catch(() => setDua(null));
   }, [documentId]);
   useEffect(() => { charger(); }, [charger]);
 
@@ -132,6 +135,12 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
             </form>
           )}
 
+          {/* Conservation (032) : échéance de la DUA et sort final de la classe. */}
+          {dua?.dua_annees != null && (
+            <p className={`text-xs ${dua.echu ? 'text-red-700 font-semibold' : 'text-slate-600'}`}>
+              Conservation : {dua.dua_annees} an(s) à compter de {dua.libelle_point_depart} — {dua.echeance ? `${dua.echu ? 'échue le' : 'échéance le'} ${dateFr(dua.echeance)}` : 'pas encore commencée'} · sort final : {SORTS[dua.sort_final] || '—'}
+            </p>
+          )}
           {etat.fichiers.length === 0 ? (
             <p className="text-xs text-slate-500">Aucun fichier : rien à vérifier.</p>
           ) : (
