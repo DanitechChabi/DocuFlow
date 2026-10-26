@@ -12,6 +12,8 @@ import IndexationPage from './pages/IndexationPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import CompanyAdminPage from './pages/CompanyAdminPage';
 import ClassesPage from './pages/ClassesPage';
+import ConformitePage from './pages/ConformitePage';
+import FournisseursPage from './pages/FournisseursPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -100,6 +102,8 @@ function App() {
           <Route path="/documents/a-indexer" element={<DocumentsPage statutFiltre="à indexer" />} />
           <Route path="/documents/a-indexer/poste" element={<IndexationPage />} />
           <Route path="/documents/classes" element={<ClassesPage />} />
+          <Route path="/documents/conformite" element={<ConformitePage />} />
+          <Route path="/documents/fournisseurs" element={<FournisseursPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

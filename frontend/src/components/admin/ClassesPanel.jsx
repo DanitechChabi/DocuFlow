@@ -56,6 +56,7 @@ const FicheClasse = ({ classe, communes, dossiers, onEnregistree, onSupprimer })
       modele_nom: classe.modele_nom || '',
       dossier_defaut_id: classe.dossier_defaut_id || '',
       sous_dossier_annee: Boolean(classe.sous_dossier_annee),
+      nature_conformite: classe.nature_conformite || '',
     });
   }, [classe]);
 
@@ -86,6 +87,7 @@ const FicheClasse = ({ classe, communes, dossiers, onEnregistree, onSupprimer })
       await metadataApi.updateSchema(classe.id, {
         ...form,
         dossier_defaut_id: form.dossier_defaut_id ? Number(form.dossier_defaut_id) : null,
+        nature_conformite: form.nature_conformite || null,
       });
       toast.success('Classe enregistrée');
       onEnregistree();
@@ -123,6 +125,16 @@ const FicheClasse = ({ classe, communes, dossiers, onEnregistree, onSupprimer })
           {champ('code', 'Code', 'Ex. FAC, CTR', { maxLength: 12, style: { textTransform: 'uppercase' } })}
         </div>
         {champ('mots_cles', 'Mots de reconnaissance', 'Séparés par des virgules. Trouvés dans le texte d\'un scan, ils font proposer cette classe à l\'indexation.')}
+        <label className="block">
+          <span className="block text-xs font-bold text-slate-500 mb-1">Rôle dans les contrôles de conformité</span>
+          <select className="input-premium" value={form.nature_conformite ?? ''} onChange={(e) => setForm({ ...form, nature_conformite: e.target.value })}>
+            <option value="">Aucun — la classe n'entre pas dans les contrôles</option>
+            <option value="facture">Facture — comparée aux devis du même fournisseur</option>
+            <option value="devis">Devis — comparé aux factures du même fournisseur</option>
+            <option value="attestation">Attestation — sa validité est surveillée</option>
+          </select>
+          <span className="block text-[11px] text-slate-400 mt-1">Les documents de cette classe sont contrôlés entre eux selon ce rôle (montants, chronologie, identifiants, expiration).</span>
+        </label>
       </div>
 
       <div className="glass-card-premium p-5 space-y-3">

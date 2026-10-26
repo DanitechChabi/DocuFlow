@@ -8,6 +8,7 @@
 //   modele_nom — charte de nommage (voir services/classeService.rendreNom)
 //   dossiers   — noms (sans code) du dossier de rangement, par préférence
 //   annee      — ranger dans un sous-dossier par année
+//   nature     — rôle dans les contrôles de conformité (facture, devis, attestation)
 //   champs     — propriétés propres à la classe : [libellé, type, requis?, options?]
 // ============================================================================
 
@@ -15,18 +16,18 @@ const PAIEMENT = ['À payer', 'Payée', 'Payée partiellement', 'En litige'];
 
 const CLASSES = [
   // --- Finances ------------------------------------------------------------
-  { code: 'FACF', nom: 'Facture fournisseur', categorie: 'Finances', mots_cles: 'facture, invoice',
+  { code: 'FACF', nom: 'Facture fournisseur', categorie: 'Finances', mots_cles: 'facture, invoice', nature: 'facture',
     modele_nom: 'FACF-{année}-{N° de facture} — {Fournisseur}', dossiers: ['Factures fournisseurs', 'Factures'], annee: true,
     champs: [['N° de facture', 'text', true], ['Fournisseur', 'text', true], ['Date de facture', 'date'], ['Montant HT', 'number'],
       ['TVA', 'number'], ['Montant TTC', 'number', true], ['Date d\'échéance', 'date'], ['Statut de paiement', 'select', false, PAIEMENT]] },
-  { code: 'FACC', nom: 'Facture client', categorie: 'Finances', mots_cles: 'facture client, facture de vente',
+  { code: 'FACC', nom: 'Facture client', categorie: 'Finances', mots_cles: 'facture client, facture de vente', nature: 'facture',
     modele_nom: 'FACC-{année}-{N° de facture} — {Client}', dossiers: ['Factures clients', 'Factures'], annee: true,
     champs: [['N° de facture', 'text', true], ['Client', 'text', true], ['Date de facture', 'date'], ['Montant TTC', 'number', true],
       ['Date d\'échéance', 'date'], ['Statut de paiement', 'select', false, PAIEMENT]] },
   { code: 'BC', nom: 'Bon de commande', categorie: 'Finances', mots_cles: 'bon de commande, purchase order',
     modele_nom: 'BC-{année}-{compteur} — {Fournisseur}', dossiers: ['Commandes', 'Achats'], annee: true,
     champs: [['N° de commande', 'text'], ['Fournisseur', 'text', true], ['Date de commande', 'date'], ['Montant TTC', 'number']] },
-  { code: 'DEV', nom: 'Devis', categorie: 'Finances', mots_cles: 'devis, proforma, facture proforma',
+  { code: 'DEV', nom: 'Devis', categorie: 'Finances', mots_cles: 'devis, proforma, facture proforma', nature: 'devis',
     modele_nom: 'DEV-{année}-{compteur} — {Fournisseur}', dossiers: ['Commandes', 'Achats'], annee: true,
     champs: [['N° de devis', 'text'], ['Fournisseur', 'text', true], ['Date du devis', 'date'], ['Montant TTC', 'number'], ['Date de validité', 'date']] },
   { code: 'REC', nom: 'Reçu / quittance', categorie: 'Finances', mots_cles: 'reçu, quittance, recu de paiement',

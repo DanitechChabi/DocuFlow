@@ -120,6 +120,8 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
     entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
+    entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite' }),
+    entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view' }),
     entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille' }),
   ];
 

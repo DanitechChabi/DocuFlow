@@ -52,16 +52,45 @@ async function charger(tenantId, user) {
   }));
 }
 
+/**
+ * Clé finale de chaque document. Un document sans identifiant rejoint le
+ * fournisseur du MÊME nom qui en a un — s'il n'y en a qu'un : deux numéros
+ * pour un même nom, c'est précisément ce que la conformité signale, on ne
+ * tranche pas à sa place.
+ */
+function resoudreCles(docs) {
+  const parNom = new Map(); // nom normalisé → clés « id: » rencontrées
+  for (const d of docs) {
+    const cle = cleFournisseur(d.donnees);
+    if (!cle.startsWith(PREFIXE_ID)) continue;
+    const nom = conformiteService.cleNom(d.donnees.emetteur_nom || d.donnees.destinataire_nom);
+    if (!nom) continue;
+    if (!parNom.has(nom)) parNom.set(nom, new Set());
+    parNom.get(nom).add(cle);
+  }
+  const cles = new Map();
+  for (const d of docs) {
+    let cle = cleFournisseur(d.donnees);
+    if (cle.startsWith(PREFIXE_NOM)) {
+      const ids = parNom.get(cle.slice(PREFIXE_NOM.length));
+      if (ids && ids.size === 1) cle = [...ids][0];
+    }
+    cles.set(d.id, cle);
+  }
+  return cles;
+}
+
 /** Liste des fournisseurs. */
 async function lister(tenantId, user) {
   const docs = await charger(tenantId, user);
+  const cles = resoudreCles(docs);
   const fiches = new Map();
   for (const d of docs) {
-    const cle = cleFournisseur(d.donnees);
+    const cle = cles.get(d.id);
     const nom = (d.donnees.emetteur_nom || d.donnees.destinataire_nom || '').trim() || 'Tiers inconnu';
     let f = fiches.get(cle);
     if (!f) {
-      f = { cle, groupe: typeGroupe(cle), identifiant: d.donnees.identifiant || null, nom, nombre_documents: 0, total_ttc: 0, a_des_alertes: false, nombre_alertes: 0, natures: new Set(), devise: d.donnees.devise || null };
+      f = { cle, groupe: typeGroupe(cle), identifiant: cle.startsWith(PREFIXE_ID) ? cle.slice(PREFIXE_ID.length) : null, nom, nombre_documents: 0, total_ttc: 0, a_des_alertes: false, nombre_alertes: 0, natures: new Set(), devise: d.donnees.devise || null };
       fiches.set(cle, f);
     } else if (f.nom === 'Tiers inconnu' && nom !== 'Tiers inconnu') f.nom = nom;
     f.nombre_documents += 1;
@@ -80,7 +109,8 @@ async function lister(tenantId, user) {
 /** Documents d'un fournisseur, les plus récents d'abord. */
 async function documentsDe(tenantId, user, cle) {
   const docs = await charger(tenantId, user);
-  return docs.filter((d) => cleFournisseur(d.donnees) === cle);
+  const cles = resoudreCles(docs);
+  return docs.filter((d) => cles.get(d.id) === cle);
 }
 
 /** Export CSV (séparateur « ; », BOM : Excel en français l'ouvre correctement). */
@@ -91,4 +121,4 @@ function versCsv(fiches) {
   return `﻿${[entete.map(esc).join(';'), ...lignes].join('\r\n')}\r\n`;
 }
 
-module.exports = { cleFournisseur, lister, documentsDe, versCsv, typeGroupe };
+module.exports = { cleFournisseur, resoudreCles, lister, documentsDe, versCsv, typeGroupe };

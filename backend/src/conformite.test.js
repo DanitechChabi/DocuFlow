@@ -148,6 +148,15 @@ const deType = (alertes, type) => alertes.filter((a) => a.type === type);
     && fournisseurService.cleFournisseur({ emetteur_nom: 'S.B.E.É.  SA' }) === 'nom:s b e e sa'
     && fournisseurService.cleFournisseur({}) === 'inconnu', 'clé : identifiant, sinon nom normalisé, sinon inconnu');
   ok(fournisseurService.cleFournisseur({ destinataire_nom: 'AGRO-SAVANE SARL' }) === 'nom:agro savane sarl', 'sans émetteur : le destinataire est le tiers');
+  const cles = fournisseurService.resoudreCles([
+    { id: 1, donnees: { identifiant: '3202400056781', emetteur_nom: 'BÂTIR PLUS SA' } },
+    { id: 2, donnees: { emetteur_nom: 'Batir Plus SA' } },
+    { id: 3, donnees: { identifiant: '1111111111111', emetteur_nom: 'LUMINA' } },
+    { id: 4, donnees: { identifiant: '2222222222222', emetteur_nom: 'LUMINA' } },
+    { id: 5, donnees: { emetteur_nom: 'Lumina' } },
+  ]);
+  ok(cles.get(2) === 'id:3202400056781' && cles.get(5) === 'nom:lumina',
+    'un document sans identifiant rejoint le seul fournisseur de même nom ; avec deux numéros pour ce nom, rien n\'est tranché');
   const csv = fournisseurService.versCsv([{ cle: 'nom:a', groupe: 'nom', identifiant: null, nom: 'Dupont "et fils"', nombre_documents: 2, total_ttc: 10.5, devise: 'EUR', nombre_alertes: 1, natures: ['facture', 'devis'] }]);
   ok(csv.startsWith('﻿') && csv.includes('"Dupont ""et fils"""') && csv.includes(';"10.5";'), 'export CSV : BOM, guillemets échappés, séparateur « ; »');
 
