@@ -73,10 +73,13 @@ console.log('\n3. Sémantique des rôles — calque des pouvoirs d\'avant le RBA
 console.log('\n4. Migration 019 — provisionne exactement les définitions du code');
 // Permissions accordées après 019 par une migration dédiée (qui doit les poser).
 const AJOUTS_POSTERIEURS = {
-  archiviste: ['requests.create', 'compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold'],
+  archiviste: ['requests.create', 'compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold',
+    'workflows.manage', 'workflows.start'],
   lecteur: ['requests.create'],
-  admin: ['compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold', 'archives.validate'],
-  responsable: ['compliance.view', 'archives.view', 'archives.validate'],
+  admin: ['compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold', 'archives.validate',
+    'workflows.manage', 'workflows.start'],
+  responsable: ['compliance.view', 'archives.view', 'archives.validate', 'workflows.start'],
+  agent: ['workflows.start'],
 };
 {
   const sql023 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '023_request_quick.sql'), 'utf8');
@@ -95,6 +98,15 @@ const AJOUTS_POSTERIEURS = {
     ['archives.hold', ['admin', 'archiviste']], ['archives.validate', ['admin', 'responsable']]]) {
     const attendus = ROLES_SYSTEME.filter((r) => r.permissions.includes(perm)).map((r) => r.key).sort();
     ok(JSON.stringify(attendus) === JSON.stringify(roles.slice().sort()), `${perm} : mêmes rôles dans le code et dans la 031 (${attendus.join(', ')})`);
+  }
+  // Migration 034 : circuits de validation.
+  const sql034 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '034_circuits_validation.sql'), 'utf8');
+  const accordeDans034 = (perm, roles) => new RegExp(`array_append\\(permissions, '${perm.replace('.', '\\.')}'\\)\\s*\\n\\s*WHERE is_system AND key IN \\(${roles.map((r) => `'${r}'`).join(', ')}\\)`).test(sql034);
+  ok(accordeDans034('workflows.manage', ['admin', 'archiviste']) && accordeDans034('workflows.start', ['admin', 'archiviste', 'responsable', 'agent']),
+    'migration 034 : workflows.manage (admin, archiviste) et workflows.start (admin, archiviste, responsable, agent) accordées');
+  for (const [perm, roles] of [['workflows.manage', ['admin', 'archiviste']], ['workflows.start', ['admin', 'archiviste', 'responsable', 'agent']]]) {
+    const attendus = ROLES_SYSTEME.filter((r) => r.permissions.includes(perm)).map((r) => r.key).sort();
+    ok(JSON.stringify(attendus) === JSON.stringify(roles.slice().sort()), `${perm} : mêmes rôles dans le code et dans la 034 (${attendus.join(', ')})`);
   }
   const sql = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '019_rbac.sql'), 'utf8');
   for (const role of ROLES_SYSTEME) {

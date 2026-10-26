@@ -272,6 +272,14 @@ const CATALOG = [
   { key: 'partage_mot_de_passe_obligatoire', group: 'collaboration', label: 'Mot de passe obligatoire sur les liens',
     description: 'Exiger un mot de passe pour chaque nouveau lien de partage public.',
     type: 'boolean', default: 'false' },
+  // ------------------------------------------- CIRCUITS DE VALIDATION (034)
+  { key: 'circuits_relance_jours', group: 'documents', label: 'Rappel des tâches de validation en retard (jours)',
+    description: "Une tâche de circuit de validation dont l'échéance est dépassée est rappelée à son destinataire, au plus une fois par période.",
+    type: 'number', default: '1', min: 1, max: 30 },
+  { key: 'circuits_nouvelle_version', group: 'documents', label: 'Nouvelle version pendant un circuit de validation',
+    description: "Quand une version est déposée sur un document en cours de validation alors que des visas ont déjà été donnés : avertir (les visas antérieurs restent, la fiche signale la version qu'ils portent), ou relancer le circuit depuis la première étape sur la nouvelle version.",
+    type: 'select', default: 'avertir',
+    options: [{ value: 'avertir', label: 'Avertir (les visas antérieurs restent)' }, { value: 'relancer', label: 'Relancer le circuit sur la nouvelle version' }] },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));
