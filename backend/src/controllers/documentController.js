@@ -2170,6 +2170,8 @@ exports.setDocumentMetadata = async (req, res) => {
     await collaboration.signaler(tenantId, parseInt(id, 10), 'metadonnees', { acteur: req.user });
     // Indexation achevée (sortie de « à indexer ») : circuit automatique de la classe.
     await circuits.demarrageAutomatique(tenantId, parseInt(id, 10), req.user, { ip: req.ip });
+    // Une propriété « échéance » a pu changer : l'échéancier suit (035).
+    await require('../services/echeanceService').deriver({ tenantId, documentId: parseInt(id, 10) }).catch(() => {});
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: err.message || 'Erreur lors de la mise à jour des métadonnées' });

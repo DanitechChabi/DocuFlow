@@ -3,7 +3,7 @@ import { FileSearch,
 
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
-  Lock, Unlock, Link2, Wand2, RotateCcw,
+  Lock, Unlock, Link2, Wand2, RotateCcw, Package,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
@@ -19,6 +19,8 @@ import PartagesDocument from './collaboration/PartagesDocument';
 import { collaborationService } from '../services/collaborationService';
 import { usePermissions } from '../hooks/usePermissions';
 import CircuitDocument from './circuits/CircuitDocument';
+import EcheancesDocument from './recherche/EcheancesDocument';
+import { rechercheService, messageBlob } from '../services/rechercheService';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
@@ -233,6 +235,13 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
           </div>
           <div className="flex items-center gap-2">
             {doc && <FavoriSuivi documentId={doc.id} />}
+            {/* Paquet d'archive (035) : fichiers, manifeste, empreintes, en un ZIP. */}
+            {doc && (
+              <button type="button" title="Exporter le paquet d'archive (ZIP)" className="btn-secondary flex items-center gap-1.5"
+                onClick={() => rechercheService.paquet([doc.id]).catch(async (err) => toast.error(await messageBlob(err, 'Export impossible')))}>
+                <Package size={15} /> <span className="hidden md:inline">Paquet</span>
+              </button>
+            )}
             <button onClick={() => setShowShare(true)} className="btn-secondary flex items-center gap-1.5"><Share2 size={15} /> Partager</button>
             {/* Indexation : visible pour le personnel (la route /:id/metadata
                 est réservée aux rôles GED côté serveur). Mise en avant quand le
@@ -306,6 +315,8 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                 {/* Collaboration (033) : liens publics, commentaires. */}
                 <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
                 <CommentairesDocument documentId={doc.id} />
+                {/* Échéances à surveiller (035). */}
+                <EcheancesDocument documentId={doc.id} />
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (
