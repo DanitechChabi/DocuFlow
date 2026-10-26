@@ -141,11 +141,33 @@ function visiteDocuments({ can }) {
       content: 'Chaque document versé est lu (émetteur, montants, dates) puis contrôlé avec les autres : facture hors devis, attestation expirée, numéro d\'entreprise incohérent.',
     });
   }
+  etapes.push({
+    id: 'favoris', selector: '[data-tour="favoris"]', position: 'right',
+    title: 'Vos favoris et vos suivis',
+    content: 'L\'étoile d\'une fiche garde un document à portée de main ; la cloche vous prévient de ses nouvelles versions, de ses changements de statut et des commentaires où l\'on vous mentionne.',
+  });
+  etapes.push({
+    id: 'taches', selector: '[data-tour="taches"]', position: 'right',
+    title: 'Mes tâches',
+    content: 'Les documents qui attendent votre visa dans un circuit de validation. Votre approbation enregistre l\'empreinte exacte de la version visée.',
+  });
+  if (can('search.advanced')) {
+    etapes.push({
+      id: 'recherche', selector: '[data-tour="recherche"]', position: 'right',
+      title: 'Recherche avancée',
+      content: 'Combinez le texte des fichiers, la classe et ses propriétés, le dossier, les dates. Enregistrez une recherche et activez son alerte : vous serez prévenu des nouveaux documents.',
+    });
+  }
+  etapes.push({
+    id: 'echeances', selector: '[data-tour="echeances"]', position: 'right',
+    title: 'Échéancier',
+    content: 'Fins de contrat, validités d\'attestation, factures à payer : les dates à ne pas manquer, avec un rappel avant l\'échéance.',
+  });
   if (can('archives.view')) {
     etapes.push({
       id: 'archivage', selector: '[data-tour="archivage"]', position: 'right',
       title: 'Archivage & preuve',
-      content: 'Chaque fichier porte son empreinte SHA-256 et il est relu régulièrement. Le journal est chaîné et scellé, et un gel juridique interdit toute destruction le temps d\'un contentieux. Un certificat d\'archivage s\'émet depuis la fiche.',
+      content: 'Chaque fichier porte son empreinte SHA-256 et il est relu régulièrement. Le journal est chaîné et scellé, et un gel juridique interdit toute destruction le temps d\'un contentieux. Un certificat d\'archivage s\'émet depuis la fiche ; les durées de conservation mènent aux bordereaux d\'élimination, validés par une autre personne.',
     });
   }
   etapes.push({
