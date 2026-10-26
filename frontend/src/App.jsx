@@ -22,6 +22,7 @@ import MesTachesPage from './pages/MesTachesPage';
 import CircuitsPage from './pages/CircuitsPage';
 import RecherchePage from './pages/RecherchePage';
 import EcheancesPage from './pages/EcheancesPage';
+import ProcesVerbalPage from './pages/ProcesVerbalPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -121,6 +122,7 @@ function App() {
           <Route path="/documents/circuits" element={<CircuitsPage />} />
           <Route path="/documents/recherche" element={<RecherchePage />} />
           <Route path="/documents/echeances" element={<EcheancesPage />} />
+          <Route path="/documents/archivage/bordereaux/:id/pv" element={<ProcesVerbalPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />
