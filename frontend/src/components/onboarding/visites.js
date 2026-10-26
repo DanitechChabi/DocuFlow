@@ -141,6 +141,13 @@ function visiteDocuments({ can }) {
       content: 'Chaque document versé est lu (émetteur, montants, dates) puis contrôlé avec les autres : facture hors devis, attestation expirée, numéro d\'entreprise incohérent.',
     });
   }
+  if (can('archives.view')) {
+    etapes.push({
+      id: 'archivage', selector: '[data-tour="archivage"]', position: 'right',
+      title: 'Archivage & preuve',
+      content: 'Chaque fichier porte son empreinte SHA-256 et il est relu régulièrement. Le journal est chaîné et scellé, et un gel juridique interdit toute destruction le temps d\'un contentieux. Un certificat d\'archivage s\'émet depuis la fiche.',
+    });
+  }
   etapes.push({
     id: 'corbeille', selector: '[data-tour="corbeille"]', position: 'right',
     title: 'Rien ne disparaît d\'un clic',

@@ -48,6 +48,13 @@ const SELF_LOGGED = new Set([
   'DELETE /superadmin/tenants/:id',
   'DELETE /tenants/:id',
   'DELETE /superadmin/audit',
+  // Collaboration (033) : journal chaîné du document, écrit par le contrôleur.
+  'POST /documents/:id/commentaires',
+  'PATCH /documents/:id/commentaires/:id',
+  'DELETE /documents/:id/commentaires/:id',
+  'POST /documents/:id/partages',
+  'DELETE /documents/:id/partages/:id',
+  'POST /documents/:id/files/:id/restaurer',
 ]);
 
 // Écritures de pure mécanique d'interface : accusés de lecture déclenchés par
@@ -58,6 +65,11 @@ const IGNORED = new Set([
   'PATCH /notifications/:id/read',
   'PATCH /notifications/read-all',
   'PATCH /messages/conversations/:id/read',
+  // Favoris et suivi (033) : préférences personnelles, pas des actes documentaires.
+  'PUT /documents/:id/favori',
+  'DELETE /documents/:id/favori',
+  'PUT /documents/:id/suivi',
+  'DELETE /documents/:id/suivi',
 ]);
 
 // Libellé lisible par route. Clé : « MÉTHODE /chemin » (préfixe /api retiré,
@@ -94,6 +106,13 @@ const LABELS = {
   'POST /documents/:id/share': 'Document partagé par e-mail',
   'POST /documents/from-request/:id': 'Demande archivée en document',
   'POST /documents/assembly/generate': 'Document assemblé généré',
+  // Collaboration (033) — libellés des échecs (les succès sont journalisés par le contrôleur).
+  'POST /documents/:id/commentaires': 'Commentaire ajouté',
+  'PATCH /documents/:id/commentaires/:id': 'Commentaire modifié',
+  'DELETE /documents/:id/commentaires/:id': 'Commentaire supprimé',
+  'POST /documents/:id/partages': 'Lien de partage public créé',
+  'DELETE /documents/:id/partages/:id': 'Lien de partage public révoqué',
+  'POST /documents/:id/files/:id/restaurer': 'Version restaurée',
 
   // Dossiers et vues
   'POST /documents/folders': 'Dossier créé',

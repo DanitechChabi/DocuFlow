@@ -60,6 +60,7 @@ const GROUPS = [
   { name: 'retention',     label: 'Conservation',  description: 'Durées légales de conservation des documents.' },
   { name: 'compliance',    label: 'Conformité & IA', description: "Analyse des documents, contrôle d'incohérences entre documents et modèle de langage." },
   { name: 'archives',      label: 'Archivage & preuve', description: "Contrôle d'intégrité des fichiers et scellement du journal d'audit." },
+  { name: 'collaboration', label: 'Collaboration', description: 'Favoris, suivi des documents, commentaires et liens de partage publics.' },
 ];
 
 const CATALOG = [
@@ -260,6 +261,17 @@ const CATALOG = [
   { key: 'journal_scellement_auto', group: 'archives', label: 'Sceller le journal chaque jour',
     description: "Fige chaque jour l'empreinte de tête du journal d'audit chaîné. Conservez le relevé des sceaux hors de DocuFlow : il prouve qu'aucune entrée passée n'a été réécrite.",
     type: 'boolean', default: 'true' },
+
+  // ------------------------------------------------------- COLLABORATION (033)
+  { key: 'partage_public_actif', group: 'collaboration', label: 'Liens de partage publics',
+    description: "Autoriser la création de liens publics vers un document (consultation et téléchargement sans compte). Désactivé, aucun lien ne se crée et les liens existants cessent de fonctionner.",
+    type: 'boolean', default: 'true' },
+  { key: 'partage_duree_jours', group: 'collaboration', label: 'Validité par défaut des liens (jours)',
+    description: "Durée proposée à la création d'un lien de partage public. Un lien vaut 90 jours au plus.",
+    type: 'number', default: '7', min: 1, max: 90 },
+  { key: 'partage_mot_de_passe_obligatoire', group: 'collaboration', label: 'Mot de passe obligatoire sur les liens',
+    description: 'Exiger un mot de passe pour chaque nouveau lien de partage public.',
+    type: 'boolean', default: 'false' },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { notificationService } from '../services/notificationService';
 import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
 
 const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
   const [notifications, setNotifications] = useState([]);
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [coords, setCoords] = useState({ top: 0, right: 16 }); // DEFAULT right:16 (viewport gutter)
@@ -173,7 +175,10 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                 notifications.map((n) => (
                   <div
                     key={n.id}
-                    className={`px-5 py-4 border-b border-slate-50 last:border-b-0 transition-colors ${
+                    // Notification liée à un document (031/033) : un clic ouvre sa fiche.
+                    onClick={n.document_id ? () => { if (!n.is_read) handleMarkAsRead(n.id); setIsOpen(false); navigate(`/documents/liste?doc=${n.document_id}`); } : undefined}
+                    role={n.document_id ? 'button' : undefined}
+                    className={`${n.document_id ? 'cursor-pointer ' : ''}px-5 py-4 border-b border-slate-50 last:border-b-0 transition-colors ${
                       !n.is_read ? 'bg-blue-50/30 border-l-2 border-l-docuflow-secondary' : 'hover:bg-slate-50'
                     }`}
                   >
@@ -189,7 +194,7 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                       </div>
                       {!n.is_read && (
                         <button
-                          onClick={() => handleMarkAsRead(n.id)}
+                          onClick={(e) => { e.stopPropagation(); handleMarkAsRead(n.id); }}
                           className="p-1.5 text-docuflow-secondary hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
                           title="Marquer comme lu"
                         >

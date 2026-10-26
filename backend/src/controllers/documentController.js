@@ -17,6 +17,9 @@ const { verifyFileTicket } = require('../helpers/fileTicket');
 const { FILES_DIR } = require('../config/paths');
 const path = require('path');
 const { typeContenu } = require('../helpers/contentType');
+// Suivi des documents (033) : les abonnés sont prévenus des gestes ci-dessous,
+// APRÈS la réponse — une notification ne fait jamais échouer l'action.
+const collaboration = require('../services/collaborationService');
 
 const ADMIN_ROLES = ['superadmin', 'admin', 'archiviste'];
 
@@ -684,6 +687,7 @@ exports.updateDocument = async (req, res) => {
     const classement = await classeService.appliquer(tenantId, Number(id), req.user.id)
       .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
     res.json({ message: 'Document mis à jour', classement });
+    await collaboration.signaler(tenantId, Number(id), 'fiche', { acteur: req.user });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la mise à jour du document" });
@@ -881,6 +885,7 @@ exports.addFiles = async (req, res) => {
     }
     await logHistory(tenantId, id, req.user.id, "Ajout d'une version", null, null);
     res.status(201).json({ files: added });
+    await collaboration.signaler(tenantId, Number(id), 'version', { acteur: req.user, nombre: added.length, fichier: added.length === 1 ? added[0].original_name : null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de l\'ajout des fichiers' });
@@ -1067,6 +1072,7 @@ exports.setStatus = async (req, res) => {
     await tenantDb.query(tenantId, 'UPDATE documents SET statut = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [statut, id]);
     await logHistory(tenantId, id, req.user.id, stateMachine.TRANSITIONS_LABELS[`${doc.statut}>${statut}`] || 'Changement de statut', doc.statut, statut, comment);
     res.json({ message: 'Statut mis à jour', statut });
+    await collaboration.signaler(tenantId, Number(id), 'statut', { acteur: req.user, de: doc.statut, vers: statut });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors du changement de statut' });
@@ -2150,6 +2156,7 @@ exports.setDocumentMetadata = async (req, res) => {
     const classement = await classeService.appliquer(tenantId, parseInt(id, 10), req.user.id)
       .catch((e) => { console.error('[classe] application impossible :', e.message); return null; });
     res.json({ message: 'Métadonnées mises à jour avec succès', classement });
+    await collaboration.signaler(tenantId, parseInt(id, 10), 'metadonnees', { acteur: req.user });
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: err.message || 'Erreur lors de la mise à jour des métadonnées' });
@@ -2266,3 +2273,6 @@ exports.createDocumentRelation = async (req, res) => {
   }
 };
 
+// Garde d'écriture partagée avec la restauration de version (033,
+// collaborationController) : une seule définition des refus.
+exports.chargerPourEcriture = chargerPourEcriture;

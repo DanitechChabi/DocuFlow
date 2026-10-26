@@ -164,6 +164,11 @@ app.use('/api/audit', auditRoutes);
 // Conformité : alertes d'incohérence entre documents, fournisseurs (migration 030).
 app.use('/api', require('./routes/conformiteRoutes'));
 app.use('/api', require('./routes/archivesRoutes'));
+// Collaboration (migration 033) : favoris, suivi, commentaires, liens de
+// partage (gestion), restauration de version — authentifiées route par route.
+app.use('/api', require('./routes/collaborationRoutes'));
+// Liens de partage PUBLICS (/api/partage/:jeton) — sans authentification.
+app.use('/api', require('./routes/partageRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
