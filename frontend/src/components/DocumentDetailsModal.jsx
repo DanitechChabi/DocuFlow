@@ -3,7 +3,7 @@ import { FileSearch,
 
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
-  Lock, Unlock, Link2, Wand2,
+  Lock, Unlock, Link2, Wand2, Package,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
@@ -13,6 +13,8 @@ import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
 import IntegriteDocument from './archives/IntegriteDocument';
+import EcheancesDocument from './recherche/EcheancesDocument';
+import { rechercheService, messageBlob } from '../services/rechercheService';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
@@ -213,6 +215,13 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
             <p className="text-sm text-slate-400 font-medium">{doc?.nom_entreprise || 'Chargement…'}</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Paquet d'archive (035) : fichiers, manifeste, empreintes, en un ZIP. */}
+            {doc && (
+              <button type="button" title="Exporter le paquet d'archive (ZIP)" className="btn-secondary flex items-center gap-1.5"
+                onClick={() => rechercheService.paquet([doc.id]).catch(async (err) => toast.error(await messageBlob(err, 'Export impossible')))}>
+                <Package size={15} /> <span className="hidden md:inline">Paquet</span>
+              </button>
+            )}
             <button onClick={() => setShowShare(true)} className="btn-secondary flex items-center gap-1.5"><Share2 size={15} /> Partager</button>
             {/* Indexation : visible pour le personnel (la route /:id/metadata
                 est réservée aux rôles GED côté serveur). Mise en avant quand le
@@ -279,6 +288,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
 
                 {/* Intégrité et preuve : empreintes, contrôle, gel, certificat (031). */}
                 <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
+
+                {/* Échéances à surveiller (035). */}
+                <EcheancesDocument documentId={doc.id} />
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (

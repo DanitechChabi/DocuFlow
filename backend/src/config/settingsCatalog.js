@@ -260,6 +260,14 @@ const CATALOG = [
   { key: 'journal_scellement_auto', group: 'archives', label: 'Sceller le journal chaque jour',
     description: "Fige chaque jour l'empreinte de tête du journal d'audit chaîné. Conservez le relevé des sceaux hors de DocuFlow : il prouve qu'aucune entrée passée n'a été réécrite.",
     type: 'boolean', default: 'true' },
+
+  // ------------------------------------- RECHERCHE, ÉCHÉANCIER, EXPORT (035)
+  { key: 'echeances_rappel_jours', group: 'documents', label: 'Rappel avant échéance (jours)',
+    description: "Nombre de jours avant une échéance (fin de contrat, validité d'une attestation, facture à payer…) où son destinataire est prévenu. Il l'est aussi le jour même. Modifiable échéance par échéance.",
+    type: 'number', default: '15', min: 0, max: 365 },
+  { key: 'export_taille_max_mo', group: 'archives', label: "Taille maximale d'un paquet d'archive (Mo)",
+    description: "Volume total des fichiers d'un export « paquet d'archive » (ZIP avec manifeste et empreintes). Au-delà, l'export est refusé : réduisez la sélection.",
+    type: 'number', default: '500', min: 1, max: 2000 },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));
