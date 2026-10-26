@@ -72,11 +72,20 @@ console.log('\n3. Sémantique des rôles — calque des pouvoirs d\'avant le RBA
 
 console.log('\n4. Migration 019 — provisionne exactement les définitions du code');
 // Permissions accordées après 019 par une migration dédiée (qui doit les poser).
-const AJOUTS_POSTERIEURS = { archiviste: ['requests.create'], lecteur: ['requests.create'] };
+const AJOUTS_POSTERIEURS = {
+  archiviste: ['requests.create', 'compliance.view', 'compliance.manage'],
+  lecteur: ['requests.create'],
+  admin: ['compliance.view', 'compliance.manage'],
+  responsable: ['compliance.view'],
+};
 {
   const sql023 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '023_request_quick.sql'), 'utf8');
   ok(/array_append\(permissions, 'requests\.create'\)/.test(sql023) && sql023.includes("key IN ('archiviste', 'lecteur')"),
     'migration 023 : requests.create ajoutée à archiviste et lecteur');
+  const sql030 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '030_conformite.sql'), 'utf8');
+  ok(/array_append\(permissions, 'compliance\.view'\)/.test(sql030) && sql030.includes("key IN ('admin', 'archiviste', 'responsable')")
+    && /array_append\(permissions, 'compliance\.manage'\)/.test(sql030),
+    'migration 030 : compliance.view (admin, archiviste, responsable) et compliance.manage (admin, archiviste) accordées');
   const sql = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '019_rbac.sql'), 'utf8');
   for (const role of ROLES_SYSTEME) {
     // La section SQL du rôle : de sa clé à la clé du rôle suivant (ou la fin

@@ -67,6 +67,14 @@ const CATALOGUE = [
     ],
   },
   {
+    module: 'compliance',
+    titre: 'Conformité',
+    permissions: [
+      { key: 'compliance.view', label: 'Consulter la conformité', description: 'Tableau de bord, alertes d\'incohérence entre documents, fiche des fournisseurs, analyse d\'un document.' },
+      { key: 'compliance.manage', label: 'Gérer la conformité', description: 'Traiter ou ignorer les alertes, relancer l\'analyse des documents.' },
+    ],
+  },
+  {
     module: 'search',
     titre: 'Recherche',
     permissions: [
@@ -142,6 +150,7 @@ const ROLES_SYSTEME = [
       'documents.manage_versions', 'documents.view_history', 'documents.index', 'documents.validate',
       'folders.view', 'folders.create', 'folders.edit', 'folders.move', 'folders.delete', 'folders.manage_permissions',
       'search.documents', 'search.requests', 'search.advanced',
+      'compliance.view', 'compliance.manage',
       'users.view', 'users.create', 'users.edit', 'users.disable',
       'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
       'audit.view', 'settings.manage', 'groups.view', 'groups.manage',
@@ -157,6 +166,7 @@ const ROLES_SYSTEME = [
       'requests.validate', 'requests.reject', 'requests.close', 'requests.view_history',
       'documents.view', 'documents.download',
       'search.documents', 'search.requests',
+      'compliance.view',
       'audit.view',
     ],
     embleme: '🧑‍💼',
@@ -172,6 +182,7 @@ const ROLES_SYSTEME = [
       'documents.view_history', 'documents.index', 'documents.validate',
       'folders.view', 'folders.create', 'folders.edit', 'folders.move', 'folders.delete', 'folders.manage_permissions',
       'search.documents', 'search.requests', 'search.advanced',
+      'compliance.view', 'compliance.manage',
       'groups.view',
     ],
     embleme: '📚',

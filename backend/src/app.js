@@ -161,6 +161,8 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/audit', auditRoutes);
+// Conformité : alertes d'incohérence entre documents, fournisseurs (migration 030).
+app.use('/api', require('./routes/conformiteRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
@@ -295,6 +297,9 @@ const server = app.listen(PORT, HOST, () => {
     contenu.demarrerRattrapage();
     // Scans (PDF sans texte, photos) : OCR en arrière-plan (migration 028).
     contenu.demarrerOcr();
+    // Analyse des documents (migration 030) : lecture des montants, dates et
+    // identifiants, puis contrôle de conformité entre documents.
+    require('./services/analyseService').demarrerAnalyse();
   });
   migrer
     .then(() => tenantProvisioningService.syncSettingDefinitions())

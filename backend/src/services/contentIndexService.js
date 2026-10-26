@@ -79,6 +79,9 @@ async function enregistrerTexte(run, tenantId, documentId, fileId, texte, { sour
       WHERE id = $1 AND tenant_id = $2`,
     [documentId, tenantId]
   );
+  // Le texte est lisible : l'analyse (émetteur, montants, contrôles de
+  // conformité) peut le lire. Mise en file, sans attendre ni bloquer l'envoi.
+  if (texte) require('./analyseService').planifier(tenantId, documentId);
 }
 
 /**
