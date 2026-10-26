@@ -18,6 +18,8 @@ import ArchivagePage from './pages/ArchivagePage';
 import CertificatPage from './pages/CertificatPage';
 import FavorisPage from './pages/FavorisPage';
 import PartagePublicPage from './pages/PartagePublicPage';
+import MesTachesPage from './pages/MesTachesPage';
+import CircuitsPage from './pages/CircuitsPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -113,6 +115,8 @@ function App() {
           <Route path="/documents/archivage" element={<ArchivagePage />} />
           <Route path="/documents/certificat/:id" element={<CertificatPage />} />
           <Route path="/documents/favoris" element={<FavorisPage />} />
+          <Route path="/documents/taches" element={<MesTachesPage />} />
+          <Route path="/documents/circuits" element={<CircuitsPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

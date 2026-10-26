@@ -6,11 +6,12 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star,
+  Fingerprint, Star, ListChecks, GitBranch,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { circuitService } from '../services/circuitService';
 import { RESTART_TOUR_EVENT } from './OnboardingTour';
 import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
 import Modal from './ui/Modal';
@@ -58,6 +59,16 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
   const user = authService.getCurrentUser();
   const settings = useSettings();
   const { can } = usePermissions();
+
+  // Tâches de validation à traiter (034) : compteur de « Mes tâches »,
+  // rafraîchi à chaque navigation et après une décision.
+  const [tachesOuvertes, setTachesOuvertes] = useState(0);
+  useEffect(() => {
+    const lire = () => circuitService.compte().then((c) => setTachesOuvertes(c.total || 0)).catch(() => {});
+    lire();
+    window.addEventListener('docuflow:taches', lire);
+    return () => window.removeEventListener('docuflow:taches', lire);
+  }, [location.pathname]);
 
   // --- Contexte de module : la navigation CHANGE quand on entre dans un module ---
   //
@@ -119,9 +130,11 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view', end: true }),
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
     entree('/documents/favoris', 'Mes favoris', <Star size={18} />, { permission: 'documents.view', tourId: 'favoris' }),
+    entree('/documents/taches', 'Mes tâches', <ListChecks size={18} />, { tourId: 'taches', compteur: tachesOuvertes }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
     entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
+    entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits' }),
     entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite' }),
     entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view' }),
     entree('/documents/archivage', 'Archivage & preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage' }),
@@ -202,6 +215,11 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
       <>
         <span className={`w-5 h-5 flex items-center justify-center flex-shrink-0 ${repliee && !mobile ? 'mx-auto' : ''}`} style={{ color: 'inherit' }}>{item.icon}</span>
         <span className={`truncate ${repliee && !mobile ? 'hidden' : ''}`}>{item.label}</span>
+        {item.compteur > 0 && (
+          <span className={`ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-docuflow-secondary text-white text-[11px] font-bold ${repliee && !mobile ? 'hidden' : ''}`}>
+            {item.compteur > 99 ? '99+' : item.compteur}
+          </span>
+        )}
         {item.label === 'Notifications' && unreadCount > 0 && (
           <span className={`ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold ${repliee && !mobile ? 'hidden' : ''}`}>
             {unreadCount > 99 ? '99+' : unreadCount}

@@ -85,6 +85,14 @@ const CATALOGUE = [
     ],
   },
   {
+    module: 'workflows',
+    titre: 'Circuits de validation',
+    permissions: [
+      { key: 'workflows.manage', label: 'Configurer les circuits', description: "Créer et modifier les circuits de validation (étapes, destinataires, délais, classe), suivre les circuits en cours, réassigner une tâche, annuler ou relancer tout circuit." },
+      { key: 'workflows.start', label: 'Lancer un circuit', description: "Soumettre un document à un circuit de validation, et annuler ou relancer celui qu'on a lancé. Viser n'exige aucune permission : il suffit d'être destinataire de la tâche." },
+    ],
+  },
+  {
     module: 'search',
     titre: 'Recherche',
     permissions: [
@@ -162,6 +170,7 @@ const ROLES_SYSTEME = [
       'search.documents', 'search.requests', 'search.advanced',
       'compliance.view', 'compliance.manage',
       'archives.view', 'archives.manage', 'archives.hold', 'archives.validate',
+      'workflows.manage', 'workflows.start',
       'users.view', 'users.create', 'users.edit', 'users.disable',
       'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
       'audit.view', 'settings.manage', 'groups.view', 'groups.manage',
@@ -179,6 +188,7 @@ const ROLES_SYSTEME = [
       'search.documents', 'search.requests',
       'compliance.view',
       'archives.view', 'archives.validate',
+      'workflows.start',
       'audit.view',
     ],
     embleme: '🧑‍💼',
@@ -196,6 +206,7 @@ const ROLES_SYSTEME = [
       'search.documents', 'search.requests', 'search.advanced',
       'compliance.view', 'compliance.manage',
       'archives.view', 'archives.manage', 'archives.hold',
+      'workflows.manage', 'workflows.start',
       'groups.view',
     ],
     embleme: '📚',
@@ -208,6 +219,7 @@ const ROLES_SYSTEME = [
       'requests.view', 'requests.create', 'requests.process', 'requests.view_history',
       'documents.view', 'documents.upload', 'documents.download',
       'search.documents', 'search.requests',
+      'workflows.start',
     ],
     embleme: '📝',
   },
