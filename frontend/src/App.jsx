@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
+import MonEspacePage from './pages/MonEspacePage';
 import DocumentsPage from './pages/DocumentsPage';
 import CorbeillePage from './pages/CorbeillePage';
 import PretsPage from './pages/PretsPage';
@@ -90,6 +91,7 @@ function App() {
         <Route element={<ProtectedRoute><LicenseGuard><AppLayout /></LicenseGuard></ProtectedRoute>}>
           {/* Accueil global — vision synthétique des deux modules */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/mon-espace" element={<MonEspacePage />} />
 
           {/* Module DEMANDES — les anciennes routes /dashboard/* redirigent
               (liens partagés, favoris, tour guidé) : la page est la même. */}
