@@ -141,9 +141,18 @@ const retentionService = {
     const expires = await this.checkExpiredDocuments(tenantId);
     const appliques = [];
     const erreurs = [];
+    const suspendus = [];
+    // Gel juridique (031) : la rétention ne détruit pas un document gelé ;
+    // l'échéance est seulement notée, et reprendra à la levée du gel.
+    const geles = await require('./integriteService')
+      .documentsGeles(tenantId, expires.filter((e) => e.action === 'delete').map((e) => e.documentId));
 
     for (const e of expires) {
       try {
+        if (e.action === 'delete' && geles.has(e.documentId)) {
+          suspendus.push(e);
+          continue;
+        }
         if (e.action === 'archive') {
           await db.query(
             `UPDATE documents SET statut = 'archivé', updated_at = CURRENT_TIMESTAMP
@@ -173,7 +182,7 @@ const retentionService = {
         erreurs.push({ ...e, erreur: err.message });
       }
     }
-    return { appliques, erreurs };
+    return { appliques, erreurs, suspendus };
   }
 };
 

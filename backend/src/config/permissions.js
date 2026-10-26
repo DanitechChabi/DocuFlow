@@ -75,6 +75,16 @@ const CATALOGUE = [
     ],
   },
   {
+    module: 'archives',
+    titre: 'Archivage',
+    permissions: [
+      { key: 'archives.view', label: "Consulter l'archivage", description: "Rapport d'intégrité des fichiers, doublons, vérification du journal chaîné et de ses sceaux, liste des gels juridiques." },
+      { key: 'archives.manage', label: "Gérer l'archivage", description: 'Lancer le contrôle des fichiers, sceller le journal.' },
+      { key: 'archives.hold', label: 'Poser un gel juridique', description: "Geler un document (contentieux, contrôle, enquête) pour en interdire toute destruction, et lever ce gel." },
+      { key: 'archives.validate', label: 'Valider les éliminations', description: "Approuver un bordereau d'élimination proposé par un autre (séparation des tâches)." },
+    ],
+  },
+  {
     module: 'search',
     titre: 'Recherche',
     permissions: [
@@ -151,6 +161,7 @@ const ROLES_SYSTEME = [
       'folders.view', 'folders.create', 'folders.edit', 'folders.move', 'folders.delete', 'folders.manage_permissions',
       'search.documents', 'search.requests', 'search.advanced',
       'compliance.view', 'compliance.manage',
+      'archives.view', 'archives.manage', 'archives.hold', 'archives.validate',
       'users.view', 'users.create', 'users.edit', 'users.disable',
       'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
       'audit.view', 'settings.manage', 'groups.view', 'groups.manage',
@@ -167,6 +178,7 @@ const ROLES_SYSTEME = [
       'documents.view', 'documents.download',
       'search.documents', 'search.requests',
       'compliance.view',
+      'archives.view', 'archives.validate',
       'audit.view',
     ],
     embleme: '🧑‍💼',
@@ -183,6 +195,7 @@ const ROLES_SYSTEME = [
       'folders.view', 'folders.create', 'folders.edit', 'folders.move', 'folders.delete', 'folders.manage_permissions',
       'search.documents', 'search.requests', 'search.advanced',
       'compliance.view', 'compliance.manage',
+      'archives.view', 'archives.manage', 'archives.hold',
       'groups.view',
     ],
     embleme: '📚',

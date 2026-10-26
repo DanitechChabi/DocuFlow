@@ -73,10 +73,10 @@ console.log('\n3. Sémantique des rôles — calque des pouvoirs d\'avant le RBA
 console.log('\n4. Migration 019 — provisionne exactement les définitions du code');
 // Permissions accordées après 019 par une migration dédiée (qui doit les poser).
 const AJOUTS_POSTERIEURS = {
-  archiviste: ['requests.create', 'compliance.view', 'compliance.manage'],
+  archiviste: ['requests.create', 'compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold'],
   lecteur: ['requests.create'],
-  admin: ['compliance.view', 'compliance.manage'],
-  responsable: ['compliance.view'],
+  admin: ['compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold', 'archives.validate'],
+  responsable: ['compliance.view', 'archives.view', 'archives.validate'],
 };
 {
   const sql023 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '023_request_quick.sql'), 'utf8');
@@ -86,6 +86,16 @@ const AJOUTS_POSTERIEURS = {
   ok(/array_append\(permissions, 'compliance\.view'\)/.test(sql030) && sql030.includes("key IN ('admin', 'archiviste', 'responsable')")
     && /array_append\(permissions, 'compliance\.manage'\)/.test(sql030),
     'migration 030 : compliance.view (admin, archiviste, responsable) et compliance.manage (admin, archiviste) accordées');
+  const sql031 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '031_integrite_sae.sql'), 'utf8');
+  const accordeDans031 = (perm, roles) => new RegExp(`array_append\\(permissions, '${perm.replace('.', '\\.')}'\\)\\s*\\n\\s*WHERE is_system AND key IN \\(${roles.map((r) => `'${r}'`).join(', ')}\\)`).test(sql031);
+  ok(accordeDans031('archives.view', ['admin', 'archiviste', 'responsable']) && accordeDans031('archives.manage', ['admin', 'archiviste'])
+    && accordeDans031('archives.hold', ['admin', 'archiviste']) && accordeDans031('archives.validate', ['admin', 'responsable']),
+    'migration 031 : archives.view / manage / hold / validate accordées aux rôles du code');
+  for (const [perm, roles] of [['archives.view', ['admin', 'archiviste', 'responsable']], ['archives.manage', ['admin', 'archiviste']],
+    ['archives.hold', ['admin', 'archiviste']], ['archives.validate', ['admin', 'responsable']]]) {
+    const attendus = ROLES_SYSTEME.filter((r) => r.permissions.includes(perm)).map((r) => r.key).sort();
+    ok(JSON.stringify(attendus) === JSON.stringify(roles.slice().sort()), `${perm} : mêmes rôles dans le code et dans la 031 (${attendus.join(', ')})`);
+  }
   const sql = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '019_rbac.sql'), 'utf8');
   for (const role of ROLES_SYSTEME) {
     // La section SQL du rôle : de sa clé à la clé du rôle suivant (ou la fin

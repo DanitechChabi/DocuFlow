@@ -1064,3 +1064,46 @@ button:disabled, [disabled] { cursor: not-allowed; }
   .portail-impression tr { break-inside: avoid; }
   @page { size: A4 landscape; margin: 12mm; }
 }
+
+/* ---------------------------------------------------------------------------
+   Certificat d'archivage (migration 031) : une feuille, à l'écran comme sur
+   papier. À l'écran, la feuille est posée sur la page ; à l'impression, le
+   portail la rend seule (règle .portail-impression ci-dessus).
+   --------------------------------------------------------------------------- */
+.certificat-ecran {
+  background: #fff; color: #0f172a; border-radius: 18px; padding: 40px 44px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 20px 50px -20px rgba(15, 23, 42, .25);
+  border: 1px solid #e2e8f0;
+}
+.certificat { font-size: 12.5px; line-height: 1.55; }
+.certificat h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; margin: 2px 0 0; }
+.certificat h2 {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #475569;
+  margin: 22px 0 8px; display: flex; align-items: center; gap: 6px;
+}
+.certificat-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 14px; border-bottom: 3px double #0f172a; }
+.certificat-entete svg { color: #b45309; flex-shrink: 0; }
+.certificat-surtitre { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: #64748b; }
+.certificat-numero { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #475569; margin-top: 4px; }
+.certificat-texte { margin-top: 14px; color: #334155; }
+.certificat-grille { display: grid; grid-template-columns: 170px 1fr; gap: 4px 14px; }
+.certificat-grille dt { color: #64748b; }
+.certificat-grille dd { font-weight: 600; margin: 0; word-break: break-word; }
+.certificat table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.certificat th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; border-bottom: 1px solid #cbd5e1; padding: 5px 6px; }
+.certificat td { border-bottom: 1px solid #e2e8f0; padding: 6px; vertical-align: top; }
+.certificat .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.certificat .empreinte { word-break: break-all; max-width: 260px; }
+.certificat .discret { color: #94a3b8; font-size: 10.5px; }
+.certificat-gel { margin-top: 16px; padding: 10px 14px; border: 1.5px solid #fca5a5; background: #fef2f2; border-radius: 10px; color: #991b1b; }
+.certificat-gel h2 { color: #991b1b; margin-top: 0; }
+.certificat-sceau { margin-top: 8px; padding-top: 4px; border-top: 1px dashed #cbd5e1; }
+@media (max-width: 640px) {
+  .certificat-ecran { padding: 22px 18px; }
+  .certificat-grille { grid-template-columns: 1fr; }
+  .certificat-grille dt { margin-top: 6px; }
+}
+@media print {
+  .portail-portrait .certificat { font-size: 10.5px; }
+  .portail-portrait .certificat td, .portail-portrait .certificat th { border: none; border-bottom: 1px solid #cbd5e1; }
+}

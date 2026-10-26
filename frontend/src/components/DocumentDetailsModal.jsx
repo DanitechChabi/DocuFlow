@@ -12,6 +12,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
+import IntegriteDocument from './archives/IntegriteDocument';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
@@ -96,8 +97,11 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
     if (!newFiles.length) return;
     setUploading(true);
     try {
-      await documentService.addFiles(documentId, newFiles);
+      const { files: ajoutes = [] } = await documentService.addFiles(documentId, newFiles);
       toast.success(`${newFiles.length} fichier(s) ajouté(s)`);
+      // Doublons (031) : même empreinte qu'une pièce d'un AUTRE document.
+      const ailleurs = [...new Set(ajoutes.flatMap((f) => (f.doublons || []).map((d) => d.reference_mfile)))];
+      if (ailleurs.length) toast.info(`Fichier déjà présent dans ${ailleurs.join(', ')} (même empreinte).`, 8000);
       setNewFiles([]);
       await load();
       if (onChanged) onChanged();
@@ -272,6 +276,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
 
                 {/* Analyse et contrôle de conformité (migration 030). */}
                 <AnalyseDocument documentId={doc.id} />
+
+                {/* Intégrité et preuve : empreintes, contrôle, gel, certificat (031). */}
+                <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (

@@ -10,6 +10,8 @@ const fs = require('fs');
 const { FILES_DIR } = require('../config/paths');
 const { extractText } = require('./textExtractionService');
 const { enregistrerTexte } = require('./contentIndexService');
+const integrite = require('./integriteService');
+const settingsService = require('./settingsService');
 
 // Insère une ligne d'historique du cycle de vie documentaire.
 // client : optionnel — si fourni (transaction), les requêtes s'exécutent dessus.
@@ -30,6 +32,8 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
   // supprime le fichier temporaire, et l'extraction faite après ne trouvait
   // plus rien — le contenu n'était jamais indexé en production (voir 027).
   const texte = await extractText(file.path, file.mimetype).catch(() => '');
+  // Empreinte d'archivage (031), pour la même raison avant saveFile.
+  const empreinte = await integrite.empreinteVersement(file);
   const info = await storage.saveFile(file, { keepLocal });
   const run = client || db;
   const ver = await run.query(
@@ -37,11 +41,23 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
     [documentId]
   );
   const version = ver.rows[0].v;
+  const colonnes = ['document_id', 'version', 'original_name', 'stored_name', 'cloudinary_public_id', 'mime_type', 'file_size', 'uploaded_by', 'secure_url'];
+  const valeurs = [documentId, version, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null];
+  if (empreinte && (await integrite.migrationPassee())) {
+    colonnes.push('empreinte_sha256', 'empreinte_at', 'empreinte_origine');
+    valeurs.push(empreinte, new Date(), 'versement');
+    // Sur disque, le fichier stocké EST celui qui vient d'être lu : il est
+    // vérifié de fait. Chez Cloudinary, la première relecture le confirmera.
+    if (!info.cloudinaryPublicId) {
+      colonnes.push('integrite_statut', 'integrite_verifiee_at');
+      valeurs.push('intacte', new Date());
+    }
+  }
   const result = await run.query(
-    `INSERT INTO document_files (document_id, version, original_name, stored_name, cloudinary_public_id, mime_type, file_size, uploaded_by, secure_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO document_files (${colonnes.join(', ')})
+     VALUES (${colonnes.map((_, i) => `$${i + 1}`).join(', ')})
      RETURNING *`,
-    [documentId, version, file.originalname, info.storedName, info.cloudinaryPublicId, file.mimetype, file.size, userId, info.secureUrl || null]
+    valeurs
   );
   await run.query(
     'UPDATE documents SET est_numerise = true, version = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tenant_id = $3',
@@ -50,7 +66,13 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
   // Conservé et versé dans l'index plein texte. `texte` est aussi rendu à
   // l'appelant (auto-tags) : inutile de relire un fichier peut-être supprimé.
   await enregistrerTexte(run, tenantId, documentId, result.rows[0].id, texte);
-  return { ...result.rows[0], texte };
+  // Doublons : signalés, jamais refusés — deux documents peuvent légitimement
+  // porter la même pièce (une attestation jointe à deux dossiers).
+  let doublons = [];
+  if (empreinte && (await settingsService.get(tenantId, 'enable_deduplication', true))) {
+    doublons = await integrite.doublons(tenantId, empreinte, { userId, exclureDocumentId: documentId, run }).catch(() => []);
+  }
+  return { ...result.rows[0], texte, doublons };
 }
 
 // Génère la référence mfile canonique : DOC-<tenant>-<id>

@@ -163,6 +163,7 @@ app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/audit', auditRoutes);
 // Conformité : alertes d'incohérence entre documents, fournisseurs (migration 030).
 app.use('/api', require('./routes/conformiteRoutes'));
+app.use('/api', require('./routes/archivesRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
@@ -300,6 +301,9 @@ const server = app.listen(PORT, HOST, () => {
     // Analyse des documents (migration 030) : lecture des montants, dates et
     // identifiants, puis contrôle de conformité entre documents.
     require('./services/analyseService').demarrerAnalyse();
+    // Preuve et intégrité (migration 031) : empreintes des anciens fichiers,
+    // contrôle périodique des fichiers stockés, sceau quotidien du journal.
+    require('./services/integriteService').demarrerIntegrite();
   });
   migrer
     .then(() => tenantProvisioningService.syncSettingDefinitions())
