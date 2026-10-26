@@ -58,6 +58,7 @@ const GROUPS = [
   { name: 'localization',  label: 'Localisation',  description: 'Langue, formats et fuseau horaire.' },
   { name: 'storage',       label: 'Stockage',      description: 'Destination et déduplication des fichiers.' },
   { name: 'retention',     label: 'Conservation',  description: 'Durées légales de conservation des documents.' },
+  { name: 'compliance',    label: 'Conformité & IA', description: "Analyse des documents, contrôle d'incohérences entre documents et modèle de langage." },
 ];
 
 const CATALOG = [
@@ -223,6 +224,33 @@ const CATALOG = [
       { value: 'delete', label: 'Supprimer' },
       { value: 'alert', label: 'Alerter seulement' },
     ] },
+
+  // ------------------------------------------------------- CONFORMITÉ & IA (030)
+  // Les clés d'API (GROQ_API_KEY, INSEE_API_KEY) ne sont JAMAIS des réglages :
+  // ce sont des secrets de la plateforme, lus dans l'environnement du serveur.
+  { key: 'conformite_active', group: 'compliance', label: 'Analyse automatique des documents',
+    description: "Lire chaque document versé (émetteur, montants, dates, identifiants) et contrôler sa cohérence avec les autres documents. Traitement en arrière-plan.",
+    type: 'boolean', default: 'true' },
+  { key: 'conformite_pays', group: 'compliance', label: "Référentiel d'identification des entreprises",
+    description: "Format du numéro d'entreprise contrôlé : IFU (Bénin, 13 chiffres), SIREN/SIRET (France, 9 et 14 chiffres), ou aucun contrôle d'identifiant.",
+    type: 'select', default: 'bj',
+    options: [{ value: 'bj', label: 'Bénin — IFU' }, { value: 'fr', label: 'France — SIREN / SIRET' }, { value: 'aucun', label: "Aucun contrôle d'identifiant" }] },
+  { key: 'conformite_tolerance_montant', group: 'compliance', label: 'Tolérance sur les montants (%)',
+    description: "Écart accepté entre le montant d'un devis et celui de la facture correspondante avant de lever une alerte.",
+    type: 'number', default: '5', min: 0, max: 100 },
+  { key: 'conformite_verifier_registre', group: 'compliance', label: 'Vérifier au registre officiel',
+    description: "Interroger le registre officiel (INSEE SIRENE, France) : existence, état et nom de l'entreprise. Exige le référentiel France et la clé INSEE_API_KEY sur le serveur.",
+    type: 'boolean', default: 'false' },
+  { key: 'llm_provider', group: 'compliance', label: 'Modèle de langage (IA)',
+    description: "Améliore la lecture des documents. « Groq » envoie le TEXTE des documents à un service externe (clé GROQ_API_KEY sur le serveur). « Ollama » reste sur votre réseau ou votre poste. Sans modèle, des règles de lecture intégrées sont utilisées.",
+    type: 'select', default: 'aucun',
+    options: [{ value: 'aucun', label: 'Aucun (règles intégrées)' }, { value: 'ollama', label: 'Ollama (local, données chez vous)' }, { value: 'groq', label: 'Groq (service externe)' }] },
+  { key: 'llm_model', group: 'compliance', label: 'Nom du modèle',
+    description: "Laisser vide pour le modèle par défaut : llama-3.3-70b-versatile (Groq) ou gpt-oss:20b (Ollama).",
+    type: 'string', default: '' },
+  { key: 'llm_ollama_url', group: 'compliance', label: 'Adresse du serveur Ollama',
+    description: "Adresse de l'instance Ollama, par exemple http://localhost:11434.",
+    type: 'string', default: 'http://localhost:11434' },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));

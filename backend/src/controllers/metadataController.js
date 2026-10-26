@@ -43,6 +43,11 @@ exports.updateSchema = async (req, res) => {
     if (!schema) {
       return res.status(404).json({ error: 'Schéma non trouvé' });
     }
+    // Le rôle de la classe dans les contrôles a pu changer : les alertes de
+    // conformité sont recalculées (en arrière-plan).
+    if (req.body && req.body.nature_conformite !== undefined) {
+      require('../services/analyseService').planifierRecalcul(req.user.tenant_id);
+    }
     res.json(schema);
   } catch (error) {
     res.status(400).json({ error: error.message });

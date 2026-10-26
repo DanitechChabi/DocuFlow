@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const indexSuggestionController = require('../controllers/indexSuggestionController');
+const conformiteController = require('../controllers/conformiteController');
 const documentController = require('../controllers/documentController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/requirePermission');
@@ -85,6 +86,10 @@ router.get('/:id/suggestions', requirePermission('documents.edit'), indexSuggest
 // correction de fiche : permission documents.edit.
 router.post('/:id/metadata', requirePermission('documents.edit'), documentController.setDocumentMetadata);
 router.get('/:id/audit', requirePermission('documents.view_history'), documentController.getDocumentAudit);
+// Analyse du document (migration 030) : ce que la lecture a trouvé (émetteur,
+// montants, dates, identifiants) et les alertes de conformité qui le concernent.
+router.get('/:id/analysis', requirePermission('compliance.view'), conformiteController.analyseDocument);
+router.post('/:id/analysis', requirePermission('compliance.manage'), conformiteController.relancerAnalyse);
 
 // Verrouillage pour édition (check-out / check-in) — une action sur les
 // versions du fond documentaire, réservée à qui peut les gérer.

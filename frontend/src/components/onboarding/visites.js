@@ -134,6 +134,13 @@ function visiteDocuments({ can }) {
       content: 'Les documents versés en masse ou issus d\'une demande, qui attendent leurs métadonnées.',
     });
   }
+  if (can('compliance.view')) {
+    etapes.push({
+      id: 'conformite', selector: '[data-tour="conformite"]', position: 'right',
+      title: 'Conformité',
+      content: 'Chaque document versé est lu (émetteur, montants, dates) puis contrôlé avec les autres : facture hors devis, attestation expirée, numéro d\'entreprise incohérent.',
+    });
+  }
   etapes.push({
     id: 'corbeille', selector: '[data-tour="corbeille"]', position: 'right',
     title: 'Rien ne disparaît d\'un clic',

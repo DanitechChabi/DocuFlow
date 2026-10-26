@@ -219,6 +219,13 @@ async function reglagesClasse(tenantId, body = {}) {
     r.code = code || null;
   }
   if (body.mots_cles !== undefined) r.mots_cles = String(body.mots_cles || '').slice(0, 500) || null;
+  if (body.nature_conformite !== undefined) {
+    const n = body.nature_conformite || null;
+    if (n !== null && !['facture', 'devis', 'attestation'].includes(n)) {
+      throw new Error('Rôle de conformité attendu : facture, devis ou attestation.');
+    }
+    r.nature_conformite = n;
+  }
   if (body.modele_nom !== undefined) r.modele_nom = String(body.modele_nom || '').slice(0, 300) || null;
   if (body.sous_dossier_annee !== undefined) r.sous_dossier_annee = Boolean(body.sous_dossier_annee);
   if (body.dossier_defaut_id !== undefined) {

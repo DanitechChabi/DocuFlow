@@ -312,9 +312,9 @@ async function installerClasses(tenantId, codes) {
       if (existe.rows[0]) { ignorees.push(c.nom); continue; }
       const dossier = await trouverDossier(client, tenantId, c.dossiers);
       const s = await client.query(
-        `INSERT INTO metadata_schemas (tenant_id, name, description, is_default, code, mots_cles, modele_nom, dossier_defaut_id, sous_dossier_annee)
-         VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7, $8) RETURNING id`,
-        [tenantId, c.nom, `Modèle DocuFlow — ${c.categorie}`, c.code, c.mots_cles, c.modele_nom, dossier, Boolean(c.annee && dossier)]
+        `INSERT INTO metadata_schemas (tenant_id, name, description, is_default, code, mots_cles, modele_nom, dossier_defaut_id, sous_dossier_annee, nature_conformite)
+         VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [tenantId, c.nom, `Modèle DocuFlow — ${c.categorie}`, c.code, c.mots_cles, c.modele_nom, dossier, Boolean(c.annee && dossier), c.nature || null]
       );
       const pris = new Set();
       let ordre = 0;

@@ -11,6 +11,7 @@ import DocumentFormModal from './DocumentFormModal';
 import ConfirmDialog from './ConfirmDialog';
 import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
+import AnalyseDocument from './conformite/AnalyseDocument';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
@@ -268,6 +269,9 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   )}
                   {doc.description && <p className="text-sm text-slate-600 leading-relaxed">{doc.description}</p>}
                 </div>
+
+                {/* Analyse et contrôle de conformité (migration 030). */}
+                <AnalyseDocument documentId={doc.id} />
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (
