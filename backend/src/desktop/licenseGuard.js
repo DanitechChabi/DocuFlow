@@ -490,13 +490,27 @@ function deactivate() {
   return lastState;
 }
 
+// ---------------------------------------------------------------------------
+// LICENCES SUSPENDUES — décision de l'éditeur (octobre 2026) : pour le moment,
+// l'application de bureau fonctionne sans licence. Le dispositif reste intact
+// et se réactive en posant DOCUFLOW_LICENCES=on dans l'environnement du poste
+// (ou de l'installateur) : aucun code à réécrire. Désactivé, chaque poste est
+// « actif » et le serveur ne renvoie jamais 402 LICENSE_REQUIRED.
+// ---------------------------------------------------------------------------
+const licencesActives = () => process.env.DOCUFLOW_LICENCES === 'on';
+const etatSansLicence = () => ({
+  state: 'active', licences_desactivees: true, message: null, license_key: null,
+  valid_until: null, days_remaining: null, grace_days_remaining: null, offline: false, machine_id: null,
+});
+
 module.exports = {
   configure,
   activate,
-  check,
-  revalidate,
-  getState,
-  isAllowed,
+  check: async (opts) => (licencesActives() ? check(opts) : etatSansLicence()),
+  revalidate: () => (licencesActives() ? revalidate() : etatSansLicence()),
+  getState: () => (licencesActives() ? getState() : etatSansLicence()),
+  isAllowed: (state) => !licencesActives() || isAllowed(state),
+  licencesActives,
   deactivate,
   evaluate,          // exporté pour les tests
   getCacheFile: resolveCacheFile, // exporté pour les tests (et le support)

@@ -19,3 +19,11 @@ export const estBureau = () => Boolean(window.desktopApp?.isDesktop);
 
 /** Inverse lisible, pour les gardes « SaaS uniquement ». */
 export const estWeb = () => !estBureau();
+
+/**
+ * Licences suspendues pour le moment (décision de l'éditeur) : l'onglet
+ * « Licences » du portail est retiré, et le serveur considère tout poste de
+ * bureau comme actif. Réactivation : VITE_LICENCES=on au build (et
+ * DOCUFLOW_LICENCES=on côté serveur, voir backend/src/desktop/licenseGuard.js).
+ */
+export const licencesActives = () => import.meta.env.VITE_LICENCES === 'on';

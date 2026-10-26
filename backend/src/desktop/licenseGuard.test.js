@@ -39,6 +39,9 @@ const path = require('path');
 // du client. On détourne donc LOCALAPPDATA vers un dossier temporaire, retiré à
 // la fin.
 // ---------------------------------------------------------------------------
+// Le dispositif est suspendu par défaut (voir licenseGuard) : ces tests
+// l'exercent donc explicitement activé.
+process.env.DOCUFLOW_LICENCES = 'on';
 const BAC_A_SABLE = fs.mkdtempSync(path.join(os.tmpdir(), 'docuflow-licence-test-'));
 process.env.LOCALAPPDATA = BAC_A_SABLE;
 process.env.APPDATA = BAC_A_SABLE;

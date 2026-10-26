@@ -22,7 +22,7 @@ import LicensePanel from '../components/admin/LicensePanel';
 import RolesPanel from '../components/admin/RolesPanel';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
-import { estBureau } from '../utils/plateforme';
+import { estBureau, licencesActives } from '../utils/plateforme';
 import { toast } from '../components/Toast';
 import { authService } from '../services/authService';
 
@@ -44,7 +44,7 @@ const roleColor = (role) => ALL_ROLES.find((r) => r.key === role)?.color || 'bg-
 // le mode d'exécution ne change pas en cours de session.
 const PANNEAUX = [
   'dashboard', 'requests', 'users', 'roles', 'superadmins', 'sections', 'metadata',
-  'folders', 'tenants', ...(estBureau() ? [] : ['licenses']), 'audit',
+  'folders', 'tenants', ...(estBureau() || !licencesActives() ? [] : ['licenses']), 'audit',
   'branding', 'configuration',
 ];
 
@@ -544,7 +544,7 @@ const SuperAdminPage = () => {
     { id: 'metadata', label: 'Métadonnées', icon: Database },
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'tenants', label: 'Entreprises', icon: Building2, badge: stats.totalTenants },
-    !estBureau() && { id: 'licenses', label: 'Licences', icon: KeyRound },
+    !estBureau() && licencesActives() && { id: 'licenses', label: 'Licences', icon: KeyRound },
     { id: 'audit', label: 'Journal', icon: ScrollText },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
@@ -1064,7 +1064,7 @@ const SuperAdminPage = () => {
             le panneau appelle /api/superadmin/licenses au montage, qui répond 404
             en mode bureau — l'écran s'afficherait donc en erreur au lieu de ne pas
             s'afficher. */}
-        {activePanel === 'licenses' && !estBureau() && (
+        {activePanel === 'licenses' && !estBureau() && licencesActives() && (
           <div className="animate-fade-in-up">
             <LicensePanel />
           </div>
