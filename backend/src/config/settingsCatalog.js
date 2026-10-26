@@ -59,6 +59,7 @@ const GROUPS = [
   { name: 'storage',       label: 'Stockage',      description: 'Destination et déduplication des fichiers.' },
   { name: 'retention',     label: 'Conservation',  description: 'Durées légales de conservation des documents.' },
   { name: 'compliance',    label: 'Conformité & IA', description: "Analyse des documents, contrôle d'incohérences entre documents et modèle de langage." },
+  { name: 'archives',      label: 'Archivage & preuve', description: "Contrôle d'intégrité des fichiers et scellement du journal d'audit." },
 ];
 
 const CATALOG = [
@@ -213,7 +214,7 @@ const CATALOG = [
   // la base ; exposer ce réglage en écriture donnerait un interrupteur sans effet.
   { key: 'storage_backend', group: 'storage', label: 'Zone de stockage', description: 'Destination effective des fichiers, déterminée par la configuration serveur.', type: 'select', default: 'local', editable: false,
     options: [{ value: 'local', label: 'Serveur local' }, { value: 'cloudinary', label: 'Cloudinary' }] },
-  { key: 'enable_deduplication', group: 'storage', label: 'Déduplication', description: "Éviter de stocker deux fois un fichier identique (empreinte SHA-256).", type: 'boolean', default: 'true' },
+  { key: 'enable_deduplication', group: 'storage', label: 'Signalement des doublons', description: "Signaler au versement un fichier déjà présent dans la GED (même empreinte SHA-256). Le fichier est versé quand même : rien n'est refusé ni fusionné.", type: 'boolean', default: 'true' },
 
   // ------------------------------------------------------------- CONSERVATION
   { key: 'enable_retention',        group: 'retention', label: 'Politiques de rétention', description: 'Appliquer les durées de conservation réglementaires.', type: 'boolean', default: 'true' },
@@ -251,6 +252,14 @@ const CATALOG = [
   { key: 'llm_ollama_url', group: 'compliance', label: 'Adresse du serveur Ollama',
     description: "Adresse de l'instance Ollama, par exemple http://localhost:11434.",
     type: 'string', default: 'http://localhost:11434' },
+
+  // ---------------------------------------------------- ARCHIVAGE & PREUVE (031)
+  { key: 'integrite_verification_jours', group: 'archives', label: "Fréquence du contrôle d'intégrité (jours)",
+    description: "Chaque fichier stocké est relu et comparé à son empreinte SHA-256 au moins une fois par période. Une altération est journalisée et signalée aux gestionnaires de l'archivage.",
+    type: 'number', default: '30', min: 1, max: 365 },
+  { key: 'journal_scellement_auto', group: 'archives', label: 'Sceller le journal chaque jour',
+    description: "Fige chaque jour l'empreinte de tête du journal d'audit chaîné. Conservez le relevé des sceaux hors de DocuFlow : il prouve qu'aucune entrée passée n'a été réécrite.",
+    type: 'boolean', default: 'true' },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));

@@ -135,6 +135,13 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
         });
         files.forEach((f) => fd.append('files', f));
         const res = await documentService.createDocument(fd);
+        // Doublons (031) : signalés, le versement est fait.
+        const doublons = bulkMode ? (res.created || []).filter((c) => c.doublons?.length).length : (res.doublons || []).length;
+        if (doublons) {
+          toast.info(bulkMode
+            ? `${doublons} fichier(s) déjà présent(s) dans la GED (même empreinte) — voir le détail ci-dessous.`
+            : `Ce fichier est déjà présent dans ${res.doublons.map((d) => d.reference_mfile).join(', ')} (même empreinte).`, 8000);
+        }
         if (bulkMode) {
           setBulkResults(res);
           // Toast + onSuccess : la liste de documents doit se recharger dès le
@@ -337,9 +344,15 @@ const DocumentFormModal = ({ editing, folders, onClose, onSuccess }) => {
               </div>
               <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
                 {(bulkResults.created || []).map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between text-[12px] p-2 bg-white rounded-lg border border-slate-100">
-                    <span className="text-slate-600 font-medium truncate max-w-[200px]">{doc.fileName}</span>
-                    <span className="text-docuflow-secondary font-bold whitespace-nowrap">{doc.reference}</span>
+                  <div key={i} className="text-[12px] p-2 bg-white rounded-lg border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium truncate max-w-[200px]">{doc.fileName}</span>
+                      <span className="text-docuflow-secondary font-bold whitespace-nowrap">{doc.reference}</span>
+                    </div>
+                    {/* Doublon (031) : même empreinte SHA-256 qu'un document existant. */}
+                    {doc.doublons?.length > 0 && (
+                      <p className="text-[11px] text-amber-700 mt-0.5">Déjà présent dans {doc.doublons.map((d) => d.reference_mfile).join(', ')}</p>
+                    )}
                   </div>
                 ))}
                 {(bulkResults.failed || []).map((fail, i) => (

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const indexSuggestionController = require('../controllers/indexSuggestionController');
 const conformiteController = require('../controllers/conformiteController');
+const archivesController = require('../controllers/archivesController');
 const documentController = require('../controllers/documentController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission } = require('../middlewares/requirePermission');
@@ -90,6 +91,15 @@ router.get('/:id/audit', requirePermission('documents.view_history'), documentCo
 // montants, dates, identifiants) et les alertes de conformité qui le concernent.
 router.get('/:id/analysis', requirePermission('compliance.view'), conformiteController.analyseDocument);
 router.post('/:id/analysis', requirePermission('compliance.manage'), conformiteController.relancerAnalyse);
+// Intégrité et preuve (migration 031) : empreintes et contrôle des fichiers,
+// certificat d'archivage — pour qui peut lire le document ; le gel juridique
+// est un pouvoir à part (archives.hold).
+router.get('/:id/integrite', lireDocuments, archivesController.etatDocument);
+router.post('/:id/integrite/verifier', lireDocuments, archivesController.verifierDocument);
+// Émettre un certificat est un acte journalisé (CERTIFICAT_EMIS) : POST.
+router.post('/:id/certificat', lireDocuments, archivesController.certificat);
+router.post('/:id/gel', requirePermission('archives.hold'), archivesController.poserGel);
+router.post('/:id/gel/levee', requirePermission('archives.hold'), archivesController.leverGel);
 
 // Verrouillage pour édition (check-out / check-in) — une action sur les
 // versions du fond documentaire, réservée à qui peut les gérer.

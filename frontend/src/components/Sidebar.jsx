@@ -6,6 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
+  Fingerprint,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -122,6 +123,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
     entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite' }),
     entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view' }),
+    entree('/documents/archivage', 'Archivage & preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage' }),
     entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille' }),
   ];
 
@@ -135,6 +137,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     ? [
         {
           titre: null,
+          cle: 'quitter',
           items: [entree('/', 'Quitter le module', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
         },
         {
@@ -150,6 +153,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         // Vestibule (accueil, administration, profil…) : les deux modules proposés.
         {
           titre: null,
+          cle: 'accueil',
           items: [entree('/', 'Accueil', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
         },
         {
@@ -162,6 +166,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         },
         {
           titre: null,
+          cle: 'outils',
           items: [
             {
               to: '#notifications',
@@ -237,8 +242,10 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
   const renduSection = (section, mobile = false) => {
     const visibles = section.items.filter((i) => i.visible && !i.doublon);
     if (!visibles.length) return null;
+    // Deux sections sans titre coexistent (accueil, outils) : la clé ne peut
+    // pas reposer sur le titre seul.
     return (
-      <div key={section.titre || 'principal'} className="space-y-1">
+      <div key={section.cle || section.titre} className="space-y-1">
         {section.titre && !repliee && !mobile && (
           <div className="px-3 pt-4 pb-1 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: tMuted }}>
             {section.titre}

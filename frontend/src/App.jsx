@@ -14,6 +14,8 @@ import CompanyAdminPage from './pages/CompanyAdminPage';
 import ClassesPage from './pages/ClassesPage';
 import ConformitePage from './pages/ConformitePage';
 import FournisseursPage from './pages/FournisseursPage';
+import ArchivagePage from './pages/ArchivagePage';
+import CertificatPage from './pages/CertificatPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -104,6 +106,8 @@ function App() {
           <Route path="/documents/classes" element={<ClassesPage />} />
           <Route path="/documents/conformite" element={<ConformitePage />} />
           <Route path="/documents/fournisseurs" element={<FournisseursPage />} />
+          <Route path="/documents/archivage" element={<ArchivagePage />} />
+          <Route path="/documents/certificat/:id" element={<CertificatPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

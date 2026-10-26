@@ -557,6 +557,10 @@ exports.deleteTenant = async (req, res) => {
     // disparaît avec elle — le conserver serait d'ailleurs contraire à la
     // minimisation des données une fois le client parti.
     await client.query("SET LOCAL docuflow.audit_override = 'on'");
+    // Même logique pour le gel juridique (031) : les gardes de la base refusent
+    // la destruction d'un document gelé, sauf ce drapeau, posé ici seulement —
+    // l'organisation entière quitte la plateforme, ses gels avec elle.
+    await client.query("SET LOCAL docuflow.gel_override = 'on'");
 
     await client.query('DELETE FROM tenants WHERE id = $1', [tenantId]);
 

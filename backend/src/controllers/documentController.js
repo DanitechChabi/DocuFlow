@@ -2,6 +2,7 @@ const db = require('../config/db');
 const tenantDb = require('../config/db-tenant');
 const storage = require('../services/storageService');
 const { logHistory, addFileToDocument, setCanonicalReference, indexRequestToDocuments } = require('../services/documentIndexService');
+const integrite = require('../services/integriteService');
 const { extractAutoTags } = require('../services/textExtractionService');
 const metadataService = require('../services/metadataService');
 const documentAuditService = require('../services/documentAuditService');
@@ -201,7 +202,7 @@ exports.createDocument = async (req, res) => {
           const reference_mfile = await setCanonicalReference(tenantId, doc.id);
 
           // Le texte est extrait par addFileToDocument, avant l'envoi au stockage.
-          const { texte: text } = await addFileToDocument(tenantId, doc.id, userId, file);
+          const { texte: text, doublons } = await addFileToDocument(tenantId, doc.id, userId, file);
           if (text) {
             const autoTags = extractAutoTags(text, dbTags);
             const sanitizedAutoTags = autoTags.map(t => sanitizeTags(t)).filter(Boolean).flat();
@@ -211,7 +212,7 @@ exports.createDocument = async (req, res) => {
           }
 
           await logHistory(tenantId, doc.id, userId, 'Téléversement en masse', null, 'à indexer');
-          results.created.push({ id: doc.id, reference: reference_mfile, fileName: file.originalname });
+          results.created.push({ id: doc.id, reference: reference_mfile, fileName: file.originalname, doublons: doublons || [] });
         } catch (err) {
           console.error(`[bulk] Erreur fichier ${file.originalname}:`, err);
           results.failed.push({ fileName: file.originalname, error: err.message });
@@ -250,12 +251,16 @@ exports.createDocument = async (req, res) => {
     const doc = result.rows[0];
     const reference_mfile = await setCanonicalReference(tenantId, doc.id);
 
-    // Extraction de texte + auto-tagging
+    // Extraction de texte + auto-tagging ; doublons signalés (031), pas refusés.
     let allText = '';
+    const doublons = [];
     if (req.files && req.files.length) {
       for (const file of req.files) {
-        const { texte: text } = await addFileToDocument(tenantId, doc.id, userId, file);
+        const { texte: text, doublons: memes } = await addFileToDocument(tenantId, doc.id, userId, file);
         if (text) allText += ' ' + text;
+        for (const d of memes || []) {
+          if (!doublons.some((x) => x.id === d.id)) doublons.push({ ...d, fichier: file.originalname });
+        }
       }
     }
 
@@ -274,7 +279,7 @@ exports.createDocument = async (req, res) => {
     }
 
     await logHistory(tenantId, doc.id, userId, 'Création du document', null, doc.statut || 'disponible');
-    res.status(201).json({ ...doc, reference_mfile });
+    res.status(201).json({ ...doc, reference_mfile, doublons });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la création du document' });
@@ -712,6 +717,10 @@ exports.deleteDocument = async (req, res) => {
     const refus = await gardePerimetreDocument(tenantId, req.user.id, id, 'write');
     if (refus) return res.status(refus.statut).json({ message: refus.message, code: refus.code });
 
+    // Gel juridique (031) : même la corbeille est refusée — elle mène à la purge.
+    const gel = await integrite.gelActif(tenantId, id);
+    if (gel) return integrite.reponseGel(res, gel);
+
     // Corbeille : marquer, ne rien détruire. Le document reste complet
     // (fichiers, historique, métadonnées) et restaurable à l'identique.
     const result = await db.query(
@@ -728,6 +737,8 @@ exports.deleteDocument = async (req, res) => {
     await logHistory(tenantId, id, req.user.id, 'Mis à la corbeille', null, null);
     res.json({ message: 'Document mis à la corbeille — restaurable depuis la corbeille.' });
   } catch (err) {
+    // Gel posé entre la vérification et l'écriture : le trigger de la 031 tranche.
+    if (integrite.estErreurGel(err)) return integrite.reponseGel(res, await integrite.gelActif(tenantId, id).catch(() => null));
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la mise à la corbeille' });
   }
@@ -809,6 +820,12 @@ exports.purgeDocument = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Document introuvable en corbeille (la purge ne vise que la corbeille)' });
     }
+    // Gel juridique (031) : aucune destruction tant qu'il n'est pas levé.
+    const gel = await integrite.gelActif(tenantId, id, client);
+    if (gel) {
+      await client.query('ROLLBACK');
+      return integrite.reponseGel(res, gel);
+    }
 
     // Fichiers pour suppression du stockage après commit.
     const filesRes = await client.query('SELECT * FROM document_files WHERE document_id = $1', [id]);
@@ -836,6 +853,7 @@ exports.purgeDocument = async (req, res) => {
     res.json({ message: 'Document définitivement détruit.' });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    if (integrite.estErreurGel(err)) return integrite.reponseGel(res, await integrite.gelActif(tenantId, id).catch(() => null));
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la purge' });
   } finally {
@@ -877,11 +895,14 @@ exports.deleteFile = async (req, res) => {
   try {
     // Cycle de vie : corbeille, archivé, verrou d'autrui (voir la garde).
     // AVANT la transaction : un refus ne doit pas ouvrir de transaction pour rien.
+    // La connexion est rendue par le `finally` : la rendre aussi ici levait
+    // « Release called on client which has already been released » depuis
+    // le finally — un rejet non géré, fatal au processus sous Node ≥ 15.
     const verrou = await chargerPourEcriture(tenantId, id, req.user);
-    if (verrou) {
-      client.release();
-      return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
-    }
+    if (verrou) return res.status(verrou.statut).json({ message: verrou.message, code: verrou.code });
+    // Gel juridique (031) : une version retirée serait une destruction.
+    const gel = await integrite.gelActif(tenantId, id);
+    if (gel) return integrite.reponseGel(res, gel);
 
     await client.query('BEGIN');
 
@@ -922,6 +943,7 @@ exports.deleteFile = async (req, res) => {
     res.json({ message: 'Fichier supprimé' });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    if (integrite.estErreurGel(err)) return integrite.reponseGel(res, await integrite.gelActif(tenantId, id).catch(() => null));
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la suppression du fichier' });
   } finally {
