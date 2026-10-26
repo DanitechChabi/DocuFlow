@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -131,6 +131,8 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
     entree('/documents/favoris', 'Mes favoris', <Star size={18} />, { permission: 'documents.view', tourId: 'favoris' }),
     entree('/documents/taches', 'Mes tâches', <ListChecks size={18} />, { tourId: 'taches', compteur: tachesOuvertes }),
+    entree('/documents/recherche', 'Recherche avancée', <Search size={18} />, { permission: 'search.advanced', tourId: 'recherche' }),
+    entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
     entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),

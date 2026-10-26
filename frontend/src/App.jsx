@@ -20,6 +20,8 @@ import FavorisPage from './pages/FavorisPage';
 import PartagePublicPage from './pages/PartagePublicPage';
 import MesTachesPage from './pages/MesTachesPage';
 import CircuitsPage from './pages/CircuitsPage';
+import RecherchePage from './pages/RecherchePage';
+import EcheancesPage from './pages/EcheancesPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -117,6 +119,8 @@ function App() {
           <Route path="/documents/favoris" element={<FavorisPage />} />
           <Route path="/documents/taches" element={<MesTachesPage />} />
           <Route path="/documents/circuits" element={<CircuitsPage />} />
+          <Route path="/documents/recherche" element={<RecherchePage />} />
+          <Route path="/documents/echeances" element={<EcheancesPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

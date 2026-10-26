@@ -280,6 +280,13 @@ const CATALOG = [
     description: "Quand une version est déposée sur un document en cours de validation alors que des visas ont déjà été donnés : avertir (les visas antérieurs restent, la fiche signale la version qu'ils portent), ou relancer le circuit depuis la première étape sur la nouvelle version.",
     type: 'select', default: 'avertir',
     options: [{ value: 'avertir', label: 'Avertir (les visas antérieurs restent)' }, { value: 'relancer', label: 'Relancer le circuit sur la nouvelle version' }] },
+  // ------------------------------------- RECHERCHE, ÉCHÉANCIER, EXPORT (035)
+  { key: 'echeances_rappel_jours', group: 'documents', label: 'Rappel avant échéance (jours)',
+    description: "Nombre de jours avant une échéance (fin de contrat, validité d'une attestation, facture à payer…) où son destinataire est prévenu. Il l'est aussi le jour même. Modifiable échéance par échéance.",
+    type: 'number', default: '15', min: 0, max: 365 },
+  { key: 'export_taille_max_mo', group: 'archives', label: "Taille maximale d'un paquet d'archive (Mo)",
+    description: "Volume total des fichiers d'un export « paquet d'archive » (ZIP avec manifeste et empreintes). Au-delà, l'export est refusé : réduisez la sélection.",
+    type: 'number', default: '500', min: 1, max: 2000 },
 ];
 
 const BY_KEY = new Map(CATALOG.map((d) => [d.key, d]));
