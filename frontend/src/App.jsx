@@ -16,6 +16,8 @@ import ConformitePage from './pages/ConformitePage';
 import FournisseursPage from './pages/FournisseursPage';
 import ArchivagePage from './pages/ArchivagePage';
 import CertificatPage from './pages/CertificatPage';
+import FavorisPage from './pages/FavorisPage';
+import PartagePublicPage from './pages/PartagePublicPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -70,6 +72,8 @@ function App() {
         <Route path="/:slug/register" element={<RegisterPage />} />
         <Route path="/register-company" element={<CompanyRegisterPage />} />
         <Route path="/about" element={<AboutPage />} />
+        {/* Lien de partage public (033) : hors connexion, hors mise en page. */}
+        <Route path="/partage/:jeton" element={<PartagePublicPage />} />
         <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
         <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
         {/* Hors ProtectedRoute : au premier lancement d'un poste sans licence,
@@ -108,6 +112,7 @@ function App() {
           <Route path="/documents/fournisseurs" element={<FournisseursPage />} />
           <Route path="/documents/archivage" element={<ArchivagePage />} />
           <Route path="/documents/certificat/:id" element={<CertificatPage />} />
+          <Route path="/documents/favoris" element={<FavorisPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

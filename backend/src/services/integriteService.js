@@ -551,6 +551,8 @@ async function poserGel(tenantId, documentId, { motif, reference } = {}, user) {
   });
   await require('./documentIndexService').logHistory(tenantId, documentId, user?.id || null,
     `Gel juridique posé${ref ? ` (réf. ${ref})` : ''}`.slice(0, 100), null, null, m.slice(0, 500));
+  // Abonnés du document prévenus (033) — ne lève jamais.
+  await require('./collaborationService').signaler(tenantId, documentId, 'gel_pose', { acteur: user, reference: ref || null });
   return versGel(gel);
 }
 
@@ -571,6 +573,7 @@ async function leverGel(tenantId, documentId, { motif } = {}, user) {
   });
   await require('./documentIndexService').logHistory(tenantId, documentId, user?.id || null,
     'Gel juridique levé', null, null, m.slice(0, 500));
+  await require('./collaborationService').signaler(tenantId, documentId, 'gel_leve', { acteur: user });
   return versGel(rows[0]);
 }
 
@@ -662,6 +665,11 @@ const LIBELLES_ACTIONS = {
   FILE_DOWNLOADED: 'Fichier consulté ou téléchargé', METADATA_UPDATE: 'Métadonnées modifiées', RELATION_CREATED: 'Relation créée',
   GEL_POSE: 'Gel juridique posé', GEL_LEVE: 'Gel juridique levé', INTEGRITE_ALTEREE: 'Altération constatée',
   FICHIER_INTROUVABLE: 'Fichier introuvable', INTEGRITE_RETABLIE: 'Intégrité rétablie', CERTIFICAT_EMIS: 'Certificat émis',
+  // Collaboration (033)
+  PARTAGE_CREE: 'Lien de partage public créé', PARTAGE_REVOQUE: 'Lien de partage public révoqué',
+  PARTAGE_CONSULTE: 'Accès par lien de partage public', PARTAGE_REFUSE: 'Accès refusé par lien de partage public',
+  VERSION_RESTAUREE: 'Version restaurée', COMMENTAIRE_AJOUTE: 'Commentaire ajouté',
+  COMMENTAIRE_MODIFIE: 'Commentaire modifié', COMMENTAIRE_SUPPRIME: 'Commentaire supprimé',
 };
 
 /**

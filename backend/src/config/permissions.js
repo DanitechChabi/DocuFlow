@@ -43,7 +43,7 @@ const CATALOGUE = [
       { key: 'documents.rename', label: 'Renommer', description: 'Changer le nom affiché d\'un document.' },
       { key: 'documents.move', label: 'Déplacer', description: 'Changer le classement d\'un document.' },
       { key: 'documents.download', label: 'Télécharger', description: 'Récupérer les fichiers d\'un document.' },
-      { key: 'documents.share', label: 'Partager', description: 'Envoyer un accès par e-mail.' },
+      { key: 'documents.share', label: 'Partager', description: 'Envoyer un accès par e-mail, créer et révoquer les liens de partage publics.' },
       { key: 'documents.delete', label: 'Supprimer', description: 'Mettre un document à la corbeille.' },
       { key: 'documents.restore', label: 'Restaurer', description: 'Sortir un document de la corbeille.' },
       { key: 'documents.purge', label: 'Purger définitivement', description: 'Détruire irrévocablement les documents de la corbeille.' },
