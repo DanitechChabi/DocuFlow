@@ -625,7 +625,9 @@ function createCustomMenu() {
             }
           }
         },
-        {
+        // Licences suspendues pour le moment (voir backend/src/desktop/licenseGuard.js) :
+        // l'entrée ne réapparaît qu'avec DOCUFLOW_LICENCES=on.
+        ...(process.env.DOCUFLOW_LICENCES === 'on' ? [{
           label: 'Licence',
           click: () => {
             dialog.showMessageBox({
@@ -635,7 +637,7 @@ function createCustomMenu() {
               detail: 'Veuillez consulter les conditions générales d\'utilisation pour plus de détails.'
             });
           }
-        }
+        }] : []),
       ]
     }
   ];
