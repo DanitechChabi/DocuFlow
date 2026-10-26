@@ -3,7 +3,7 @@ import { FileSearch,
 
   X, Download, FileText, File, Building2, Calendar, User, Tag, FolderOpen,
   Upload, Trash2, Clock, CheckCircle, AlertCircle, Pencil, Eye, Share2, Mail,
-  Lock, Unlock, Link2, Wand2,
+  Lock, Unlock, Link2, Wand2, RotateCcw,
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
@@ -13,6 +13,11 @@ import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
 import IntegriteDocument from './archives/IntegriteDocument';
+import FavoriSuivi from './collaboration/FavoriSuivi';
+import CommentairesDocument from './collaboration/CommentairesDocument';
+import PartagesDocument from './collaboration/PartagesDocument';
+import { collaborationService } from '../services/collaborationService';
+import { usePermissions } from '../hooks/usePermissions';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
 
 const formatSize = (bytes) => {
@@ -109,6 +114,19 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
       setError(err.response?.data?.message || "Erreur lors de l'ajout des fichiers");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const { can } = usePermissions();
+  const restaurerVersion = async (f) => {
+    if (!window.confirm(`Restaurer la version ${f.version} ? Elle sera copiée en nouvelle version ; l'historique est conservé.`)) return;
+    try {
+      const r = await collaborationService.restaurerVersion(documentId, f.id);
+      toast.success(r.message);
+      await load();
+      if (onChanged) onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Restauration impossible');
     }
   };
 
@@ -213,6 +231,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
             <p className="text-sm text-slate-400 font-medium">{doc?.nom_entreprise || 'Chargement…'}</p>
           </div>
           <div className="flex items-center gap-2">
+            {doc && <FavoriSuivi documentId={doc.id} />}
             <button onClick={() => setShowShare(true)} className="btn-secondary flex items-center gap-1.5"><Share2 size={15} /> Partager</button>
             {/* Indexation : visible pour le personnel (la route /:id/metadata
                 est réservée aux rôles GED côté serveur). Mise en avant quand le
@@ -279,6 +298,10 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
 
                 {/* Intégrité et preuve : empreintes, contrôle, gel, certificat (031). */}
                 <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
+
+                {/* Collaboration (033) : liens publics, commentaires. */}
+                <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
+                <CommentairesDocument documentId={doc.id} />
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (
@@ -477,6 +500,10 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <a href={f.url} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500" title="Télécharger"><Download size={15} /></a>
+                          {/* Restauration (033) : une ancienne version redevient la courante, par copie. */}
+                          {can('documents.manage_versions') && f.version < Math.max(...doc.files.map((x) => x.version)) && (
+                            <button onClick={(e) => { e.stopPropagation(); restaurerVersion(f); }} className="w-8 h-8 rounded-lg hover:bg-blue-50 flex items-center justify-center text-slate-500 hover:text-docuflow-secondary" title="Restaurer cette version"><RotateCcw size={15} /></button>
+                          )}
                           {isAdmin && (
                             <button onClick={() => handleDeleteFile(f.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600" title="Supprimer"><Trash2 size={15} /></button>
                           )}
