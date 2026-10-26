@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   UserCircle, ListChecks, Star, CalendarClock, Search, FileText, Bell, ArrowRight, CheckCircle2, Pin, BellRing,
+  ClipboardList, FileSearch,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { circuitService } from '../services/circuitService';
@@ -9,6 +10,7 @@ import { collaborationService } from '../services/collaborationService';
 import { rechercheService } from '../services/rechercheService';
 import { documentService } from '../services/documentService';
 import { notificationService } from '../services/notificationService';
+import { requestService } from '../services/requestService';
 import { authService } from '../services/authService';
 import { usePermissions } from '../hooks/usePermissions';
 import { useTitrePage } from '../hooks/useTitrePage';
@@ -71,12 +73,17 @@ const Ligne = ({ to, titre, detail, droite, alerte }) => (
 );
 
 const MAX = 5;
+const EN_COURS = (r) => !['livré', 'rejete', 'annulé'].includes(r.statut);
+const STATUT_DEMANDE = { 'en attente': 'En attente', 'a traiter': 'À traiter', transmis: 'Transmis' };
+const objetDemande = (r) => r.description || [r.type_document, r.nom_entreprise].filter(Boolean).join(' — ') || `Demande n° ${r.id}`;
 
 const MonEspacePage = () => {
   useTitrePage('Mon espace');
   const { can } = usePermissions();
   const user = authService.getCurrentUser();
   const docs = can('documents.view');
+  const traite = can('requests.process');
+  const demande = can('requests.view');
 
   const taches = useSource(docs, () => circuitService.mesTaches('a_traiter'));
   const favoris = useSource(docs, () => collaborationService.favoris());
@@ -86,12 +93,15 @@ const MonEspacePage = () => {
     .then((l) => [...(l || [])].sort((a, b) => Number(!!b.epinglee) - Number(!!a.epinglee))));
   const recents = useSource(docs, () => documentService.getDocuments({ mes_documents: '1', page_size: MAX })
     .then((r) => r?.documents || []));
+  const demandesATraiter = useSource(traite, () => requestService.getMyTasks().then((l) => (l || []).filter(EN_COURS)));
+  const mesDemandes = useSource(demande, () => requestService.getMyRequests().then((l) => (l || []).filter(EN_COURS)));
   const notifications = useSource(true, () => notificationService.getNotifications()
     .then((l) => (l || []).filter((n) => !n.is_read)));
 
   const prenom = (user?.full_name || '').split(' ')[0];
   const nbTaches = taches?.length || 0;
   const nbEcheances = echeances?.filter((e) => e.en_retard).length || 0;
+  const nbDemandes = demandesATraiter?.length || 0;
 
   return (
     <div className="px-4 sm:px-8 py-6 max-w-[1200px] mx-auto">
@@ -102,15 +112,43 @@ const MonEspacePage = () => {
         breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Mon espace' }]}
       />
 
-      {docs && (taches !== null && echeances !== null) && (
+      {taches !== null && echeances !== null && demandesATraiter !== null && (
         <p className="mb-5 text-sm text-slate-600" data-tour="mon-espace-resume">
-          {nbTaches === 0 && nbEcheances === 0
-            ? 'Rien d\'urgent : aucun visa en attente et aucune échéance dépassée.'
-            : [nbTaches > 0 && `${nbTaches} visa(s) en attente`, nbEcheances > 0 && `${nbEcheances} échéance(s) dépassée(s)`].filter(Boolean).join(' · ')}
+          {nbTaches === 0 && nbEcheances === 0 && nbDemandes === 0
+            ? 'Rien d\'urgent : aucune demande à traiter, aucun visa en attente, aucune échéance dépassée.'
+            : [nbDemandes > 0 && `${nbDemandes} demande(s) à traiter`, nbTaches > 0 && `${nbTaches} visa(s) en attente`, nbEcheances > 0 && `${nbEcheances} échéance(s) dépassée(s)`].filter(Boolean).join(' · ')}
         </p>
       )}
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {traite && (
+          <Carte titre="Demandes à traiter" icone={ClipboardList} teinte="bg-orange-50 text-orange-600" lien="/demandes/a-traiter" total={nbDemandes} tour="mon-espace-demandes">
+            {demandesATraiter === null ? <Squelette /> : demandesATraiter.length === 0 ? <Vide>Aucune demande ne vous attend.</Vide> : (
+              <ul className="space-y-0.5">
+                {demandesATraiter.slice(0, MAX).map((r) => (
+                  <Ligne key={r.id} to="/demandes/a-traiter" titre={objetDemande(r)}
+                    detail={[r.requester_name, STATUT_DEMANDE[r.statut]].filter(Boolean).join(' · ')}
+                    droite={quandCourt(r.created_at)} alerte={r.priorite === 'urgente' || r.priorite === 'haute'} />
+                ))}
+              </ul>
+            )}
+          </Carte>
+        )}
+
+        {demande && (
+          <Carte titre="Mes demandes en cours" icone={FileSearch} teinte="bg-sky-50 text-sky-600" lien="/demandes/mes-demandes" total={mesDemandes?.length} tour="mon-espace-mes-demandes">
+            {mesDemandes === null ? <Squelette /> : mesDemandes.length === 0 ? <Vide>Aucune demande en cours.</Vide> : (
+              <ul className="space-y-0.5">
+                {mesDemandes.slice(0, MAX).map((r) => (
+                  <Ligne key={r.id} to="/demandes/mes-demandes" titre={objetDemande(r)}
+                    detail={[STATUT_DEMANDE[r.statut], r.assignee_name && `suivie par ${r.assignee_name}`].filter(Boolean).join(' · ')}
+                    droite={quandCourt(r.created_at)} />
+                ))}
+              </ul>
+            )}
+          </Carte>
+        )}
+
         {docs && (
           <Carte titre="Mes tâches" icone={ListChecks} teinte="bg-amber-50 text-amber-600" lien="/documents/taches" total={nbTaches} tour="mon-espace-taches">
             {taches === null ? <Squelette /> : taches.length === 0 ? <Vide>Aucun document n'attend votre visa.</Vide> : (

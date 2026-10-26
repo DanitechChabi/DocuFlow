@@ -25,6 +25,7 @@ router.delete('/schemas/:id', adminOrArchivist, metadataController.deleteSchema)
 // aperçu de la charte de nommage.
 router.get('/modeles', adminOrArchivist, metadataController.getModeles);
 router.post('/modeles/classes', adminOrArchivist, metadataController.installerClasses);
+router.post('/modeles/conservation', requirePermission('archives.manage'), metadataController.appliquerReferentiel);
 router.post('/modeles/plans/:code', requirePermission('folders.create'), metadataController.installerPlan);
 router.post('/nom-apercu', adminOrArchivist, metadataController.apercuNom);
 

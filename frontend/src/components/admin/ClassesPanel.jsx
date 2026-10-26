@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Layers, Plus, Library, Trash2, Save, Loader2, FolderTree, Wand2, Check, X, Hash, Info,
+  Layers, Plus, Library, Trash2, Save, Loader2, FolderTree, Wand2, Check, X, Hash, Info, ShieldAlert,
 } from 'lucide-react';
+import { usePermissions } from '../../hooks/usePermissions';
 import { metadataApi } from '../../services/metadataApi';
 import { documentService } from '../../services/documentService';
 import { toast } from '../Toast';
@@ -184,6 +185,8 @@ const FicheClasse = ({ classe, communes, dossiers, onEnregistree, onSupprimer })
   );
 };
 
+const SORT_LIBELLE = { conservation: 'conservation définitive', elimination: 'élimination', tri: 'tri' };
+
 const Modeles = ({ onFermer, onInstalle }) => {
   const [catalogue, setCatalogue] = useState(null);
   const [choix, setChoix] = useState(new Set());
@@ -270,7 +273,10 @@ const Modeles = ({ onFermer, onInstalle }) => {
               </section>
               <section>
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">2. Classes de documents</h4>
-                <p className="text-sm text-slate-500 mb-3">Cochez les types de pièces que vous traitez. Chacun arrive avec ses propriétés, sa charte de nommage et son rangement.</p>
+                <p className="text-sm text-slate-500 mb-3">Cochez les types de pièces que vous traitez. Chacun arrive avec ses propriétés, sa charte de nommage, son rangement et sa règle de conservation.</p>
+                {catalogue.avertissement_conservation && (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">{catalogue.avertissement_conservation}</p>
+                )}
                 {parCategorie.map(([categorie, classes]) => (
                   <div key={categorie} className="mb-5">
                     <h5 className="font-bold text-slate-700 mb-2">{categorie}</h5>
@@ -283,6 +289,11 @@ const Modeles = ({ onFermer, onInstalle }) => {
                             <span className="ml-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{c.code}</span>
                             {c.installee && <span className="ml-1.5 text-[11px] text-emerald-600 font-bold">installée</span>}
                             <span className="block text-[11px] text-slate-500 mt-1 leading-snug">{c.champs.map((f) => f.label).join(' · ')}</span>
+                            {c.conservation && (
+                              <span className="block text-[11px] text-slate-700 mt-1.5" title={c.conservation.ref}>
+                                Conservation : {c.conservation.dua} ans, puis {SORT_LIBELLE[c.conservation.sort]}
+                              </span>
+                            )}
                           </span>
                         </label>
                       ))}
@@ -308,6 +319,7 @@ const Modeles = ({ onFermer, onInstalle }) => {
 };
 
 const ClassesPanel = () => {
+  const { can } = usePermissions();
   const [schemas, setSchemas] = useState(null);
   const [dossiers, setDossiers] = useState([]);
   const [selection, setSelection] = useState('communes');
@@ -343,6 +355,18 @@ const ClassesPanel = () => {
       toast.success('Classe créée : ajoutez-lui ses propriétés');
     } catch (err) {
       toast.error(err.response?.data?.error || err.response?.data?.message || 'Création impossible');
+    }
+  };
+
+  const appliquerReferentiel = async () => {
+    try {
+      const r = await metadataApi.appliquerReferentiel();
+      toast.success(r.appliquees.length
+        ? `Règle de conservation proposée pour ${r.appliquees.length} classe(s). Vérifiez-les avant validation par la DAN.`
+        : 'Aucune classe reconnue par le référentiel : saisissez leur règle à la main.');
+      await charger();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Application du référentiel impossible');
     }
   };
 
@@ -391,6 +415,17 @@ const ClassesPanel = () => {
           <button type="submit" className="btn btn-primary" disabled={!nouveauNom.trim()}><Check size={16} /> Créer</button>
           <button type="button" className="btn btn-secondary" onClick={() => setNouveauNom(null)}>Annuler</button>
         </form>
+      )}
+
+      {classes.some((c) => c.dua_annees == null) && can('archives.manage') && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex flex-wrap items-center gap-3">
+          <ShieldAlert size={18} className="flex-shrink-0" />
+          <span className="flex-1 min-w-[240px]">
+            {classes.filter((c) => c.dua_annees == null).length} classe(s) sans règle de conservation : leurs documents n'arriveront jamais à échéance.
+            DocuFlow peut proposer les durées du référentiel béninois (décret n° 2007-532, OHADA), à faire valider par la DAN.
+          </span>
+          <button type="button" onClick={appliquerReferentiel} className="btn btn-secondary btn-sm">Appliquer le référentiel</button>
+        </div>
       )}
 
       {classes.length === 0 && (

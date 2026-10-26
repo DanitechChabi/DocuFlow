@@ -98,6 +98,28 @@ const CLASSES = [
   { code: 'ATD', nom: 'Attestation délivrée', categorie: 'Administration publique', mots_cles: 'attestation, certificat',
     modele_nom: 'ATD-{N° d\'attestation} — {Bénéficiaire}', dossiers: ['Attestations délivrées', 'Attestations et autorisations'], annee: true,
     champs: [['N° d\'attestation', 'text', true], ['N° de dossier', 'text'], ['Bénéficiaire', 'text', true], ['Date de délivrance', 'date', true], ['Date de validité', 'date']] },
+  // --- Commune (Bénin) -------------------------------------------------------
+  { code: 'ECN', nom: 'Acte de naissance', categorie: 'État civil (commune)', mots_cles: 'acte de naissance, naissance, declaration de naissance',
+    modele_nom: 'ECN-{année}-{N° d\'acte} — {Nom}', dossiers: ['Naissances', 'État civil'], annee: true,
+    champs: [['N° d\'acte', 'text', true], ['Nom', 'text', true], ['Prénoms', 'text'], ['Date de naissance', 'date', true], ['Lieu de naissance', 'text'], ['Arrondissement', 'text'], ['Père', 'text'], ['Mère', 'text']] },
+  { code: 'ECM', nom: 'Acte de mariage', categorie: 'État civil (commune)', mots_cles: 'acte de mariage, mariage, celebration du mariage',
+    modele_nom: 'ECM-{année}-{N° d\'acte} — {Époux} et {Épouse}', dossiers: ['Mariages', 'État civil'], annee: true,
+    champs: [['N° d\'acte', 'text', true], ['Époux', 'text', true], ['Épouse', 'text', true], ['Date du mariage', 'date', true], ['Arrondissement', 'text'], ['Régime matrimonial', 'text']] },
+  { code: 'ECD', nom: 'Acte de décès', categorie: 'État civil (commune)', mots_cles: 'acte de deces, deces, declaration de deces',
+    modele_nom: 'ECD-{année}-{N° d\'acte} — {Nom du défunt}', dossiers: ['Décès', 'État civil'], annee: true,
+    champs: [['N° d\'acte', 'text', true], ['Nom du défunt', 'text', true], ['Date du décès', 'date', true], ['Lieu du décès', 'text'], ['Arrondissement', 'text'], ['Déclarant', 'text']] },
+  { code: 'DCC', nom: 'Délibération du conseil communal', categorie: 'Administration communale', mots_cles: 'deliberation, conseil communal, session du conseil',
+    modele_nom: 'DCC-{année}-{N° de délibération} — {Objet}', dossiers: ['Délibérations du conseil communal', 'Arrêtés et décisions'], annee: true,
+    champs: [['N° de délibération', 'text', true], ['Date de la session', 'date', true], ['Objet', 'text', true], ['Type de session', 'select', false, ['Ordinaire', 'Extraordinaire']]] },
+  { code: 'DPA', nom: 'Dossier individuel d\'agent', categorie: 'Ressources humaines', mots_cles: 'dossier individuel, dossier du personnel, fiche signaletique',
+    modele_nom: 'DPA — {Agent} — {Matricule}', dossiers: ['Dossiers du personnel', 'Ressources humaines'],
+    champs: [['Agent', 'text', true], ['Matricule', 'text', true], ['Date de naissance', 'date', true], ['Date de prise de service', 'date'], ['Date de cessation', 'date']] },
+  { code: 'MP', nom: 'Marché public', categorie: 'Finances et marchés', mots_cles: 'marche public, appel d\'offres, dossier d\'appel d\'offres, attribution du marche',
+    modele_nom: 'MP-{année}-{N° du marché} — {Titulaire}', dossiers: ['Marchés et contrats', 'Contrats'], annee: true,
+    champs: [['N° du marché', 'text', true], ['Objet', 'text', true], ['Titulaire', 'text', true], ['Montant TTC', 'number'], ['Date d\'attribution', 'date'], ['Date de réception définitive', 'date']] },
+  { code: 'AFF', nom: 'Dossier foncier', categorie: 'Domaines et urbanisme', mots_cles: 'titre foncier, certificat de propriete fonciere, attestation de detention coutumiere, lotissement, parcelle',
+    modele_nom: 'AFF — {N° de parcelle} — {Titulaire}', dossiers: ['Affaires foncières', 'Domaines et urbanisme'],
+    champs: [['N° de parcelle', 'text', true], ['Titulaire', 'text', true], ['Nature de l\'acte', 'text'], ['Date de l\'acte', 'date'], ['Localisation', 'text']] },
 ];
 
 // Plans de classement : arborescence codée (code + libellé, à la manière des
@@ -122,6 +144,18 @@ const PLANS = [
       ['300 Attestations et autorisations', ['310 Demandes', '320 Soumissions', '330 Prorogations', '340 Attestations délivrées']],
       ['400 Finances et marchés', ['410 Factures fournisseurs', '420 Marchés et contrats', '430 Budget']],
       ['500 Archives historiques', []],
+    ],
+  },
+  {
+    code: 'commune', nom: 'Commune (Bénin)',
+    arbre: [
+      ['100 Administration générale', ['110 Courrier arrivé', '120 Courrier départ', '130 Arrêtés et décisions', '140 Délibérations du conseil communal', '150 Procès-verbaux']],
+      ['200 État civil', ['210 Naissances', '220 Mariages', '230 Décès']],
+      ['300 Ressources humaines', ['310 Dossiers du personnel', '320 Paie', '330 Congés et absences']],
+      ['400 Finances et marchés publics', ['410 Factures fournisseurs', '420 Marchés et contrats', '430 Budget', '440 Banque et trésorerie']],
+      ['500 Domaines et urbanisme', ['510 Affaires foncières', '520 Permis et autorisations']],
+      ['600 Attestations et autorisations', ['610 Demandes', '620 Attestations délivrées', '630 Prorogations', '640 Soumissions']],
+      ['900 Pré-archivage et versements', []],
     ],
   },
 ];
