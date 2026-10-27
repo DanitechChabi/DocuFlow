@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Fingerprint, ShieldCheck, ShieldAlert, Loader2, RefreshCw, Link2, Stamp, Download, Gavel, Files, BadgeCheck,
-  FileWarning, Hourglass, Search, Trash2, Archive, FileCheck2,
+  FileWarning, Hourglass, Search, Trash2, Archive, FileCheck2, BookCheck, ClipboardList,
 } from 'lucide-react';
 import { OngletSortFinal, OngletEliminations } from '../components/archives/OngletsElimination';
 import { OngletVersements } from '../components/archives/OngletVersements';
 import { HorodatagesPanel, OngletFormats } from '../components/archives/PreuveConservation';
+import { OngletCopies, OngletRapport } from '../components/archives/OngletsServiceArchives';
 import PageHeader from '../components/PageHeader';
 import {
   archivesService, STATUTS_INTEGRITE, empreinteCourte, empreinteGroupee, dateHeure, dateCourte,
@@ -29,6 +30,8 @@ const ONGLETS = [
   { cle: 'sort-final', libelle: 'Sort final', icone: Hourglass },
   { cle: 'eliminations', libelle: 'Éliminations', icone: Trash2 },
   { cle: 'versements', libelle: 'Versements', icone: Archive },
+  { cle: 'copies', libelle: 'Copies certifiées', icone: BookCheck },
+  { cle: 'rapport', libelle: 'Rapport annuel', icone: ClipboardList },
   { cle: 'journal', libelle: 'Journal & sceaux', icone: Link2 },
   { cle: 'gels', libelle: 'Gels juridiques', icone: Gavel },
   { cle: 'doublons', libelle: 'Doublons', icone: Files },
@@ -419,6 +422,8 @@ const ArchivagePage = () => {
         <OngletEliminations ouvert={Number(params.get('bordereau')) || null}
           setOuvert={(id) => setParams(id ? { onglet: 'eliminations', bordereau: id } : { onglet: 'eliminations' })} />
       )}
+      {onglet === 'copies' && <OngletCopies />}
+      {onglet === 'rapport' && <OngletRapport />}
       {onglet === 'journal' && <OngletJournal peutGerer={peutGerer} />}
       {onglet === 'gels' && <OngletGels />}
       {onglet === 'doublons' && <OngletDoublons />}

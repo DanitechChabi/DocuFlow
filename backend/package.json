@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans && npm run test:migrations && npm run test:onboarding && npm run test:ged && npm run test:ocr && npm run test:indexation && npm run test:classes && npm run test:conformite && npm run test:integrite && npm run test:collaboration && npm run test:circuits && npm run test:recherche && npm run test:archivage && npm run test:archives-benin && npm run test:conservation && npm run test:physique && npm run test:demarrage",
+    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans && npm run test:migrations && npm run test:onboarding && npm run test:ged && npm run test:ocr && npm run test:indexation && npm run test:classes && npm run test:conformite && npm run test:integrite && npm run test:collaboration && npm run test:circuits && npm run test:recherche && npm run test:archivage && npm run test:archives-benin && npm run test:conservation && npm run test:physique && npm run test:demarrage && npm run test:service-archives",
     "test:license": "node src/desktop/licenseGuard.test.js",
     "test:rbac": "node src/rbac.test.js",
     "test:lifecycle": "node src/lifecycle.test.js",
@@ -28,7 +28,8 @@
     "test:archives-benin": "node src/archivesBenin.test.js",
     "test:conservation": "node src/conservation.test.js",
     "test:physique": "node src/physique.test.js",
-    "test:demarrage": "node src/demarrage.test.js"
+    "test:demarrage": "node src/demarrage.test.js",
+    "test:service-archives": "node src/serviceArchives.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",
@@ -45,6 +46,7 @@
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.12.1",
     "multer": "^2.2.0",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "pg": "^8.11.3",
     "resend": "^6.18.1",
