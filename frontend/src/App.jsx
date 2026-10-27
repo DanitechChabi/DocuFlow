@@ -8,6 +8,9 @@ import HomePage from './pages/HomePage';
 import MonEspacePage from './pages/MonEspacePage';
 import BordereauImprimablePage from './pages/BordereauImprimablePage';
 import RapportAnnuelPage from './pages/RapportAnnuelPage';
+import PortailCitoyenPage from './pages/PortailCitoyenPage';
+import AffichePortailPage from './pages/AffichePortailPage';
+import VerificationCopiePage from './pages/VerificationCopiePage';
 import MagasinsPage from './pages/MagasinsPage';
 import RecolementPvPage from './pages/RecolementPvPage';
 import DocumentsPage from './pages/DocumentsPage';
@@ -84,6 +87,9 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         {/* Lien de partage public (033) : hors connexion, hors mise en page. */}
         <Route path="/partage/:jeton" element={<PartagePublicPage />} />
+        {/* Portail citoyen et vérification des copies (040) : publics. */}
+        <Route path="/portail/:slug" element={<PortailCitoyenPage />} />
+        <Route path="/verifier/:jeton" element={<VerificationCopiePage />} />
         <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
         <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
         {/* Hors ProtectedRoute : au premier lancement d'un poste sans licence,
@@ -100,6 +106,7 @@ function App() {
           {/* Module DEMANDES — les anciennes routes /dashboard/* redirigent
               (liens partagés, favoris, tour guidé) : la page est la même. */}
           <Route path="/demandes" element={<Dashboard tab="overview" />} />
+          <Route path="/demandes/portail/affiche" element={<AffichePortailPage />} />
           <Route path="/demandes/mes-demandes" element={<Dashboard tab="requests" />} />
           <Route path="/demandes/nouvelle" element={<Dashboard tab="requests" nouveau />} />
           <Route path="/demandes/a-traiter" element={<Dashboard tab="my_tasks" />} />

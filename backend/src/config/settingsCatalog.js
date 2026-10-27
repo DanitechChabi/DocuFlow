@@ -175,6 +175,19 @@ const CATALOG = [
   { key: 'loan_require_confirmation', group: 'requests', label: 'Confirmation de réception obligatoire',
     description: 'Si activé, l\'agent doit confirmer depuis son compte avoir reçu le dossier. Sinon, la remise vaut accusé de réception tacite : l\'agent est notifié et peut la signaler.',
     type: 'boolean', default: 'false' },
+  // Portail citoyen (migration 040).
+  { key: 'portail_citoyen_actif', group: 'requests', label: 'Portail citoyen',
+    description: "Ouvre une page publique où l'usager, sans compte, demande un acte (naissance, mariage, décès…) et suit sa demande avec un code de suivi. La demande arrive dans « À traiter » comme les autres.",
+    type: 'boolean', default: 'false' },
+  { key: 'portail_lieu_retrait', group: 'requests', label: 'Lieu de retrait des actes',
+    description: "Indiqué à l'usager quand son acte est prêt (ex. : guichet de l'état civil, mairie centrale, du lundi au vendredi, 8 h - 12 h 30).",
+    type: 'string', default: null },
+  { key: 'portail_message', group: 'requests', label: "Message d'accueil du portail",
+    description: "Texte affiché en tête du portail citoyen : pièces à présenter au retrait, frais éventuels, délais habituels.",
+    type: 'string', default: null },
+  { key: 'adresse_publique', group: 'requests', label: 'Adresse publique de DocuFlow',
+    description: "Adresse web à laquelle les usagers et les autres administrations joignent DocuFlow (ex. : https://archives.mairie-exemple.bj). Elle sert au lien du portail et au QR code de vérification imprimé sur les copies certifiées.",
+    type: 'string', default: null },
 
   // ---------------------------------------------------------------- SÉCURITÉ
   { key: 'password_min_length',      group: 'security', label: 'Longueur minimale du mot de passe', description: 'Nombre minimal de caractères exigé.', type: 'number', default: '8', min: 6, max: 128 },

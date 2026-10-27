@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { libelleDemande, aDesReferences } from '../utils/demande';
 import LoanPanel from './LoanPanel';
+import DemandeCitoyennePanel from './DemandeCitoyennePanel';
+import { usePermissions } from '../hooks/usePermissions';
 import GedMatchPanel from './GedMatchPanel';
 import { requestService } from '../services/requestService';
 import { uploadService } from '../services/uploadService';
@@ -56,6 +58,8 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
   const [versionDetails, setVersionDetails] = useState(0);
 
   const isAdmin = role === 'archiviste' || role === 'admin' || role === 'superadmin';
+  const { can } = usePermissions();
+  const canProcess = can('requests.process');
 
   const loadFiles = useCallback(async () => {
     if (!request?.id) return;
@@ -322,6 +326,9 @@ const RequestDetailsModal = ({ request, history, stateHistory = [], role, onClos
                 </div>
               </div>
             )}
+
+            {/* Demande déposée sur le portail citoyen (040) */}
+            {canProcess && <DemandeCitoyennePanel request={request} onDone={() => setVersionDetails((v) => v + 1)} />}
 
             {/* Dossier physique : remise, retour, signalement (migration 025) */}
             <LoanPanel request={request} loan={pret.loan} requireConfirmation={pret.requireConfirmation}

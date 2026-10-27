@@ -177,6 +177,9 @@ app.use('/api', require('./routes/rechercheRoutes'));
 app.use('/api', require('./routes/archivageRoutes'));
 app.use('/api', require('./routes/physiqueRoutes'));
 app.use('/api', require('./routes/serviceArchivesRoutes'));
+// Portail citoyen et vérification publique des copies (040) : routes publiques
+// (débit limité) et volet du personnel.
+app.use('/api', require('./routes/portailRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
