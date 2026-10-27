@@ -49,6 +49,18 @@ router.post('/archives/versements/:id/prise-en-charge', gerer, ctrl.priseEnCharg
 router.post('/archives/versements/:id/annulation', gerer, ctrl.annulerVersement);
 router.get('/archives/versements/:id/paquet', gerer, ctrl.paquetVersement);
 
+router.get('/archives/horodatages', voir, ctrl.horodatages);
+router.post('/archives/horodatages', gerer, ctrl.horodaterMaintenant);
+router.get('/archives/horodatages/:id/jeton', voir, ctrl.jetonHorodatage);
+
+router.get('/archives/formats', voir, ctrl.formats);
+router.post('/documents/:id/fichiers/:fileId/pdfa', gerer, ctrl.copiePdfa);
+
+const administrer = [auth, requirePermission('settings.manage')];
+router.get('/archives/sauvegarde', administrer, ctrl.sauvegarde);
+router.put('/archives/sauvegarde', administrer, ctrl.reglerSauvegarde);
+router.post('/archives/sauvegarde', administrer, ctrl.sauvegarder);
+
 router.get('/documents/:id/dua', auth, requirePermission('documents.view'), ctrl.echeanceDocument);
 
 module.exports = router;

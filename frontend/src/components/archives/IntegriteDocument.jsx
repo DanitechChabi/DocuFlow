@@ -7,7 +7,7 @@ import {
   archivesService, STATUTS_INTEGRITE, empreinteCourte, dateHeure, dateCourte,
 } from '../../services/archivesService';
 import { usePermissions } from '../../hooks/usePermissions';
-import { archivageService, SORTS, dateFr } from '../../services/archivageService';
+import { archivageService, SORTS, RISQUES_FORMAT, dateFr } from '../../services/archivageService';
 import { toast } from '../Toast';
 
 /**
@@ -48,6 +48,21 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
     archivageService.echeanceDocument(documentId).then(setDua).catch(() => setDua(null));
   }, [documentId]);
   useEffect(() => { charger(); }, [charger]);
+
+  const [conversion, setConversion] = useState(null);
+  const copiePdfa = async (f) => {
+    setConversion(f.id);
+    try {
+      const r = await archivageService.copiePdfa(documentId, f.id);
+      toast.success(`Copie de conservation PDF/A-${r.pdfa} ajoutée (version ${r.version}) ; l'original reste intact`);
+      charger();
+      if (onChanged) onChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Conversion impossible');
+    } finally {
+      setConversion(null);
+    }
+  };
 
   const verifier = async () => {
     setVerification(true);
@@ -169,6 +184,18 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
                     </div>
                   ) : (
                     <p className="text-slate-400">Empreinte en cours de calcul (fichier antérieur à l'archivage probant).</p>
+                  )}
+                  {f.format_nom && (
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                      Format : {f.format_nom}{f.pdfa ? ` (PDF/A-${f.pdfa})` : ''}
+                      {RISQUES_FORMAT[f.format_risque] && <span className={`px-1.5 rounded-full font-bold ${RISQUES_FORMAT[f.format_risque][1]}`}>{RISQUES_FORMAT[f.format_risque][0]}</span>}
+                      {f.copie_de_file_id && <span className="text-emerald-700">copie de conservation</span>}
+                      {can('archives.manage') && f.format_risque && f.format_risque !== 'perenne' && !etat.fichiers.some((x) => x.copie_de_file_id === f.id) && (
+                        <button type="button" disabled={conversion !== null} onClick={() => copiePdfa(f)} className="font-bold text-docuflow-secondary hover:underline disabled:opacity-40">
+                          {conversion === f.id ? 'Conversion…' : 'Faire une copie PDF/A'}
+                        </button>
+                      )}
+                    </p>
                   )}
                   <p className="text-[11px] text-slate-400">
                     {f.empreinte_origine === 'rattrapage' ? `Empreinte calculée le ${dateCourte(f.empreinte_at)} (après versement)` : f.empreinte_at ? `Empreinte au versement, le ${dateCourte(f.empreinte_at)}` : ''}

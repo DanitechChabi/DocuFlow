@@ -315,6 +315,11 @@ const server = app.listen(PORT, HOST, () => {
     // Preuve et intégrité (migration 031) : empreintes des anciens fichiers,
     // contrôle périodique des fichiers stockés, sceau quotidien du journal.
     require('./services/integriteService').demarrerIntegrite();
+    require('./services/horodatageService').demarrerHorodatage();
+    // Formats de conservation (037) : identification des fichiers existants.
+    require('./services/formatService').demarrerFormats();
+    // Sauvegarde quotidienne de l'application de bureau (si activée).
+    require('./services/sauvegardeService').demarrerSauvegarde();
     // Rappels des tâches de validation en retard (migration 034).
     require('./services/circuitService').demarrerRelances();
     // Alertes des recherches enregistrées et rappels d'échéances (035).

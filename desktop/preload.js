@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('desktopApp', {
    * Fonctions nommées, une par geste : pas d'accès générique au disque. La
    * lecture ne porte que sur les fichiers signalés par le guetteur.
    */
+  /** Sauvegarde intégrée : choisir le dossier de destination (boîte native). */
+  sauvegarde: {
+    choisirDossier: () => ipcRenderer.invoke('sauvegarde:choisir'),
+  },
+
   dossierSurveille: {
     config: () => ipcRenderer.invoke('dossier:config'),
     enregistrer: (config) => ipcRenderer.invoke('dossier:enregistrer', config),

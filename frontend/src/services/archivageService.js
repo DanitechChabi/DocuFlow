@@ -19,6 +19,21 @@ export const archivageService = {
   ajouterVersement: async (id, ids) => (await api.post(`/archives/versements/${id}/documents`, { document_ids: ids })).data,
   retirerVersement: async (id, documentId) => (await api.delete(`/archives/versements/${id}/documents/${documentId}`)).data,
   actionVersement: async (id, action, corps = {}) => (await api.post(`/archives/versements/${id}/${action}`, corps)).data,
+  // Horodatage RFC 3161, formats, sauvegarde (migration 037).
+  horodatages: async (params = {}) => (await api.get('/archives/horodatages', { params })).data,
+  horodaterMaintenant: async () => (await api.post('/archives/horodatages')).data,
+  jetonHorodatage: async (h) => {
+    const r = await api.get(`/archives/horodatages/${h.id}/jeton`, { responseType: 'blob' });
+    const url = URL.createObjectURL(r.data);
+    const a = document.createElement('a');
+    a.href = url; a.download = `horodatage-${h.objet_type}-${h.objet_id}.tsr`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+  formats: async () => (await api.get('/archives/formats')).data,
+  copiePdfa: async (documentId, fileId) => (await api.post(`/documents/${documentId}/fichiers/${fileId}/pdfa`)).data,
+  sauvegarde: async () => (await api.get('/archives/sauvegarde')).data,
+  reglerSauvegarde: async (corps) => (await api.put('/archives/sauvegarde', corps)).data,
+  sauvegarder: async () => (await api.post('/archives/sauvegarde', {}, { timeout: 30 * 60 * 1000 })).data,
   paquetVersement: async (id) => {
     const r = await api.get(`/archives/versements/${id}/paquet`, { responseType: 'blob' });
     const nom = /filename="([^"]+)"/.exec(r.headers['content-disposition'] || '')?.[1] || 'versement.zip';
@@ -57,3 +72,9 @@ export const COMMUNICABILITE = {
   statistique: 'Statistiques individuelles : 60 ans',
   surete: "Sûreté de l'État, militaire, diplomatique : 50 ans",
 };
+export const RISQUES_FORMAT = {
+  perenne: ['Pérenne', 'bg-emerald-50 text-emerald-700'],
+  surveiller: ['À surveiller', 'bg-amber-50 text-amber-700'],
+  risque: ['À risque', 'bg-red-50 text-red-700'],
+};
+export const OBJETS_HORODATES = { sceau: 'Sceau du journal', pv_elimination: "Procès-verbal d'élimination", versement: 'Bordereau de versement' };
