@@ -177,13 +177,8 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
                     <span className="font-semibold text-slate-700 truncate" title={f.original_name}>v{f.version} · {f.original_name}</span>
                     <Badge statut={f.empreinte_sha256 ? (f.integrite_statut || 'attente') : (f.integrite_statut || 'attente')} />
                   </div>
-                  {f.empreinte_sha256 ? (
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                      <span className="font-mono text-[11px]" title={f.empreinte_sha256}>SHA-256 {empreinteCourte(f.empreinte_sha256)}</span>
-                      <button type="button" onClick={() => copier(f.empreinte_sha256)} className="text-slate-400 hover:text-docuflow-secondary" aria-label="Copier l'empreinte"><Copy size={11} /></button>
-                    </div>
-                  ) : (
-                    <p className="text-slate-400">Empreinte en cours de calcul (fichier antérieur à l'archivage probant).</p>
+                  {!f.empreinte_sha256 && (
+                    <p className="text-slate-400">Vérification en préparation (fichier ajouté avant l'archivage probant).</p>
                   )}
                   {f.format_nom && (
                     <p className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
@@ -197,10 +192,22 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
                       )}
                     </p>
                   )}
-                  <p className="text-[11px] text-slate-400">
-                    {f.empreinte_origine === 'rattrapage' ? `Empreinte calculée le ${dateCourte(f.empreinte_at)} (après versement)` : f.empreinte_at ? `Empreinte au versement, le ${dateCourte(f.empreinte_at)}` : ''}
-                    {f.integrite_verifiee_at && ` · contrôlé le ${dateHeure(f.integrite_verifiee_at)}`}
-                  </p>
+                  {/* Détails techniques : l'empreinte n'intéresse que l'expert ou le juge. */}
+                  {f.empreinte_sha256 && (
+                    <details className="text-[11px] text-slate-400">
+                      <summary className="cursor-pointer select-none hover:text-slate-600">Détails techniques</summary>
+                      <div className="mt-1 space-y-0.5 pl-3">
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <span className="font-mono" title={f.empreinte_sha256}>Empreinte SHA-256 {empreinteCourte(f.empreinte_sha256)}</span>
+                          <button type="button" onClick={() => copier(f.empreinte_sha256)} className="text-slate-400 hover:text-docuflow-secondary" aria-label="Copier l'empreinte"><Copy size={11} /></button>
+                        </div>
+                        <p>
+                          {f.empreinte_origine === 'rattrapage' ? `Empreinte calculée le ${dateCourte(f.empreinte_at)} (après versement)` : f.empreinte_at ? `Empreinte au versement, le ${dateCourte(f.empreinte_at)}` : ''}
+                          {f.integrite_verifiee_at && ` · contrôlé le ${dateHeure(f.integrite_verifiee_at)}`}
+                        </p>
+                      </div>
+                    </details>
+                  )}
                   {f.doublons?.length > 0 && (
                     <p className="text-[11px] text-amber-700 flex items-start gap-1">
                       <Files size={12} className="mt-0.5 flex-shrink-0" />

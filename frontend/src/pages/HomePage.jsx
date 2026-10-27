@@ -10,6 +10,7 @@ import { notificationService } from '../services/notificationService';
 import { authService } from '../services/authService';
 import { usePermissions } from '../hooks/usePermissions';
 import PageHeader from '../components/PageHeader';
+import AssistantDemarrage from '../components/AssistantDemarrage';
 
 // ============================================================================
 // HomePage — le vestibule de la plateforme à deux modules.
@@ -71,6 +72,8 @@ const HomePage = () => {
         breadcrumb={[{ label: 'Accueil' }]}
         documentTitle="Accueil"
       />
+
+      <AssistantDemarrage />
 
       {/* Les deux portes — chacune n'existe que si l'utilisateur peut y entrer */}
       <div className={`grid gap-6 mt-8 ${voitDemandes && voitDocuments ? 'lg:grid-cols-2' : 'max-w-xl'}`}>

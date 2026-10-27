@@ -1,6 +1,9 @@
 import api from './api';
 
 export const settingsService = {
+  /** Assistant de démarrage (administrateur) : étapes constatées. */
+  demarrage: async () => (await api.get('/settings/demarrage')).data,
+
   getSettings: async () => {
     const response = await api.get('/settings');
     return response.data;

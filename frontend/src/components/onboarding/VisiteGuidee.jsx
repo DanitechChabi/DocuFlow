@@ -53,6 +53,8 @@ const VisiteGuidee = ({ onOccupe }) => {
     moduleActifRef.current = m;
     setModuleActif(m);
     setActif(false);
+    // Les familles repliées du menu cachent des cibles : on les déplie.
+    window.dispatchEvent(new CustomEvent('docuflow:deplier-menu'));
     // Laisser la page se rendre (cibles présentes) avant la première mesure.
     clearTimeout(demarrageRef.current);
     demarrageRef.current = setTimeout(() => setActif(true), DELAI_DEMARRAGE_MS);

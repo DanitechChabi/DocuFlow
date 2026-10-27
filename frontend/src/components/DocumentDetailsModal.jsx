@@ -13,6 +13,7 @@ import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
 import IntegriteDocument from './archives/IntegriteDocument';
+import SectionRepliable from './ui/SectionRepliable';
 import LocalisationDocument from './archives/LocalisationDocument';
 import FavoriSuivi from './collaboration/FavoriSuivi';
 import CommentairesDocument from './collaboration/CommentairesDocument';
@@ -307,18 +308,21 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                 {/* Circuit de validation (034) : visas, étapes, décision. */}
                 <CircuitDocument documentId={doc.id} onChanged={() => { load(); if (onChanged) onChanged(); }} />
 
-                {/* Analyse et contrôle de conformité (migration 030). */}
-                <AnalyseDocument documentId={doc.id} />
+                {/* Les cartes spécialisées, rangées par famille repliable. */}
+                <SectionRepliable cle="fiche-conservation" titre="Conservation et preuve" resume="Rangement, intégrité, durée" ouvertParDefaut>
+                  <LocalisationDocument documentId={doc.id} onChanged={onChanged} />
+                  <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
+                </SectionRepliable>
 
-                {/* Intégrité et preuve : empreintes, contrôle, gel, certificat (031). */}
-                <LocalisationDocument documentId={doc.id} onChanged={onChanged} />
-                <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
+                <SectionRepliable cle="fiche-partage" titre="Partage et suivi" resume="Liens, commentaires, échéances">
+                  <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
+                  <CommentairesDocument documentId={doc.id} />
+                  <EcheancesDocument documentId={doc.id} />
+                </SectionRepliable>
 
-                {/* Collaboration (033) : liens publics, commentaires. */}
-                <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
-                <CommentairesDocument documentId={doc.id} />
-                {/* Échéances à surveiller (035). */}
-                <EcheancesDocument documentId={doc.id} />
+                <SectionRepliable cle="fiche-controle" titre="Contrôle de conformité" resume="Analyse du contenu">
+                  <AnalyseDocument documentId={doc.id} />
+                </SectionRepliable>
 
                 {/* Documents liés : relations et dépendances */}
                 {relations.length > 0 && (
@@ -373,6 +377,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   rangée d'actions de chaque fichier, elle se répétait autant de
                   fois qu'il y avait de versions.
                 */}
+                <SectionRepliable cle="fiche-gestion" titre="Gestion du document" resume={doc.is_checked_out ? 'Verrouillé' : 'Verrou, statut, corbeille'}>
                 <div className="glass-card-premium p-5 space-y-3">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5">
@@ -460,6 +465,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                     </p>
                   </div>
                 )}
+                </SectionRepliable>
               </div>
 
               {/* Colonne droite : fichiers + aperçu */}

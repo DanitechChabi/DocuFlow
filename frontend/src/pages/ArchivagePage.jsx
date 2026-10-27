@@ -393,7 +393,7 @@ const ArchivagePage = () => {
   return (
     <div className="px-4 sm:px-8 py-6 max-w-[1400px] mx-auto">
       <PageHeader
-        title="Archivage & preuve"
+        title="Conservation et preuve"
         subtitle="Intégrité des fichiers, journal infalsifiable, gels juridiques et certificats"
         icon={Fingerprint}
         breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents', to: '/documents' }, { label: 'Archivage' }]}
