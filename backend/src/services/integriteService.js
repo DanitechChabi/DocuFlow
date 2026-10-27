@@ -603,7 +603,10 @@ async function listerGels(tenantId, user, { actifs = true } = {}) {
 async function etatDocument(tenantId, documentId, user) {
   const { rows: fichiers } = await db.query(
     `SELECT id, version, original_name, mime_type, file_size, created_at, empreinte_sha256, empreinte_at,
-            empreinte_origine, integrite_statut, integrite_verifiee_at
+            empreinte_origine, integrite_statut, integrite_verifiee_at,
+            -- Formats (037), lus par to_jsonb : une base antérieure répond NULL.
+            to_jsonb(document_files) ->> 'format_nom' AS format_nom, to_jsonb(document_files) ->> 'format_risque' AS format_risque,
+            to_jsonb(document_files) ->> 'pdfa' AS pdfa, (to_jsonb(document_files) ->> 'copie_de_file_id')::int AS copie_de_file_id
        FROM document_files WHERE document_id = $1 ORDER BY version DESC`,
     [documentId]
   );

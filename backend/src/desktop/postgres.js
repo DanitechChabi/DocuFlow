@@ -474,7 +474,14 @@ async function ensureRunning({ dataDir, logFile, onProgress = () => {} }) {
   return { host: '127.0.0.1', port, user: SUPERUSER, password: '', database: DATABASE, dataDir };
 }
 
+/** Chemin d'un outil des binaires embarqués (pg_dump, pg_restore), ou null. */
+function outil(name) {
+  const root = pgRoot();
+  return root ? binary(root, name) : null;
+}
+
 module.exports = {
+  outil,
   isAvailable,
   isInitialized,
   clusterVersion,

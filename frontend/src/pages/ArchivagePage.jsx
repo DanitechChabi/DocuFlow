@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Fingerprint, ShieldCheck, ShieldAlert, Loader2, RefreshCw, Link2, Stamp, Download, Gavel, Files, BadgeCheck,
-  FileWarning, Hourglass, Search, Trash2, Archive,
+  FileWarning, Hourglass, Search, Trash2, Archive, FileCheck2,
 } from 'lucide-react';
 import { OngletSortFinal, OngletEliminations } from '../components/archives/OngletsElimination';
 import { OngletVersements } from '../components/archives/OngletVersements';
+import { HorodatagesPanel, OngletFormats } from '../components/archives/PreuveConservation';
 import PageHeader from '../components/PageHeader';
 import {
   archivesService, STATUTS_INTEGRITE, empreinteCourte, empreinteGroupee, dateHeure, dateCourte,
@@ -31,6 +32,7 @@ const ONGLETS = [
   { cle: 'journal', libelle: 'Journal & sceaux', icone: Link2 },
   { cle: 'gels', libelle: 'Gels juridiques', icone: Gavel },
   { cle: 'doublons', libelle: 'Doublons', icone: Files },
+  { cle: 'formats', libelle: 'Formats', icone: FileCheck2 },
   { cle: 'certificat', libelle: 'Vérifier un certificat', icone: BadgeCheck },
 ];
 
@@ -260,6 +262,8 @@ const OngletJournal = ({ peutGerer }) => {
           </div>
         )}
       </div>
+
+      <HorodatagesPanel peutGerer={peutGerer} />
     </div>
   );
 };
@@ -418,6 +422,7 @@ const ArchivagePage = () => {
       {onglet === 'journal' && <OngletJournal peutGerer={peutGerer} />}
       {onglet === 'gels' && <OngletGels />}
       {onglet === 'doublons' && <OngletDoublons />}
+      {onglet === 'formats' && <OngletFormats />}
       {onglet === 'certificat' && <OngletCertificat />}
     </div>
   );

@@ -268,6 +268,12 @@ const CATALOG = [
   { key: 'archives_autorite', group: 'archives', label: "Autorité d'archives compétente",
     description: "Service qui vise les éliminations et reçoit les versements : la Direction des Archives Nationales, ou la Direction des Archives Départementales qui la représente (art. 24).",
     type: 'string', default: 'Direction des Archives Nationales (DAN)' },
+  { key: 'horodatage_actif', group: 'archives', label: 'Horodatage par une autorité tierce',
+    description: "Fait horodater (protocole RFC 3161) l'empreinte des sceaux du journal, des procès-verbaux d'élimination et des bordereaux de versement. Seule l'empreinte quitte DocuFlow. Code du numérique, art. 299-300 : un horodatage qualifié est présumé exact ; la qualification dépend du prestataire choisi.",
+    type: 'boolean', default: 'false' },
+  { key: 'horodatage_tsa_url', group: 'archives', label: "Adresse de l'autorité d'horodatage",
+    description: "Service RFC 3161 qui signe les jetons. Par défaut FreeTSA (gratuit, non qualifié) ; préférez un prestataire de services de confiance qualifié si vous en disposez.",
+    type: 'string', default: 'https://freetsa.org/tsr' },
 
   // ------------------------------------------------------- COLLABORATION (033)
   { key: 'partage_public_actif', group: 'collaboration', label: 'Liens de partage publics',

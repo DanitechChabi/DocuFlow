@@ -9,7 +9,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import {
   Users, Layers, Palette, Building2,
   X, Plus, Trash2, Search, UserCog, Upload, Pencil,
-  Users2, Database, SlidersHorizontal, FolderTree, ListChecks
+  Users2, Database, SlidersHorizontal, FolderTree, ListChecks, HardDrive
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ThemeManager from '../components/ThemeManager';
@@ -23,6 +23,7 @@ import { roleService } from '../services/roleService';
 import PageHeader from '../components/PageHeader';
 import { useOngletUrl } from '../hooks/useOngletUrl';
 import { toast } from '../components/Toast';
+import { SauvegardePanel } from '../components/archives/PreuveConservation';
 
 const roleColor = (role) => ({
   demandeur: 'bg-green-100 text-green-600',
@@ -42,7 +43,7 @@ const ROLE_OPTIONS_LEGACY = [
 // Déclaré hors du composant : `useOngletUrl` mémorise sur ce tableau, et un
 // littéral reconstruit à chaque rendu invaliderait le calcul en permanence.
 // L'ordre fixe le premier élément comme onglet par défaut.
-const PANNEAUX = ['users', 'roles', 'sections', 'groups', 'metadata', 'request-fields', 'folders', 'branding', 'configuration'];
+const PANNEAUX = ['users', 'roles', 'sections', 'groups', 'metadata', 'request-fields', 'folders', 'branding', 'configuration', 'sauvegarde'];
 
 // Libellé lisible de chaque panneau, pour le fil d'Ariane et le titre d'onglet du
 // navigateur. Sans lui, dix onglets « Administration » resteraient indiscernables
@@ -57,6 +58,7 @@ const NOMS_PANNEAUX = {
   folders: 'Dossiers',
   branding: 'Branding',
   configuration: 'Configuration',
+  sauvegarde: 'Sauvegarde',
 };
 
 /**
@@ -273,6 +275,7 @@ const CompanyAdminPage = () => {
     { id: 'folders', label: 'Dossiers', icon: FolderTree },
     { id: 'branding', label: 'Branding', icon: Palette },
     { id: 'configuration', label: 'Configuration', icon: SlidersHorizontal },
+    { id: 'sauvegarde', label: 'Sauvegarde', icon: HardDrive },
   ];
 
   // Sécurité : un superadmin d'une autre entreprise ne doit JAMAIS voir le portail global.
@@ -452,6 +455,11 @@ const CompanyAdminPage = () => {
         {/* ============ CONFIGURATION ============ */}
         {/* Console générée depuis le catalogue backend : tout paramètre ajouté à
             config/settingsCatalog.js y apparaît sans modifier cette page. */}
+        {activePanel === 'sauvegarde' && (
+          <div className="animate-fade-in-up">
+            <SauvegardePanel />
+          </div>
+        )}
         {activePanel === 'configuration' && (
           <div className="animate-fade-in-up">
             <ConfigurationConsole />

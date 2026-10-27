@@ -6,6 +6,9 @@
 // ============================================================================
 const archivage = require('../services/archivageService');
 const versements = require('../services/versementService');
+const horodatage = require('../services/horodatageService');
+const formats = require('../services/formatService');
+const aclService = require('../services/aclService');
 const { verifierAccesDocument, repondreRefus } = require('../helpers/accesDocument');
 
 const erreur = (res, err, message) => {
@@ -70,3 +73,38 @@ exports.paquetVersement = async (req, res) => {
     if (res.headersSent) { console.error('[versement] export interrompu :', err.message); res.destroy(err); } else erreur(res, err, 'Export du versement impossible');
   }
 };
+
+// ------------------------------------------------- horodatage RFC 3161 (037)
+exports.horodatages = action((req) => horodatage.lister(t(req), { objetType: req.query.objet_type || null, objetId: req.query.objet_id || null }), 'Chargement des horodatages impossible');
+exports.horodaterMaintenant = action((req) => horodatage.horodaterOrganisation(t(req)), 'Horodatage impossible');
+exports.jetonHorodatage = async (req, res) => {
+  try {
+    const h = await horodatage.jeton(t(req), req.params.id);
+    if (!h) return res.status(404).json({ message: 'Jeton introuvable.' });
+    res.setHeader('Content-Type', 'application/timestamp-reply');
+    res.setHeader('Content-Disposition', `attachment; filename="horodatage-${h.objet_type}-${h.objet_id}.tsr"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(h.jeton);
+  } catch (err) { erreur(res, err, 'Téléchargement du jeton impossible'); }
+};
+
+// --------------------------------------------- formats de conservation (037)
+exports.formats = action(async (req) => {
+  const { lisibles } = await aclService.dossiersAccessibles(t(req), req.user.id);
+  return formats.bilan(t(req), lisibles);
+}, 'Chargement du bilan des formats impossible');
+exports.copiePdfa = async (req, res) => {
+  try {
+    // Écriture dans le dossier exigée ; un document archivé reste éligible :
+    // ajouter une copie de conservation ne modifie pas ce qui est archivé.
+    const { document, refus } = await verifierAccesDocument(req, { mode: 'write', corbeille: false });
+    if (refus) return repondreRefus(res, refus);
+    res.status(201).json(await formats.copieConservation(t(req), document.id, req.params.fileId, req.user));
+  } catch (err) { erreur(res, err, 'Copie de conservation impossible'); }
+};
+
+// ------------------------------------------- sauvegarde intégrée (bureau)
+const sauvegarde = require('../services/sauvegardeService');
+exports.sauvegarde = action(async () => sauvegarde.etat(), 'Lecture de la sauvegarde impossible');
+exports.reglerSauvegarde = action(async (req) => sauvegarde.enregistrer(req.body || {}), 'Enregistrement des réglages de sauvegarde impossible');
+exports.sauvegarder = action(async () => ({ sauvegarde: await sauvegarde.executer(), etat: sauvegarde.etat() }), 'Sauvegarde impossible');

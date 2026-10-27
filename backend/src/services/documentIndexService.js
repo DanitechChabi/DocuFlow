@@ -34,6 +34,16 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
   const texte = await extractText(file.path, file.mimetype).catch(() => '');
   // Empreinte d'archivage (031), pour la même raison avant saveFile.
   const empreinte = await integrite.empreinteVersement(file);
+  // Format de conservation (037), lu sur les octets, toujours avant saveFile.
+  const formats = require('./formatService');
+  let format = null;
+  if (await formats.migrationPassee()) {
+    try {
+      const taille = fs.statSync(file.path).size;
+      const octets = taille <= 64 * 1024 * 1024 ? fs.readFileSync(file.path) : null;
+      if (octets) format = formats.identifier(octets, file.originalname);
+    } catch { /* identifié plus tard par le rattrapage */ }
+  }
   const info = await storage.saveFile(file, { keepLocal });
   const run = client || db;
   const ver = await run.query(
@@ -52,6 +62,10 @@ async function addFileToDocument(tenantId, documentId, userId, file, { keepLocal
       colonnes.push('integrite_statut', 'integrite_verifiee_at');
       valeurs.push('intacte', new Date());
     }
+  }
+  if (format) {
+    colonnes.push('format_nom', 'format_version', 'format_risque', 'pdfa', 'format_identifie_at');
+    valeurs.push(format.nom, format.version, format.risque, format.pdfa, new Date());
   }
   const result = await run.query(
     `INSERT INTO document_files (${colonnes.join(', ')})

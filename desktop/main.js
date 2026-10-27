@@ -151,6 +151,16 @@ ipcMain.handle('dossier:enregistrer', (_event, config = {}) => {
   return { ok: true, config: suivant };
 });
 
+// Sauvegarde intégrée : seul le CHOIX du dossier passe par la fenêtre (boîte
+// de dialogue native) ; la sauvegarde elle-même est faite par le serveur.
+ipcMain.handle('sauvegarde:choisir', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: 'Dossier de sauvegarde (disque externe, clé USB, partage réseau)',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+});
+
 ipcMain.handle('dossier:choisir', async () => {
   const r = await dialog.showOpenDialog(mainWindow, {
     title: 'Dossier à surveiller (sortie du scanner)',
@@ -350,6 +360,8 @@ async function bootstrap() {
   process.env.NODE_ENV = process.env.NODE_ENV || (app.isPackaged ? 'production' : 'development');
   process.env.SERVE_FRONTEND = 'true';
   process.env.UPLOADS_DIR = path.join(app.getPath('userData'), 'uploads');
+  // Réglages du poste lus par le serveur embarqué (sauvegarde intégrée).
+  process.env.DOCUFLOW_DATA_DIR = app.getPath('userData');
   process.env.HOST = '127.0.0.1';        // loopback uniquement, pas exposé sur le LAN
   process.env.PORT = '0';                // port libre attribué par l'OS
   process.env.JWT_SECRET = process.env.JWT_SECRET || chargerOuCreerSecret();
@@ -422,6 +434,8 @@ async function bootstrap() {
         process.env.DB_NAME = conn.database;
         embeddedPg = pg;          // pour l'arrêt dans will-quit
         usingEmbedded = true;
+        // Sauvegarde intégrée (sauvegardeService) : pg_dump des binaires embarqués.
+        process.env.PG_DUMP_PATH = process.env.PG_DUMP_PATH || pg.outil('pg_dump') || '';
       } else {
         console.log('[desktop] Binaires PostgreSQL embarqués absents — repli sur une installation locale.');
       }
