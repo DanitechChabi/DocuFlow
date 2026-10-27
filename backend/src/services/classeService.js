@@ -335,8 +335,8 @@ async function installerClasses(tenantId, codes) {
       const regle = CONSERVATION[c.code];
       if (regle) {
         await client.query(
-          `UPDATE metadata_schemas SET dua_annees = $2, dua_point_depart = $3, sort_final = $4, dua_reference = $5 WHERE id = $1`,
-          [s.rows[0].id, regle.dua, regle.depart, regle.sort, regle.ref]
+          `UPDATE metadata_schemas SET dua_annees = $2, dua_point_depart = $3, sort_final = $4, dua_reference = $5, communicabilite = $6 WHERE id = $1`,
+          [s.rows[0].id, regle.dua, regle.depart, regle.sort, regle.ref, regle.communicabilite]
         );
       }
       const pris = new Set();
@@ -439,6 +439,7 @@ async function appliquerReferentiel(tenantId, user) {
     if (r.dua_annees != null) { deja.push(r.name); continue; }
     await archivage.definirDua(tenantId, r.id, {
       dua_annees: regle.dua, dua_point_depart: regle.depart, sort_final: regle.sort, dua_reference: regle.ref,
+      communicabilite: regle.communicabilite,
     }, user);
     appliquees.push(r.name);
   }

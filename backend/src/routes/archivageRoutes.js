@@ -34,8 +34,20 @@ router.post('/archives/bordereaux/:id/validation', valider, ctrl.valider);
 router.post('/archives/bordereaux/:id/rejet', valider, ctrl.rejeter);
 router.post('/archives/bordereaux/:id/reprise', gerer, ctrl.reprendre);
 router.post('/archives/bordereaux/:id/annulation', gerer, ctrl.annuler);
+router.post('/archives/bordereaux/:id/transmission', gerer, ctrl.transmettre);
+router.post('/archives/bordereaux/:id/visa', gerer, ctrl.visa);
 router.post('/archives/bordereaux/:id/execution', gerer, ctrl.executer);
 router.get('/archives/bordereaux/:id/pv', voir, ctrl.procesVerbal);
+
+router.get('/archives/versements', voir, ctrl.versements);
+router.post('/archives/versements', gerer, ctrl.creerVersement);
+router.get('/archives/versements/:id', voir, ctrl.versement);
+router.post('/archives/versements/:id/documents', gerer, ctrl.ajouterVersement);
+router.delete('/archives/versements/:id/documents/:documentId', gerer, ctrl.retirerVersement);
+router.post('/archives/versements/:id/transmission', gerer, ctrl.transmettreVersement);
+router.post('/archives/versements/:id/prise-en-charge', gerer, ctrl.priseEnCharge);
+router.post('/archives/versements/:id/annulation', gerer, ctrl.annulerVersement);
+router.get('/archives/versements/:id/paquet', gerer, ctrl.paquetVersement);
 
 router.get('/documents/:id/dua', auth, requirePermission('documents.view'), ctrl.echeanceDocument);
 

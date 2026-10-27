@@ -74,13 +74,18 @@ console.log('\n4. Migration 019 — provisionne exactement les définitions du c
 // Permissions accordées après 019 par une migration dédiée (qui doit les poser).
 const AJOUTS_POSTERIEURS = {
   archiviste: ['requests.create', 'compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold',
-    'workflows.manage', 'workflows.start'],
+    'workflows.manage', 'workflows.start', 'archives.communicate'],
   lecteur: ['requests.create'],
   admin: ['compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold', 'archives.validate',
-    'workflows.manage', 'workflows.start'],
+    'workflows.manage', 'workflows.start', 'archives.communicate'],
   responsable: ['compliance.view', 'archives.view', 'archives.validate', 'workflows.start'],
   agent: ['workflows.start'],
 };
+{
+  const sql036 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '036_archives_benin.sql'), 'utf8');
+  ok(/array_append\(permissions, 'archives\.communicate'\)/.test(sql036) && sql036.includes("key IN ('admin', 'archiviste')"),
+    'migration 036 : archives.communicate ajoutée à admin et archiviste');
+}
 {
   const sql023 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '023_request_quick.sql'), 'utf8');
   ok(/array_append\(permissions, 'requests\.create'\)/.test(sql023) && sql023.includes("key IN ('archiviste', 'lecteur')"),

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Hourglass, Loader2 } from 'lucide-react';
-import { archivageService, SORTS, POINTS } from '../../services/archivageService';
+import { archivageService, SORTS, POINTS, COMMUNICABILITE } from '../../services/archivageService';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../Toast';
 
@@ -17,7 +17,7 @@ const RegleConservation = ({ classe, onEnregistree }) => {
   useEffect(() => {
     setR({
       dua_annees: classe.dua_annees ?? '', dua_point_depart: classe.dua_point_depart || 'date_document',
-      sort_final: classe.sort_final || '', dua_reference: classe.dua_reference || '',
+      sort_final: classe.sort_final || '', dua_reference: classe.dua_reference || '', communicabilite: classe.communicabilite || '',
     });
   }, [classe]);
   if (!can('archives.view')) return null;
@@ -53,6 +53,10 @@ const RegleConservation = ({ classe, onEnregistree }) => {
             {Object.entries(SORTS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select></label>
       </div>
+      <label className="block"><span className="block text-xs font-bold text-slate-500 mb-1">Communicable au public (décret n° 2007-532, art. 32-33)</span>
+        <select disabled={!modifiable} className="input-premium" value={r.communicabilite} onChange={(e) => setR({ ...r, communicabilite: e.target.value })}>
+          {Object.entries(COMMUNICABILITE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select></label>
       <input disabled={!modifiable} className="input-premium text-sm" maxLength={2000} value={r.dua_reference} onChange={(e) => setR({ ...r, dua_reference: e.target.value })} placeholder="Référence : tableau de gestion, texte de loi…" />
       {modifiable && (
         <div className="flex justify-end">

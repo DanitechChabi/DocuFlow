@@ -69,11 +69,11 @@ exports.reporterEcheance = actionEcheance(echeances.reporter, 'Report impossible
 exports.supprimerEcheance = actionEcheance((t, id, u) => echeances.supprimer(t, id, u), 'Suppression impossible');
 
 // --------------------------------------------------------------------- paquet
-async function envoyerPaquet(req, res, ids, versions) {
+async function envoyerPaquet(req, res, ids, versions, nomImpose = null) {
   const prepare = await paquets.preparer(req.user.tenant_id, req.user, ids, { versions });
-  const nom = prepare.docs.length === 1
+  const nom = nomImpose || (prepare.docs.length === 1
     ? `paquet-${String(prepare.docs[0].reference_mfile || prepare.docs[0].id).replace(/[^\w.-]/g, '_')}.zip`
-    : `paquet-archive-${new Date().toISOString().slice(0, 10)}.zip`;
+    : `paquet-archive-${new Date().toISOString().slice(0, 10)}.zip`);
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${nom}"`);
   res.setHeader('Cache-Control', 'no-store');
@@ -99,3 +99,5 @@ exports.paquetSelection = async (req, res) => {
     if (res.headersSent) { console.error('[paquet] export interrompu :', err.message); res.destroy(err); } else erreur(res, err, 'Export du paquet impossible');
   }
 };
+
+exports.envoyerPaquet = envoyerPaquet;

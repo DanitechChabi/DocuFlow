@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Fingerprint, ShieldCheck, ShieldAlert, Loader2, RefreshCw, Link2, Stamp, Download, Gavel, Files, BadgeCheck,
-  FileWarning, Hourglass, Search, Trash2,
+  FileWarning, Hourglass, Search, Trash2, Archive,
 } from 'lucide-react';
 import { OngletSortFinal, OngletEliminations } from '../components/archives/OngletsElimination';
+import { OngletVersements } from '../components/archives/OngletVersements';
 import PageHeader from '../components/PageHeader';
 import {
   archivesService, STATUTS_INTEGRITE, empreinteCourte, empreinteGroupee, dateHeure, dateCourte,
@@ -26,6 +27,7 @@ const ONGLETS = [
   { cle: 'integrite', libelle: 'Intégrité des fichiers', icone: Fingerprint },
   { cle: 'sort-final', libelle: 'Sort final', icone: Hourglass },
   { cle: 'eliminations', libelle: 'Éliminations', icone: Trash2 },
+  { cle: 'versements', libelle: 'Versements', icone: Archive },
   { cle: 'journal', libelle: 'Journal & sceaux', icone: Link2 },
   { cle: 'gels', libelle: 'Gels juridiques', icone: Gavel },
   { cle: 'doublons', libelle: 'Doublons', icone: Files },
@@ -401,7 +403,14 @@ const ArchivagePage = () => {
         ))}
       </div>
       {onglet === 'integrite' && <OngletIntegrite peutGerer={peutGerer} />}
-      {onglet === 'sort-final' && <OngletSortFinal onBordereauCree={(id) => setParams({ onglet: 'eliminations', bordereau: id })} />}
+      {onglet === 'sort-final' && (
+        <OngletSortFinal onBordereauCree={(id) => setParams({ onglet: 'eliminations', bordereau: id })}
+          onVersementCree={(id) => setParams({ onglet: 'versements', versement: id })} />
+      )}
+      {onglet === 'versements' && (
+        <OngletVersements ouvert={Number(params.get('versement')) || null}
+          setOuvert={(id) => setParams(id ? { onglet: 'versements', versement: id } : { onglet: 'versements' })} />
+      )}
       {onglet === 'eliminations' && (
         <OngletEliminations ouvert={Number(params.get('bordereau')) || null}
           setOuvert={(id) => setParams(id ? { onglet: 'eliminations', bordereau: id } : { onglet: 'eliminations' })} />

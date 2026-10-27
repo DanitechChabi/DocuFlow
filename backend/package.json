@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans && npm run test:migrations && npm run test:onboarding && npm run test:ged && npm run test:ocr && npm run test:indexation && npm run test:classes && npm run test:conformite && npm run test:integrite && npm run test:collaboration && npm run test:circuits && npm run test:recherche && npm run test:archivage",
+    "test": "npm run test:license && npm run test:rbac && npm run test:lifecycle && npm run test:acl && npm run test:requests && npm run test:loans && npm run test:migrations && npm run test:onboarding && npm run test:ged && npm run test:ocr && npm run test:indexation && npm run test:classes && npm run test:conformite && npm run test:integrite && npm run test:collaboration && npm run test:circuits && npm run test:recherche && npm run test:archivage && npm run test:archives-benin",
     "test:license": "node src/desktop/licenseGuard.test.js",
     "test:rbac": "node src/rbac.test.js",
     "test:lifecycle": "node src/lifecycle.test.js",
@@ -24,7 +24,8 @@
     "test:collaboration": "node src/collaboration.test.js",
     "test:circuits": "node src/circuits.test.js",
     "test:recherche": "node src/recherche.test.js",
-    "test:archivage": "node src/archivage.test.js"
+    "test:archivage": "node src/archivage.test.js",
+    "test:archives-benin": "node src/archivesBenin.test.js"
   },
   "keywords": [],
   "author": "CHABI BOUKO Daniel",
