@@ -6,6 +6,8 @@ import { usePermissions } from '../hooks/usePermissions';
 import { useSettings } from '../contexts/SettingsContext';
 import { toast } from './Toast';
 import { ETATS_PRET, dateCourte, dateHeure } from '../utils/demande';
+import { NATURES_PRET } from '../services/physiqueService';
+import ChoixDocument from './archives/ChoixDocument';
 
 /**
  * LoanPanel — le dossier physique d'une demande (migration 025).
@@ -40,6 +42,9 @@ const LoanPanel = ({ request, loan, requireConfirmation = false, onDone }) => {
   const [ouvert, setOuvert] = useState(null); // 'remise' | 'retour' | 'signalement'
   const [dateRetour, setDateRetour] = useState(() => aujourdhuiPlus(Number(settings.loan_default_days) || 7));
   const [texte, setTexte] = useState('');
+  // Décret n° 2007-532, art. 35 : original, copie ou consultation sur place.
+  const [nature, setNature] = useState('original');
+  const [documentPrete, setDocumentPrete] = useState(null);
   const [occupe, setOccupe] = useState(false);
 
   const terminale = ['livré', 'rejete', 'annulé'].includes(request.statut);
@@ -77,7 +82,14 @@ const LoanPanel = ({ request, loan, requireConfirmation = false, onDone }) => {
       {/* --- Aucun prêt : l'archive peut remettre le dossier --- */}
       {!loan && (
         ouvert === 'remise' ? (
-          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); agir(() => requestService.remettreDossier(request.id, { date_retour_prevue: dateRetour, observation: texte }), 'Dossier remis'); }}>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); agir(() => requestService.remettreDossier(request.id, { date_retour_prevue: dateRetour, observation: texte, nature, document_id: documentPrete?.id || null }), 'Dossier remis'); }}>
+            <label className="block text-xs font-bold text-slate-500" htmlFor="pret-nature">Ce qui est remis</label>
+            <select id="pret-nature" className={champ} value={nature} onChange={(e) => setNature(e.target.value)}>
+              {Object.entries(NATURES_PRET).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <p className="text-[11px] text-slate-400">Un original versé aux archives publiques ne sort pas : remettez une copie ou proposez une consultation sur place (décret n° 2007-532, art. 35).</p>
+            <span className="block text-xs font-bold text-slate-500">Document de la GED correspondant <span className="font-normal text-slate-400">(facultatif — localise la boîte, alimente le récolement)</span></span>
+            <ChoixDocument valeur={documentPrete} onChange={setDocumentPrete} />
             <label className="block text-xs font-bold text-slate-500" htmlFor="pret-retour">À retourner avant le</label>
             <input id="pret-retour" type="date" className={champ} value={dateRetour} min={aujourdhuiPlus(0)} onChange={(e) => setDateRetour(e.target.value)} required />
             <label className="block text-xs font-bold text-slate-500" htmlFor="pret-obs">Observation <span className="font-normal text-slate-400">(facultatif — cote, boîte, état du dossier…)</span></label>
@@ -109,6 +121,7 @@ const LoanPanel = ({ request, loan, requireConfirmation = false, onDone }) => {
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <div><dt className="text-xs text-slate-400">Remis le</dt><dd className="text-slate-700">{dateHeure(loan.remis_at)}</dd></div>
             <div><dt className="text-xs text-slate-400">Par</dt><dd className="text-slate-700">{loan.remis_par_name || '—'}</dd></div>
+            {loan.nature && loan.nature !== 'original' && <div><dt className="text-xs text-slate-400">Remis</dt><dd className="text-slate-700">{NATURES_PRET[loan.nature]}</dd></div>}
             <div><dt className="text-xs text-slate-400">Retour prévu</dt><dd className={loan.etat === 'en_retard' ? 'text-red-600 font-bold' : 'text-slate-700'}>{dateCourte(loan.date_retour_prevue)}</dd></div>
             {loan.retourne_at && <div><dt className="text-xs text-slate-400">Retourné le</dt><dd className="text-slate-700">{dateHeure(loan.retourne_at)}</dd></div>}
           </dl>

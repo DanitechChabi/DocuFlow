@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import MonEspacePage from './pages/MonEspacePage';
 import BordereauImprimablePage from './pages/BordereauImprimablePage';
+import MagasinsPage from './pages/MagasinsPage';
+import RecolementPvPage from './pages/RecolementPvPage';
 import DocumentsPage from './pages/DocumentsPage';
 import CorbeillePage from './pages/CorbeillePage';
 import PretsPage from './pages/PretsPage';
@@ -128,6 +130,8 @@ function App() {
           <Route path="/documents/archivage/bordereaux/:id/pv" element={<ProcesVerbalPage />} />
           <Route path="/documents/archivage/bordereaux/:id/imprimer" element={<BordereauImprimablePage type="elimination" />} />
           <Route path="/documents/archivage/versements/:id/imprimer" element={<BordereauImprimablePage type="versement" />} />
+          <Route path="/documents/magasins" element={<MagasinsPage />} />
+          <Route path="/documents/magasins/recolements/:id/pv" element={<RecolementPvPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

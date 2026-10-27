@@ -31,8 +31,8 @@ export const requestService = {
   },
   // --- Prêt des dossiers physiques (migration 025) ---
   /** Remise du dossier papier à l'auteur de la demande. */
-  remettreDossier: async (requestId, { date_retour_prevue, observation }) => {
-    const response = await api.post(`/requests/${requestId}/loan`, { date_retour_prevue, observation });
+  remettreDossier: async (requestId, { date_retour_prevue, observation, nature, document_id }) => {
+    const response = await api.post(`/requests/${requestId}/loan`, { date_retour_prevue, observation, nature, document_id });
     return response.data;
   },
   /** Retour du dossier aux archives (et rangement). */

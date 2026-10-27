@@ -130,11 +130,15 @@ async function enTransaction(fn) {
  * Remise du dossier physique à l'auteur de la demande.
  * @returns {Promise<{pret, request}>}
  */
-async function remettre(tenantId, requestId, user, { date_retour_prevue, observation } = {}) {
+// Décret n° 2007-532, art. 35 : prêt d'original, copie, ou consultation sur place.
+const NATURES_PRET = ['original', 'copie', 'consultation'];
+
+async function remettre(tenantId, requestId, user, { date_retour_prevue, observation, nature = 'original', document_id: documentId = null, emplacement_id: emplacementId = null } = {}) {
   const settings = await settingsService.getAll(tenantId);
   const date = lireDateRetour(date_retour_prevue, { defautJours: settings.loan_default_days });
   if (date.erreur) throw erreur(400, date.erreur);
   const obs = texte(observation, 1000);
+  if (!NATURES_PRET.includes(nature)) throw erreur(400, 'Nature du prêt attendue : original, copie ou consultation sur place.');
 
   const { pret, request } = await enTransaction(async (client) => {
     const r = await client.query(
@@ -148,15 +152,33 @@ async function remettre(tenantId, requestId, user, { date_retour_prevue, observa
     }
     const existant = await client.query('SELECT id FROM request_loans WHERE request_id = $1', [requestId]);
     if (existant.rows[0]) throw erreur(409, 'Ce dossier a déjà été remis pour cette demande.', 'DEJA_REMIS');
+    // Document et boîte prêtés, s'ils sont connus (registre, récolement).
+    let docId = documentId ? Number(documentId) : null;
+    let boiteId = emplacementId ? Number(emplacementId) : null;
+    if (docId) {
+      const d = (await client.query(
+        `SELECT d.id, d.emplacement_id, (v.destination = 'archives_publiques') AS verse_public
+           FROM documents d LEFT JOIN bordereaux_versement v ON v.id = d.verse_versement_id AND v.statut = 'pris_en_charge'
+          WHERE d.id = $1 AND d.tenant_id = $2`, [docId, tenantId])).rows[0];
+      if (!d) throw erreur(404, 'Document introuvable.');
+      if (d.verse_public && nature === 'original') {
+        throw erreur(409, "Ce document a été versé aux archives publiques : son original ne sort pas (décret n° 2007-532, art. 35). Remettez une copie, ou proposez une consultation sur place.", 'ART35_ORIGINAL');
+      }
+      boiteId = boiteId || d.emplacement_id || null;
+    }
+    if (boiteId) {
+      const e = await client.query('SELECT id FROM emplacements WHERE id = $1 AND tenant_id = $2', [boiteId, tenantId]);
+      if (!e.rows[0]) throw erreur(404, 'Emplacement introuvable.');
+    }
 
     await client.query(
       `UPDATE requests SET statut = 'livré', date_livraison = CURRENT_TIMESTAMP WHERE id = $1 AND tenant_id = $2`,
       [requestId, tenantId]
     );
     const ins = await client.query(
-      `INSERT INTO request_loans (tenant_id, request_id, emprunteur_id, remis_par, date_retour_prevue, observation_remise)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [tenantId, requestId, request.id_user, user.id, date.valeur, obs]
+      `INSERT INTO request_loans (tenant_id, request_id, emprunteur_id, remis_par, date_retour_prevue, observation_remise, nature, document_id, emplacement_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [tenantId, requestId, request.id_user, user.id, date.valeur, obs, nature, docId, boiteId]
     );
     const emprunteur = await client.query('SELECT full_name FROM users WHERE id = $1', [request.id_user]);
     const nomEmprunteur = emprunteur.rows[0]?.full_name || 'l\'agent';
