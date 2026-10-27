@@ -151,6 +151,23 @@ async function creerPartage(tenantId, documentId, user, corps = {}, { ip = null 
   const r = await reglages(tenantId);
   if (!r.actif) throw erreur(403, "Le partage public est désactivé par votre organisation.", 'PARTAGE_DESACTIVE');
 
+  // Communicabilité (décret n° 2007-532, art. 32-33) : un lien public ouvre le
+  // document à un tiers. Avant son délai, il faut une autorisation référencée
+  // (comité permanent, art. 32 al. 3), enregistrée par qui en a le droit.
+  const comm = await require('./communicabiliteService').etatDocument(tenantId, documentId);
+  let autorisation = null;
+  if (comm && !comm.communicable) {
+    autorisation = String(corps.autorisation_communication || '').trim();
+    const motif = comm.a_partir_du
+      ? `Ce document n'est communicable au public qu'à partir du ${comm.a_partir_du.split('-').reverse().join('/')} (${comm.libelle}).`
+      : `Ce document n'est pas réputé communicable (${comm.libelle}). ${comm.raison || ''}`.trim();
+    if (!autorisation) throw Object.assign(erreur(403, `${motif} Un lien public exige une autorisation de communication anticipée.`, 'NON_COMMUNICABLE'), { communicabilite: comm });
+    if (autorisation.length > 500) throw erreur(400, "Référence de l'autorisation trop longue (500 caractères au plus).");
+    if (!(await require('./roleService').possede(tenantId, user.role, 'archives.communicate'))) {
+      throw erreur(403, `${motif} Seul un gestionnaire habilité peut enregistrer une autorisation de communication anticipée.`, 'NON_COMMUNICABLE');
+    }
+  }
+
   // Version : courante par défaut, ou une version précise du document.
   const { rows: fichiers } = await db.query('SELECT id, version FROM document_files WHERE document_id = $1 ORDER BY version DESC', [documentId]);
   if (!fichiers.length) throw erreur(409, 'Ce document ne contient aucun fichier : rien à partager.', 'SANS_FICHIER');
@@ -196,12 +213,19 @@ async function creerPartage(tenantId, documentId, user, corps = {}, { ip = null 
   const qui = await integrite.identite(user);
   const { rows } = await db.query(
     `INSERT INTO document_partages (tenant_id, document_id, version_mode, fichier_id, version_numero, jeton_hash, libelle,
-                                    mot_de_passe_hash, expire_at, max_telechargements, cree_par, cree_par_nom)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+                                    mot_de_passe_hash, expire_at, max_telechargements, cree_par, cree_par_nom, autorisation_communication)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
     [tenantId, documentId, versionMode, fichier ? fichier.id : null, fichier ? fichier.version : null, empreinteJeton(jeton),
-      libelle || null, motDePasse ? await bcrypt.hash(motDePasse, 10) : null, expireAt, max, qui.id, qui.nom]
+      libelle || null, motDePasse ? await bcrypt.hash(motDePasse, 10) : null, expireAt, max, qui.id, qui.nom, autorisation]
   );
   const p = rows[0];
+  if (autorisation) {
+    await documentAuditService.logAction({
+      tenantId, documentId, userId: qui.id, username: qui.username, ipAddress: ip,
+      action: 'COMMUNICATION_ANTICIPEE',
+      details: { partage_id: p.id, autorisation, communicable_le: comm.a_partir_du, categorie: comm.categorie },
+    });
+  }
   await documentAuditService.logAction({
     tenantId, documentId, userId: qui.id, username: qui.username, ipAddress: ip,
     action: 'PARTAGE_CREE',

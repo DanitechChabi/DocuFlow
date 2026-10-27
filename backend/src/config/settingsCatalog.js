@@ -261,6 +261,13 @@ const CATALOG = [
   { key: 'journal_scellement_auto', group: 'archives', label: 'Sceller le journal chaque jour',
     description: "Fige chaque jour l'empreinte de tête du journal d'audit chaîné. Conservez le relevé des sceaux hors de DocuFlow : il prouve qu'aucune entrée passée n'a été réécrite.",
     type: 'boolean', default: 'true' },
+  // -------------------------------------------- ARCHIVES DU BÉNIN (036)
+  { key: 'elimination_visa_requis', group: 'archives', label: "Visa de l'autorité d'archives avant toute élimination",
+    description: "Décret n° 2007-532, art. 44 : les listes de documents à éliminer sont soumises à la Direction des Archives Nationales, et la destruction a lieu sous son contrôle. Activé, un bordereau validé en interne doit être transmis puis visé avant d'être exécuté.",
+    type: 'boolean', default: 'true' },
+  { key: 'archives_autorite', group: 'archives', label: "Autorité d'archives compétente",
+    description: "Service qui vise les éliminations et reçoit les versements : la Direction des Archives Nationales, ou la Direction des Archives Départementales qui la représente (art. 24).",
+    type: 'string', default: 'Direction des Archives Nationales (DAN)' },
 
   // ------------------------------------------------------- COLLABORATION (033)
   { key: 'partage_public_actif', group: 'collaboration', label: 'Liens de partage publics',

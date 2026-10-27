@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, Link } from 'react-router-dom';
 import { Printer, Loader2, ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
-import { archivageService, dateFr, taille } from '../services/archivageService';
+import { archivageService, DECISIONS_VISA, MODES_DESTRUCTION, dateFr, taille } from '../services/archivageService';
 import { empreinteGroupee } from '../services/archivesService';
 import { useTitrePage } from '../hooks/useTitrePage';
 
@@ -33,6 +33,8 @@ const Pv = ({ pv }) => {
           <dt>Proposé par</dt><dd>{b.propose_par_nom || '—'} le {dateFr(b.propose_at)}</dd>
           <dt>Validé par</dt><dd>{b.valide_par_nom || '—'} le {dateFr(b.valide_at)}</dd>
           <dt>Exécuté par</dt><dd>{b.execute_par_nom || '—'} le {dateFr(b.execute_at)}</dd>
+          {b.visa_numero && (<><dt>Visa de l'autorité</dt><dd>{DECISIONS_VISA[b.visa_decision]} n° {b.visa_numero} du {dateFr(b.visa_date)}{b.visa_autorite ? ` — ${b.visa_autorite}` : ''}</dd></>)}
+          {b.mode_destruction && (<><dt>Destruction</dt><dd>{MODES_DESTRUCTION[b.mode_destruction]}{b.prestataire ? ` : ${b.prestataire}` : ''}{b.controle_par ? ` — sous le contrôle de ${b.controle_par}` : ''}</dd></>)}
         </dl>
       </section>
       <section>

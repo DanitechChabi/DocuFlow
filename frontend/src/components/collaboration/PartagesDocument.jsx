@@ -35,6 +35,8 @@ const PartagesDocument = ({ documentId, fichiers = [] }) => {
   const [options, setOptions] = useState({ duree_jours: '', mot_de_passe: '', max_telechargements: '', fichier_id: '', libelle: '' });
   const [envoi, setEnvoi] = useState(false);
   const [nouveau, setNouveau] = useState(null);
+  // Décret n° 2007-532, art. 32-33 : document pas encore communicable au public.
+  const [nonCommunicable, setNonCommunicable] = useState(null);
 
   const charger = useCallback(() => {
     collaborationService.partages(documentId).then(setEtat).catch(() => setEtat({ indisponible: true }));
@@ -56,9 +58,11 @@ const PartagesDocument = ({ documentId, fichiers = [] }) => {
       copier(url);
       setFormulaire(false);
       setOptions({ duree_jours: '', mot_de_passe: '', max_telechargements: '', fichier_id: '', libelle: '' });
+      setNonCommunicable(null);
       charger();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Création du lien impossible');
+      if (err.response?.data?.code === 'NON_COMMUNICABLE') setNonCommunicable(err.response.data.message);
+      else toast.error(err.response?.data?.message || 'Création du lien impossible');
     } finally {
       setEnvoi(false);
     }
@@ -114,8 +118,17 @@ const PartagesDocument = ({ documentId, fichiers = [] }) => {
                   <option value="">Toujours la version courante</option>
                   {fichiers.map((f) => <option key={f.id} value={f.id}>Version {f.version} — {f.original_name}</option>)}
                 </select></label>
+              {nonCommunicable && (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 space-y-1.5">
+                  <p className="text-amber-800">{nonCommunicable}</p>
+                  {can('archives.communicate') ? (
+                    <label className="block space-y-1"><span className="font-semibold text-slate-600">Autorisation de communication anticipée (référence)</span>
+                      <input className="input-premium text-sm" required maxLength={500} placeholder="Ex. Comité permanent, avis n° 4/2026 du 12/03/2026" {...champ('autorisation_communication')} /></label>
+                  ) : <p className="text-amber-800">Demandez à un gestionnaire des archives habilité d'enregistrer l'autorisation.</p>}
+                </div>
+              )}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setFormulaire(false)} className="btn btn-secondary btn-sm">Annuler</button>
+                <button type="button" onClick={() => { setFormulaire(false); setNonCommunicable(null); }} className="btn btn-secondary btn-sm">Annuler</button>
                 <button type="submit" disabled={envoi} className="btn btn-primary btn-sm">{envoi && <Loader2 size={13} className="animate-spin" />} Créer le lien</button>
               </div>
             </form>

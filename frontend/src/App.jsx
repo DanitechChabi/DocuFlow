@@ -6,6 +6,7 @@ import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import Dashboard from './pages/Dashboard';
 import HomePage from './pages/HomePage';
 import MonEspacePage from './pages/MonEspacePage';
+import BordereauImprimablePage from './pages/BordereauImprimablePage';
 import DocumentsPage from './pages/DocumentsPage';
 import CorbeillePage from './pages/CorbeillePage';
 import PretsPage from './pages/PretsPage';
@@ -125,6 +126,8 @@ function App() {
           <Route path="/documents/recherche" element={<RecherchePage />} />
           <Route path="/documents/echeances" element={<EcheancesPage />} />
           <Route path="/documents/archivage/bordereaux/:id/pv" element={<ProcesVerbalPage />} />
+          <Route path="/documents/archivage/bordereaux/:id/imprimer" element={<BordereauImprimablePage type="elimination" />} />
+          <Route path="/documents/archivage/versements/:id/imprimer" element={<BordereauImprimablePage type="versement" />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

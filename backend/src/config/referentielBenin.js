@@ -31,7 +31,7 @@
 /** Catégories de communicabilité (D. 2007-532, art. 32 et 33). */
 const COMMUNICABILITE = {
   libre: { libelle: 'Communicable immédiatement', annees: 0, depart: 'date_document', ref: 'D. 2007-532, art. 32 al. 4' },
-  general: { libelle: '30 ans après le document', annees: 30, depart: 'date_document', ref: 'D. 2007-532, art. 32' },
+  general: { libelle: '30 ans après le document, une fois versé aux archives publiques', annees: 30, depart: 'date_document', ref: 'D. 2007-532, art. 32', apres_versement: true },
   etat_civil: { libelle: "100 ans après la date de l'acte (état civil, minutes notariales, enregistrement)", annees: 100, depart: 'date_document', ref: 'D. 2007-532, art. 33' },
   medical: { libelle: '100 ans après la naissance de la personne (renseignements médicaux)', annees: 100, depart: 'naissance', ref: 'D. 2007-532, art. 33' },
   personnel: { libelle: '90 ans après la naissance de la personne (dossiers de personnel)', annees: 90, depart: 'naissance', ref: 'D. 2007-532, art. 33' },

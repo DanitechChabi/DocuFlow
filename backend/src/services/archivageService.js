@@ -33,11 +33,17 @@ const aclService = require('./aclService');
 const roleService = require('./roleService');
 const integrite = require('./integriteService');
 const stateMachine = require('./documentStateMachine');
+const { COMMUNICABILITE } = require('../config/referentielBenin');
 
 const POINTS_DEPART = ['date_document', 'creation', 'archivage'];
 const SORTS = ['conservation', 'elimination', 'tri'];
-const STATUTS_BORDEREAU = ['brouillon', 'propose', 'valide', 'rejete', 'execute', 'annule'];
-const OUVERTS = ['brouillon', 'propose', 'valide'];
+const STATUTS_BORDEREAU = ['brouillon', 'propose', 'valide', 'transmis', 'vise', 'rejete', 'execute', 'annule'];
+const OUVERTS = ['brouillon', 'propose', 'valide', 'transmis', 'vise'];
+// Après la validation interne, plus rien ne s'ajoute : la corbeille est admise
+// (le document attend sa destruction), la liste est celle que l'autorité vise.
+const ARRETES = ['valide', 'transmis', 'vise'];
+const DECISIONS_VISA = ['accorde', 'partiel', 'refuse'];
+const MODES_DESTRUCTION = ['sur_place', 'prestataire'];
 const LIBELLES_POINT_DEPART = {
   date_document: 'la date du document', creation: "l'entrée dans la GED", archivage: "l'archivage",
 };
@@ -55,6 +61,7 @@ const MOTIFS = {
   decision_conservation: 'Conservé par décision.',
   autre_bordereau: "Déjà inscrit sur un autre bordereau en cours.",
   absent: 'Document détruit depuis (purge).',
+  exclu_visa: "Exclu par le visa de l'autorité d'archives.",
 };
 
 const erreur = (status, message, code, extra = {}) => Object.assign(new Error(message), { status, ...(code ? { code } : {}), ...extra });
@@ -114,10 +121,18 @@ function calculerEcheance(doc, regle, aujourdhui = jourDe(new Date())) {
 }
 
 /** Règle de DUA saisie : normalisée, ou erreur 400. */
+function validerCommunicabilite(v) {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  if (!Object.prototype.hasOwnProperty.call(COMMUNICABILITE, v)) throw erreur(400, 'Catégorie de communicabilité inconnue (décret n° 2007-532, art. 32-33).');
+  return v;
+}
+
 function validerRegle(body = {}) {
   const brut = body.dua_annees;
+  const communicabilite = validerCommunicabilite(body.communicabilite);
   if (brut === null || brut === undefined || brut === '') {
-    return { dua_annees: null, dua_point_depart: POINTS_DEPART.includes(body.dua_point_depart) ? body.dua_point_depart : 'date_document', sort_final: null, dua_reference: String(body.dua_reference || '').trim().slice(0, 2000) || null };
+    return { dua_annees: null, dua_point_depart: POINTS_DEPART.includes(body.dua_point_depart) ? body.dua_point_depart : 'date_document', sort_final: null, dua_reference: String(body.dua_reference || '').trim().slice(0, 2000) || null, communicabilite };
   }
   const annees = Number(brut);
   if (!Number.isInteger(annees) || annees < 0 || annees > 200) throw erreur(400, 'La DUA est un nombre entier d\'années, de 0 à 200.');
@@ -126,7 +141,7 @@ function validerRegle(body = {}) {
   if (!SORTS.includes(body.sort_final)) throw erreur(400, 'Sort final attendu : conservation, élimination ou tri.');
   const ref = String(body.dua_reference || '').trim();
   if (ref.length > 2000) throw erreur(400, 'Référence trop longue (2 000 caractères au plus).');
-  return { dua_annees: annees, dua_point_depart: point, sort_final: body.sort_final, dua_reference: ref || null };
+  return { dua_annees: annees, dua_point_depart: point, sort_final: body.sort_final, dua_reference: ref || null, communicabilite };
 }
 
 /** Intitulé lisible : le titre calculé par la classe, sinon la fiche. */
@@ -168,8 +183,12 @@ function actionsPermises(b, userId, droits) {
     valider: valideur && b.statut === 'propose',
     rejeter: valideur && b.statut === 'propose',
     reprendre: droits.manage && b.statut === 'rejete',
-    executer: droits.manage && b.statut === 'valide',
-    annuler: droits.manage && ['brouillon', 'propose', 'rejete', 'valide'].includes(b.statut),
+    // Décret n° 2007-532, art. 44 : la liste validée est soumise à l'autorité
+    // d'archives, qui la vise ; l'exécution attend ce visa.
+    transmettre: droits.manage && b.statut === 'valide' && Boolean(b.visa_requis),
+    saisir_visa: droits.manage && b.statut === 'transmis',
+    executer: droits.manage && (b.visa_requis ? b.statut === 'vise' : b.statut === 'valide'),
+    annuler: droits.manage && ['brouillon', 'propose', 'rejete', 'valide', 'transmis', 'vise'].includes(b.statut),
     separation: droits.validate && auteur && b.statut === 'propose',
   };
 }
@@ -183,6 +202,12 @@ function corpsPv(b, lignes) {
     propose_par: b.propose_par_nom, propose_at: iso(b.propose_at),
     valide_par: b.valide_par_nom, valide_at: iso(b.valide_at),
     execute_par: b.execute_par_nom, execute_at: iso(b.execute_at),
+    // Ajoutés par la migration 036, et seulement s'ils sont renseignés : les
+    // procès-verbaux antérieurs gardent exactement leur empreinte.
+    ...(b.visa_numero || b.visa_decision ? {
+      visa: { autorite: b.visa_autorite, numero: b.visa_numero, date: b.visa_date ? jourDe(b.visa_date) : null, decision: b.visa_decision },
+    } : {}),
+    ...(b.mode_destruction ? { destruction: { mode: b.mode_destruction, prestataire: b.prestataire || null, controle_par: b.controle_par || null } } : {}),
     lignes: lignes.map((l) => ({
       ordre: l.ordre, reference: l.reference, intitule: l.intitule, classe: l.classe, echeance: l.echeance,
       sort_final: l.sort_final, resultat: l.resultat, motif_ecart: l.motif_ecart || null,
@@ -260,7 +285,7 @@ const SQL_ECHEANCES = `
   SELECT d.id, d.tenant_id, d.reference_mfile, d.description, d.nom_entreprise, d.num_dossier, d.num_acte,
          d.type_document, d.annee, d.statut, d.dossier_id, d.classe_id, d.deleted_at, d.elimine_at,
          to_char(d.date_document, 'YYYY-MM-DD') AS date_document, d.created_at, d.archive_at,
-         c.name AS classe, c.code AS classe_code, c.dua_annees, c.dua_point_depart, c.sort_final, c.dua_reference,
+         c.name AS classe, c.code AS classe_code, c.dua_annees, c.dua_point_depart, c.sort_final, c.dua_reference, c.communicabilite,
          fo.name AS dossier,
          to_char(x.depart, 'YYYY-MM-DD') AS depart, COALESCE(x.estime, false) AS depart_estime,
          to_char((x.depart + make_interval(years => c.dua_annees))::date, 'YYYY-MM-DD') AS echeance,
@@ -285,7 +310,7 @@ const SQL_ECHEANCES = `
     LEFT JOIN LATERAL (
       SELECT b.id, b.numero, b.statut FROM bordereau_documents l
         JOIN bordereaux_elimination b ON b.id = l.bordereau_id
-       WHERE l.document_id = d.id AND b.statut IN ('brouillon', 'propose', 'valide')
+       WHERE l.document_id = d.id AND b.statut IN ('brouillon', 'propose', 'valide', 'transmis', 'vise')
        ORDER BY b.id DESC LIMIT 1
     ) bo ON true
    WHERE d.tenant_id = $1`;
@@ -318,11 +343,13 @@ async function definirDua(tenantId, classeId, body, user) {
       'SELECT * FROM metadata_schemas WHERE id = $1 AND tenant_id = $2 AND is_default IS NOT TRUE FOR UPDATE', [classeId, tenantId])).rows[0];
     if (!avant) throw erreur(404, 'Classe introuvable.');
     const { rows } = await c.query(
-      `UPDATE metadata_schemas SET dua_annees = $3, dua_point_depart = $4, sort_final = $5, dua_reference = $6, updated_at = CURRENT_TIMESTAMP
+      `UPDATE metadata_schemas SET dua_annees = $3, dua_point_depart = $4, sort_final = $5, dua_reference = $6,
+              communicabilite = CASE WHEN $7::boolean THEN $8 ELSE communicabilite END, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND tenant_id = $2 RETURNING *`,
-      [classeId, tenantId, regle.dua_annees, regle.dua_point_depart, regle.sort_final, regle.dua_reference]
+      [classeId, tenantId, regle.dua_annees, regle.dua_point_depart, regle.sort_final, regle.dua_reference,
+        regle.communicabilite !== undefined, regle.communicabilite ?? null]
     );
-    const resume = (s) => ({ dua_annees: s.dua_annees, point_depart: s.dua_point_depart, sort_final: s.sort_final, reference: s.dua_reference });
+    const resume = (s) => ({ dua_annees: s.dua_annees, point_depart: s.dua_point_depart, sort_final: s.sort_final, reference: s.dua_reference, communicabilite: s.communicabilite || null });
     await journaliser(c, {
       tenantId, qui, action: 'DUA_MODIFIEE', objectType: 'classe', objectId: classeId,
       details: { classe: avant.name, avant: resume(avant), apres: resume(rows[0]) },
@@ -405,7 +432,8 @@ async function vueSortFinal(tenantId, user, { horizon = 6, classeId = null, sort
 async function echeanceDocument(tenantId, documentId) {
   const r = (await lireEcheances(db, tenantId, [Number(documentId)])).get(Number(documentId));
   if (!r) return null;
-  return { ...versLigne(r), libelle_point_depart: LIBELLES_POINT_DEPART[r.dua_point_depart] || null };
+  const communicabilite = await require('./communicabiliteService').etatDocument(tenantId, Number(documentId)).catch(() => null);
+  return { ...versLigne(r), libelle_point_depart: LIBELLES_POINT_DEPART[r.dua_point_depart] || null, communicabilite };
 }
 
 // ---------------------------------------------------------------- décisions
@@ -490,7 +518,7 @@ const SQL_LIGNES = `
          l.type_document, l.annee, to_char(l.date_document, 'YYYY-MM-DD') AS date_document, l.cree_le, l.archive_le,
          to_char(l.depart, 'YYYY-MM-DD') AS depart, l.dua_annees, l.point_depart,
          to_char(l.echeance, 'YYYY-MM-DD') AS echeance, l.sort_final, l.dua_reference,
-         l.nb_fichiers, l.volume_octets, l.fichiers, l.resultat, l.motif_ecart, l.ajoute_at, l.elimine_at,
+         l.nb_fichiers, l.volume_octets, l.fichiers, l.resultat, l.motif_ecart, l.ajoute_at, l.elimine_at, l.exclu_visa,
          d.dossier_id AS dossier_actuel
     FROM bordereau_documents l LEFT JOIN documents d ON d.id = l.document_id
    WHERE l.bordereau_id = $1
@@ -577,7 +605,7 @@ async function listerBordereaux(tenantId, { statut = null } = {}) {
        FROM bordereaux_elimination b LEFT JOIN bordereau_documents l ON l.bordereau_id = b.id
       WHERE b.tenant_id = $1${filtre}
       GROUP BY b.id
-      ORDER BY (b.statut IN ('propose', 'valide')) DESC, b.created_at DESC
+      ORDER BY (b.statut IN ('propose', 'valide', 'transmis', 'vise')) DESC, b.created_at DESC
       LIMIT 500`, params);
   return rows.map((r) => ({ ...versBordereau(r), volume_octets: Number(r.volume_octets) }));
 }
@@ -605,14 +633,15 @@ async function detailBordereau(tenantId, id, user) {
     const etats = ids.length ? await lireEcheances(db, tenantId, ids) : new Map();
     for (const l of lignes) {
       if (l.masque) continue;
-      const motif = l.document_id ? motifNonEligible(etats.get(l.document_id), { bordereauId: b.id, corbeilleAdmise: b.statut === 'valide' }) : 'absent';
-      l.alerte = motif ? MOTIFS[motif] : null;
+      const motif = l.document_id ? motifNonEligible(etats.get(l.document_id), { bordereauId: b.id, corbeilleAdmise: ARRETES.includes(b.statut) }) : 'absent';
+      l.alerte = l.exclu_visa ? MOTIFS.exclu_visa : (motif ? MOTIFS[motif] : null);
       l.gel = Boolean(l.document_id && etats.get(l.document_id)?.gel_id);
     }
   }
   const droits = await droitsDe(tenantId, user);
   return {
     ...versBordereau(b),
+    organisation: await organisationDe(tenantId),
     lignes,
     totaux: {
       documents: lignes.length,
@@ -771,7 +800,9 @@ async function proposer(tenantId, id, user) {
     if (bloquants.length) {
       throw erreur(409, `${bloquants.length} document(s) ne sont plus éliminables : retirez-les avant de proposer.`, 'LIGNES_NON_ELIGIBLES', { lignes: bloquants });
     }
-    const r = await passer(c, b, 'brouillon', 'propose_par = $4, propose_par_nom = $5, propose_at = now()', ['propose', qui.id, qui.nom]);
+    const reglages = await require('./settingsService').getAll(tenantId);
+    const r = await passer(c, b, 'brouillon', 'propose_par = $4, propose_par_nom = $5, propose_at = now(), visa_requis = $6',
+      ['propose', qui.id, qui.nom, reglages.elimination_visa_requis !== false]);
     await journaliser(c, { tenantId, qui, action: 'ELIMINATION_PROPOSEE', objectType: 'bordereau_elimination', objectId: b.id, details: { numero: b.numero, documents: lignes.length } });
     await journaliserLignes(c, tenantId, qui, lignes, 'ELIMINATION_PROPOSEE', { bordereau: b.numero });
     return r;
@@ -808,7 +839,9 @@ async function statuer(tenantId, id, user, { valider, motif }) {
   });
   await notifier(tenantId, [b2.propose_par], valider ? {
     titre: `Bordereau validé : ${b2.numero}`,
-    message: `${qui.nom} a validé « ${b2.intitule} ». L'élimination peut être exécutée (Archivage › Éliminations).`,
+    message: b2.visa_requis
+      ? `${qui.nom} a validé « ${b2.intitule} ». Transmettez-le à l'autorité d'archives pour visa (Archivage › Éliminations).`
+      : `${qui.nom} a validé « ${b2.intitule} ». L'élimination peut être exécutée (Archivage › Éliminations).`,
   } : {
     titre: `Bordereau rejeté : ${b2.numero}`,
     message: `${qui.nom} a rejeté « ${b2.intitule} » : ${texte}`,
@@ -832,7 +865,11 @@ async function reprendre(tenantId, id, user) {
   return transaction(async (c) => {
     const b = await chargerBordereau(c, tenantId, id, { verrou: true });
     exigerStatut(b, ['rejete'], 'Seul un bordereau rejeté se reprend.');
-    const r = await passer(c, b, 'rejete', 'propose_par = NULL, propose_par_nom = NULL, propose_at = NULL', ['brouillon']);
+    // Un visa refusé se reprend aussi : la prochaine transmission repart d'une page blanche.
+    await c.query('UPDATE bordereau_documents SET exclu_visa = false WHERE bordereau_id = $1 AND exclu_visa', [b.id]);
+    const r = await passer(c, b, 'rejete', `propose_par = NULL, propose_par_nom = NULL, propose_at = NULL,
+      transmis_par = NULL, transmis_par_nom = NULL, transmis_at = NULL, visa_numero = NULL, visa_date = NULL, visa_decision = NULL,
+      visa_observations = NULL, visa_piece_document_id = NULL, visa_saisi_par = NULL, visa_saisi_par_nom = NULL, visa_saisi_at = NULL`, ['brouillon']);
     await journaliser(c, { tenantId, qui, action: 'BORDEREAU_REPRIS', objectType: 'bordereau_elimination', objectId: b.id, details: { numero: b.numero } });
     return versBordereau(r);
   });
@@ -843,11 +880,85 @@ async function annuler(tenantId, id, { motif } = {}, user) {
   const texte = String(motif || '').trim().slice(0, 2000);
   return transaction(async (c) => {
     const b = await chargerBordereau(c, tenantId, id, { verrou: true });
-    exigerStatut(b, ['brouillon', 'propose', 'rejete', 'valide'], 'Ce bordereau ne s\'annule plus.');
+    exigerStatut(b, ['brouillon', 'propose', 'rejete', 'valide', 'transmis', 'vise'], 'Ce bordereau ne s\'annule plus.');
     const r = await passer(c, b, b.statut, 'annule_par = $4, annule_par_nom = $5, annule_at = now(), motif_annulation = $6', ['annule', qui.id, qui.nom, texte || null]);
     await journaliser(c, { tenantId, qui, action: 'BORDEREAU_ANNULE', objectType: 'bordereau_elimination', objectId: b.id, details: { numero: b.numero, motif: texte || null } });
     return versBordereau(r);
   });
+}
+
+/**
+ * TRANSMISSION à l'autorité d'archives (décret n° 2007-532, art. 44) : le
+ * bordereau validé est imprimé et envoyé ; il ne bouge plus jusqu'au visa.
+ */
+async function transmettre(tenantId, id, user) {
+  const qui = await integrite.identite(user);
+  return transaction(async (c) => {
+    const b = await chargerBordereau(c, tenantId, id, { verrou: true });
+    exigerStatut(b, ['valide'], 'Seul un bordereau validé se transmet.');
+    if (!b.visa_requis) throw erreur(409, "Ce bordereau a été proposé sans exigence de visa : il s'exécute directement.", 'VISA_NON_REQUIS');
+    await exigerPerimetreComplet(c, tenantId, b, user);
+    const reglages = await require('./settingsService').getAll(tenantId);
+    const r = await passer(c, b, 'valide', 'transmis_par = $4, transmis_par_nom = $5, transmis_at = now(), visa_autorite = $6',
+      ['transmis', qui.id, qui.nom, String(reglages.archives_autorite || '').trim().slice(0, 200) || 'Direction des Archives Nationales (DAN)']);
+    await journaliser(c, { tenantId, qui, action: 'ELIMINATION_TRANSMISE', objectType: 'bordereau_elimination', objectId: b.id, details: { numero: b.numero, autorite: r.visa_autorite } });
+    return versBordereau(r);
+  });
+}
+
+/**
+ * VISA reçu de l'autorité d'archives : enregistré tel qu'il est (numéro, date,
+ * décision, observations, courrier scanné dans la GED). Un visa partiel exclut
+ * des lignes, un refus rejette le bordereau.
+ */
+async function enregistrerVisa(tenantId, id, body = {}, user) {
+  const qui = await integrite.identite(user);
+  const decision = body.decision;
+  if (!DECISIONS_VISA.includes(decision)) throw erreur(400, 'Décision attendue : visa accordé, partiel ou refusé.');
+  const numero = String(body.numero || '').trim();
+  if (!numero) throw erreur(400, 'Le numéro (référence) du visa est obligatoire.');
+  if (numero.length > 100) throw erreur(400, 'Numéro de visa trop long (100 caractères au plus).');
+  const date = String(body.date || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw erreur(400, 'Date du visa attendue (AAAA-MM-JJ).');
+  if (date > jourDe(new Date())) throw erreur(400, 'La date du visa ne peut pas être dans le futur.');
+  const observations = String(body.observations || '').trim();
+  if (observations.length > 4000) throw erreur(400, 'Observations trop longues (4 000 caractères au plus).');
+  if (decision === 'refuse' && !observations) throw erreur(400, 'Un refus de visa se motive : reportez les observations de l\'autorité.');
+  const autorite = String(body.autorite || '').trim().slice(0, 200);
+  const exclus = [...new Set((Array.isArray(body.exclus) ? body.exclus : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (decision === 'partiel' && !exclus.length) throw erreur(400, 'Un visa partiel désigne les documents que l\'autorité exclut de l\'élimination.');
+  const piece = body.piece_document_id ? Number(body.piece_document_id) : null;
+  const lisible = await perimetre(tenantId, user.id);
+  const b2 = await transaction(async (c) => {
+    const b = await chargerBordereau(c, tenantId, id, { verrou: true });
+    exigerStatut(b, ['transmis'], "Seul un bordereau transmis à l'autorité reçoit son visa.");
+    const lignes = await exigerPerimetreComplet(c, tenantId, b, user);
+    if (piece) {
+      const d = (await c.query('SELECT dossier_id FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [piece, tenantId])).rows[0];
+      if (!d || !lisible(d.dossier_id)) throw erreur(400, 'Pièce introuvable : versez d\'abord le courrier de visa dans la GED.');
+    }
+    if (decision === 'partiel') {
+      const inscrits = new Set(lignes.map((l) => Number(l.document_id)));
+      const inconnus = exclus.filter((d) => !inscrits.has(d));
+      if (inconnus.length) throw erreur(400, 'Un document exclu ne figure pas sur ce bordereau.');
+      if (exclus.length >= lignes.length) throw erreur(400, 'Tous les documents sont exclus : enregistrez un refus de visa.');
+      await c.query('UPDATE bordereau_documents SET exclu_visa = true WHERE bordereau_id = $1 AND document_id = ANY($2::int[])', [b.id, exclus]);
+    }
+    const champs = `visa_numero = $4, visa_date = $5, visa_decision = $6, visa_observations = $7, visa_piece_document_id = $8,
+                    visa_saisi_par = $9, visa_saisi_par_nom = $10, visa_saisi_at = now(), visa_autorite = COALESCE(NULLIF($11, ''), visa_autorite)`;
+    const valeurs = [numero, date, decision, observations || null, piece, qui.id, qui.nom, autorite];
+    const r = decision === 'refuse'
+      ? await passer(c, b, 'transmis', `${champs}, rejete_par = $9, rejete_par_nom = $10, rejete_at = now(), motif_rejet = $12`,
+        ['rejete', ...valeurs, `Visa refusé par ${autorite || b.visa_autorite || "l'autorité d'archives"} (n° ${numero}) : ${observations}`])
+      : await passer(c, b, 'transmis', champs, ['vise', ...valeurs]);
+    const action = decision === 'refuse' ? 'VISA_ELIMINATION_REFUSE' : 'VISA_ELIMINATION_ACCORDE';
+    await journaliser(c, {
+      tenantId, qui, action, objectType: 'bordereau_elimination', objectId: b.id,
+      details: { numero: b.numero, visa: numero, date, decision, autorite: r.visa_autorite, exclus: decision === 'partiel' ? exclus : [] },
+    });
+    return r;
+  });
+  return versBordereau(b2);
 }
 
 /**
@@ -878,11 +989,22 @@ async function constater(fichiers) {
  * en base, pierre tombale, traces. Un échec sur une ligne l'écarte sans
  * défaire les autres. Les binaires partent après le COMMIT.
  */
-async function executer(tenantId, id, user) {
+async function executer(tenantId, id, user, corps = {}) {
   const qui = await integrite.identite(user);
+  // Décret n° 2007-532, art. 44 : destruction sur place, ou confiée à une
+  // entreprise spécialisée, sous le contrôle de l'autorité d'archives.
+  const mode = corps.mode_destruction || null;
+  if (mode !== null && !MODES_DESTRUCTION.includes(mode)) throw erreur(400, 'Mode de destruction attendu : sur place ou par un prestataire.');
+  const prestataire = String(corps.prestataire || '').trim().slice(0, 200) || null;
+  if (mode === 'prestataire' && !prestataire) throw erreur(400, 'Nommez l\'entreprise chargée de la destruction.');
+  const controle = String(corps.controle_par || '').trim().slice(0, 200) || null;
   // Lecture des fichiers AVANT la transaction (aucun verrou tenu pendant les E/S).
   const prealable = await chargerBordereau(db, tenantId, id);
-  exigerStatut(prealable, ['valide'], 'Seul un bordereau validé s\'exécute.');
+  const attendu = prealable.visa_requis ? 'vise' : 'valide';
+  exigerStatut(prealable, [attendu], prealable.visa_requis
+    ? "L'élimination attend le visa de l'autorité d'archives (décret n° 2007-532, art. 44)."
+    : 'Seul un bordereau validé s\'exécute.');
+  if (prealable.visa_requis && !mode) throw erreur(400, 'Précisez le mode de destruction (sur place ou par un prestataire).');
   const avant = await lignesDe(db, prealable.id);
   const constats = new Map();
   for (const l of avant) {
@@ -893,7 +1015,7 @@ async function executer(tenantId, id, user) {
   const binaires = [];
   const resultat = await transaction(async (c) => {
     const b = await chargerBordereau(c, tenantId, id, { verrou: true });
-    exigerStatut(b, ['valide'], 'Seul un bordereau validé s\'exécute.');
+    exigerStatut(b, [attendu], "Le bordereau a changé d'état entre-temps : rechargez-le.");
     const lignes = await exigerPerimetreComplet(c, tenantId, b, user);
     const ids = lignes.filter((l) => l.document_id).map((l) => l.document_id);
     if (ids.length) await c.query('SELECT id FROM documents WHERE id = ANY($1::int[]) AND tenant_id = $2 ORDER BY id FOR UPDATE', [ids, tenantId]);
@@ -902,7 +1024,7 @@ async function executer(tenantId, id, user) {
     const ecartes = [];
     for (const l of lignes) {
       const r = l.document_id ? etats.get(l.document_id) : null;
-      const motif = l.document_id ? motifNonEligible(r, { bordereauId: b.id, corbeilleAdmise: true }) : 'absent';
+      const motif = l.exclu_visa ? 'exclu_visa' : (l.document_id ? motifNonEligible(r, { bordereauId: b.id, corbeilleAdmise: true }) : 'absent');
       if (motif) {
         await c.query("UPDATE bordereau_documents SET resultat = 'ecarte', motif_ecart = $2 WHERE id = $1", [l.id, MOTIFS[motif]]);
         ecartes.push({ document_id: l.document_id, reference: l.reference, motif: MOTIFS[motif] });
@@ -968,8 +1090,9 @@ async function executer(tenantId, id, user) {
     // « exécuté » (un UPDATE ultérieur échouerait et ferait avorter la
     // transaction entière).
     let fin = (await c.query(
-      `UPDATE bordereaux_elimination SET execute_par = $2, execute_par_nom = $3, execute_at = now()
-        WHERE id = $1 AND statut = 'valide' RETURNING *`, [b.id, qui.id, qui.nom])).rows[0];
+      `UPDATE bordereaux_elimination SET execute_par = $2, execute_par_nom = $3, execute_at = now(),
+              mode_destruction = $5, prestataire = $6, controle_par = $7
+        WHERE id = $1 AND statut = $4 RETURNING *`, [b.id, qui.id, qui.nom, attendu, mode, mode === 'prestataire' ? prestataire : null, controle])).rows[0];
     const empreinte = empreintePv(fin, await lignesDe(c, b.id));
     fin = (await c.query("UPDATE bordereaux_elimination SET statut = 'execute', empreinte_pv = $2 WHERE id = $1 RETURNING *", [b.id, empreinte])).rows[0];
     await journaliser(c, {
@@ -1008,6 +1131,13 @@ async function executer(tenantId, id, user) {
     message: `${resultat.elimines.length} document(s) éliminé(s)${resultat.ecartes.length ? `, ${resultat.ecartes.length} écarté(s)` : ''}. Procès-verbal disponible dans Archivage › Éliminations.`,
   });
   return { ...resultat, stockage_echecs: echecs };
+}
+
+/** Organisation qui produit le bordereau (en-tête des pièces imprimées). */
+async function organisationDe(tenantId) {
+  const reglages = await require('./settingsService').getAll(tenantId);
+  const t = await db.query('SELECT name FROM tenants WHERE id = $1', [tenantId]);
+  return { nom: reglages.legal_entity || t.rows[0]?.name || null, adresse: reglages.legal_address || null, autorite: reglages.archives_autorite || null };
 }
 
 /** Procès-verbal d'un bordereau exécuté, empreinte recalculée et comparée. */
@@ -1054,5 +1184,8 @@ module.exports = {
   migrationPassee, definirDua, vueSortFinal, echeanceDocument, decider, annulerDecision,
   listerBordereaux, detailBordereau, creerBordereau, modifierBordereau, ajouterDocuments, retirerDocument,
   proposer, valider: (t, id, u) => statuer(t, id, u, { valider: true }), rejeter: (t, id, u, motif) => statuer(t, id, u, { valider: false, motif }),
-  retirerProposition, reprendre, annuler, executer, procesVerbal,
+  retirerProposition, reprendre, annuler, executer, procesVerbal, transmettre, enregistrerVisa,
+  DECISIONS_VISA, MODES_DESTRUCTION,
+  // Pour versementService : mêmes échéances, mêmes instantanés, même journal.
+  internes: { organisationDe, lireEcheances, fichiersDe, instantane, perimetre, journaliser, historique, notifier, transaction, erreur, jourDe },
 };

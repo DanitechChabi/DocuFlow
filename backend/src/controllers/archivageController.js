@@ -5,6 +5,7 @@
 // périmètre vivent dans archivageService ; ici, la traduction HTTP.
 // ============================================================================
 const archivage = require('../services/archivageService');
+const versements = require('../services/versementService');
 const { verifierAccesDocument, repondreRefus } = require('../helpers/accesDocument');
 
 const erreur = (res, err, message) => {
@@ -46,5 +47,26 @@ exports.valider = action((req) => archivage.valider(t(req), req.params.id, req.u
 exports.rejeter = action((req) => archivage.rejeter(t(req), req.params.id, req.user, req.body?.motif), 'Rejet impossible');
 exports.reprendre = action((req) => archivage.reprendre(t(req), req.params.id, req.user), 'Reprise impossible');
 exports.annuler = action((req) => archivage.annuler(t(req), req.params.id, req.body || {}, req.user), 'Annulation impossible');
-exports.executer = action((req) => archivage.executer(t(req), req.params.id, req.user), "Exécution de l'élimination impossible");
+exports.executer = action((req) => archivage.executer(t(req), req.params.id, req.user, req.body || {}), "Exécution de l'élimination impossible");
+exports.transmettre = action((req) => archivage.transmettre(t(req), req.params.id, req.user), "Transmission à l'autorité d'archives impossible");
+exports.visa = action((req) => archivage.enregistrerVisa(t(req), req.params.id, req.body || {}, req.user), 'Enregistrement du visa impossible');
 exports.procesVerbal = action((req) => archivage.procesVerbal(t(req), req.params.id, req.user), 'Édition du procès-verbal impossible');
+
+// ------------------------------------------- bordereaux de versement (036)
+exports.versements = action((req) => versements.lister(t(req)), 'Chargement des versements impossible');
+exports.versement = action((req) => versements.detail(t(req), req.params.id, req.user), 'Chargement du versement impossible');
+exports.creerVersement = action((req) => versements.creer(t(req), req.body || {}, req.user), 'Création du bordereau de versement impossible', 201);
+exports.ajouterVersement = action((req) => versements.ajouter(t(req), req.params.id, req.body?.document_ids || [], req.user), 'Ajout impossible');
+exports.retirerVersement = action((req) => versements.retirer(t(req), req.params.id, Number(req.params.documentId), req.user), 'Retrait impossible');
+exports.transmettreVersement = action((req) => versements.transmettre(t(req), req.params.id, req.user), 'Transmission du versement impossible');
+exports.priseEnCharge = action((req) => versements.priseEnCharge(t(req), req.params.id, req.body || {}, req.user), 'Enregistrement de la prise en charge impossible');
+exports.annulerVersement = action((req) => versements.annuler(t(req), req.params.id, req.body || {}, req.user), 'Annulation impossible');
+exports.paquetVersement = async (req, res) => {
+  try {
+    const { versement, ids } = await versements.documentsExportables(t(req), req.params.id, req.user);
+    if (!ids.length) return res.status(400).json({ message: 'Aucun document à exporter.' });
+    await require('./rechercheController').envoyerPaquet(req, res, ids, 'toutes', `versement-${versement.numero}.zip`);
+  } catch (err) {
+    if (res.headersSent) { console.error('[versement] export interrompu :', err.message); res.destroy(err); } else erreur(res, err, 'Export du versement impossible');
+  }
+};

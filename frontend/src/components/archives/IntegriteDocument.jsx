@@ -141,6 +141,17 @@ const IntegriteDocument = ({ documentId, onChanged }) => {
               Conservation : {dua.dua_annees} an(s) à compter de {dua.libelle_point_depart} — {dua.echeance ? `${dua.echu ? 'échue le' : 'échéance le'} ${dateFr(dua.echeance)}` : 'pas encore commencée'} · sort final : {SORTS[dua.sort_final] || '—'}
             </p>
           )}
+          {dua?.communicabilite && (
+            <p className={`text-xs ${dua.communicabilite.communicable ? 'text-slate-600' : 'text-amber-800'}`} title={dua.communicabilite.reference}>
+              {dua.communicabilite.hors_archives_publiques
+                ? `Non versé aux archives publiques : la règle des 30 ans s'appliquera après versement (décret n° 2007-532, art. 32).`
+                : dua.communicabilite.communicable
+                ? 'Communicable au public.'
+                : dua.communicabilite.a_partir_du
+                  ? `Communicable au public à partir du ${dateFr(dua.communicabilite.a_partir_du)} (${dua.communicabilite.libelle}).`
+                  : `Non communicable au public : ${dua.communicabilite.raison || dua.communicabilite.libelle}`}
+            </p>
+          )}
           {etat.fichiers.length === 0 ? (
             <p className="text-xs text-slate-500">Aucun fichier : rien à vérifier.</p>
           ) : (

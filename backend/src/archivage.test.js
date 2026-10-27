@@ -96,8 +96,29 @@ const attendreErreur = async (fn) => { try { await fn(); return null; } catch (e
     await archivage.valider(t, bid, resp);
     ok((await archivage.detailBordereau(t, bid, resp)).statut === 'valide', 'validé par un autre que le proposant');
 
-    const res = await archivage.executer(t, bid, archi);
-    ok(res.elimines.length === 2 && !fs.existsSync(vieux1.fichier) && !fs.existsSync(vieux2.fichier), 'exécution : documents éliminés, fichiers détruits du stockage');
+    // --- Visa de l'autorité d'archives (décret n° 2007-532, art. 44) ---------
+    ok((await attendreErreur(() => archivage.executer(t, bid, archi, { mode_destruction: 'sur_place' })))?.status === 409, 'sans visa de la DAN : exécution refusée');
+    await archivage.transmettre(t, bid, archi);
+    const transmis = await archivage.detailBordereau(t, bid, archi);
+    ok(transmis.statut === 'transmis' && /Archives Nationales/.test(transmis.visa_autorite || '') && transmis.actions.saisir_visa, 'bordereau transmis à la DAN, en attente de visa');
+    ok((await attendreErreur(() => archivage.enregistrerVisa(t, bid, { decision: 'refuse', numero: 'V-1', date: '2026-01-05' }, archi)))?.status === 400, 'refus de visa sans observations : refusé');
+    await archivage.enregistrerVisa(t, bid, { decision: 'refuse', numero: 'DAN/2026/011', date: '2026-01-05', observations: 'Bon 2 lié à un marché en cours.' }, archi);
+    const refuse = await archivage.detailBordereau(t, bid, archi);
+    ok(refuse.statut === 'rejete' && /Visa refusé/.test(refuse.motif_rejet || ''), 'visa refusé : bordereau rejeté, motif de l\'autorité conservé');
+    await archivage.reprendre(t, bid, archi);
+    await archivage.proposer(t, bid, archi);
+    await archivage.valider(t, bid, resp);
+    await archivage.transmettre(t, bid, archi);
+    ok((await attendreErreur(() => archivage.enregistrerVisa(t, bid, { decision: 'partiel', numero: 'V', date: '2999-01-01', exclus: [vieux2.id] }, archi)))?.status === 400, 'visa daté du futur : refusé');
+    await archivage.enregistrerVisa(t, bid, { decision: 'partiel', numero: 'DAN/2026/014', date: '2026-02-10', observations: 'Bon 2 à conserver.', exclus: [vieux2.id] }, archi);
+    const vise = await archivage.detailBordereau(t, bid, archi);
+    ok(vise.statut === 'vise' && vise.lignes.find((l) => l.document_id === vieux2.id)?.exclu_visa, 'visa partiel : bordereau visé, le bon 2 exclu');
+    ok((await attendreErreur(() => archivage.executer(t, bid, archi, {})))?.status === 400, 'exécution sans mode de destruction : refusée');
+    ok((await attendreErreur(() => archivage.executer(t, bid, archi, { mode_destruction: 'prestataire' })))?.status === 400, 'destruction par prestataire sans nom : refusée');
+
+    const res = await archivage.executer(t, bid, archi, { mode_destruction: 'prestataire', prestataire: 'Broyage Bénin SARL', controle_par: 'M. Agent DAN' });
+    ok(res.elimines.length === 1 && !fs.existsSync(vieux1.fichier) && fs.existsSync(vieux2.fichier), 'exécution : seul le document visé est éliminé, l\'exclu reste intact');
+    ok(res.ecartes.some((e) => e.document_id === vieux2.id && /visa/.test(e.motif)), 'le document exclu par la DAN est écarté, motif inscrit');
     const tombe = (await db.query('SELECT elimine_at, deleted_at, elimine_bordereau_id FROM documents WHERE id = $1', [vieux1.id])).rows[0];
     ok(tombe.elimine_at && tombe.deleted_at && tombe.elimine_bordereau_id === bid, 'pierre tombale : la ligne reste, marquée éliminée');
     ok((await db.query('SELECT count(*)::int AS n FROM document_files WHERE document_id = $1', [vieux1.id])).rows[0].n === 0, 'plus aucune version en base');
@@ -109,9 +130,14 @@ const attendreErreur = async (fn) => { try { await fn(); return null; } catch (e
 
     // --- Procès-verbal ------------------------------------------------------
     const pv = await archivage.procesVerbal(t, bid, archi);
-    ok(pv.totaux.elimines === 2 && pv.empreinte.conforme === true && pv.lignes.every((l) => l.masque || (l.fichiers || []).every((f) => f.empreinte_sha256)),
-      'procès-verbal : 2 éliminés, empreintes des fichiers détruits, empreinte du PV conforme');
-    ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action = 'DOCUMENT_ELIMINE'", [t])).rows[0].n === 2, 'éliminations inscrites au journal chaîné');
+    ok(pv.totaux.elimines === 1 && pv.empreinte.conforme === true && pv.lignes.every((l) => l.masque || (l.fichiers || []).every((f) => f.empreinte_sha256)),
+      'procès-verbal : 1 éliminé, empreintes des fichiers détruits, empreinte du PV conforme');
+    ok(pv.bordereau.visa_numero === 'DAN/2026/014' && pv.bordereau.prestataire === 'Broyage Bénin SARL'
+      && archivage.corpsPv(pv.bordereau, []).visa?.numero === 'DAN/2026/014' && archivage.corpsPv(pv.bordereau, []).destruction?.mode === 'prestataire',
+      'procès-verbal : visa de la DAN et mode de destruction couverts par l\'empreinte');
+    ok(!('visa' in archivage.corpsPv({ numero: 'BE-1' }, [])), 'PV antérieur à la 036 : contenu (et empreinte) inchangé');
+    ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action = 'DOCUMENT_ELIMINE'", [t])).rows[0].n === 1, 'élimination inscrite au journal chaîné');
+    ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action IN ('ELIMINATION_TRANSMISE', 'VISA_ELIMINATION_REFUSE', 'VISA_ELIMINATION_ACCORDE')", [t])).rows[0].n === 4, 'transmissions et visas journalisés');
     ok((await integrite.verifierJournal(t)).integre, 'journal chaîné intègre après l\'élimination');
 
     // --- Conservation, isolement ---------------------------------------------
