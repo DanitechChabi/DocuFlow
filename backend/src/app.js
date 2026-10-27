@@ -176,6 +176,7 @@ app.use('/api', require('./routes/rechercheRoutes'));
 // Archivage réglementaire (migration 032) : DUA, sort final, éliminations.
 app.use('/api', require('./routes/archivageRoutes'));
 app.use('/api', require('./routes/physiqueRoutes'));
+app.use('/api', require('./routes/serviceArchivesRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.

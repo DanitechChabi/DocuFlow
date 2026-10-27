@@ -203,7 +203,9 @@ const SQL_EN_ATTENTE = `
    WHERE b.tenant_id = $1 AND b.statut = 'execute' AND b.empreinte_pv IS NOT NULL
   UNION ALL
   SELECT 'versement', v.id, v.empreinte::text FROM bordereaux_versement v
-   WHERE v.tenant_id = $1 AND v.statut IN ('transmis', 'pris_en_charge') AND v.empreinte IS NOT NULL`;
+   WHERE v.tenant_id = $1 AND v.statut IN ('transmis', 'pris_en_charge') AND v.empreinte IS NOT NULL
+  UNION ALL
+  SELECT 'copie_certifiee', c.id, c.empreinte_copie::text FROM copies_certifiees c WHERE c.tenant_id = $1`;
 
 async function enAttente(tenantId) {
   const { rows } = await db.query(

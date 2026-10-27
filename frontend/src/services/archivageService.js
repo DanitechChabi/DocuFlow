@@ -77,4 +77,4 @@ export const RISQUES_FORMAT = {
   surveiller: ['À surveiller', 'bg-amber-50 text-amber-700'],
   risque: ['À risque', 'bg-red-50 text-red-700'],
 };
-export const OBJETS_HORODATES = { sceau: 'Sceau du journal', pv_elimination: "Procès-verbal d'élimination", versement: 'Bordereau de versement' };
+export const OBJETS_HORODATES = { sceau: 'Sceau du journal', pv_elimination: "Procès-verbal d'élimination", versement: 'Bordereau de versement', copie_certifiee: 'Copie certifiée conforme' };

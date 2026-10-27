@@ -14,6 +14,7 @@ import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
 import IntegriteDocument from './archives/IntegriteDocument';
 import SectionRepliable from './ui/SectionRepliable';
+import CopiesCertifiees from './archives/CopiesCertifiees';
 import LocalisationDocument from './archives/LocalisationDocument';
 import FavoriSuivi from './collaboration/FavoriSuivi';
 import CommentairesDocument from './collaboration/CommentairesDocument';
@@ -314,7 +315,8 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
                 </SectionRepliable>
 
-                <SectionRepliable cle="fiche-partage" titre="Partage et suivi" resume="Liens, commentaires, échéances">
+                <SectionRepliable cle="fiche-partage" titre="Communication et suivi" resume="Copies certifiées, liens, commentaires">
+                  <CopiesCertifiees documentId={doc.id} fichiers={doc.files || []} />
                   <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
                   <CommentairesDocument documentId={doc.id} />
                   <EcheancesDocument documentId={doc.id} />
