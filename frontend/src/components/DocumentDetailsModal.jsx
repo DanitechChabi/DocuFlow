@@ -13,6 +13,7 @@ import { toast } from './Toast';
 import DocumentMetadataEditor from './DocumentMetadataEditor';
 import AnalyseDocument from './conformite/AnalyseDocument';
 import IntegriteDocument from './archives/IntegriteDocument';
+import LocalisationDocument from './archives/LocalisationDocument';
 import FavoriSuivi from './collaboration/FavoriSuivi';
 import CommentairesDocument from './collaboration/CommentairesDocument';
 import PartagesDocument from './collaboration/PartagesDocument';
@@ -310,6 +311,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                 <AnalyseDocument documentId={doc.id} />
 
                 {/* Intégrité et preuve : empreintes, contrôle, gel, certificat (031). */}
+                <LocalisationDocument documentId={doc.id} onChanged={onChanged} />
                 <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
 
                 {/* Collaboration (033) : liens publics, commentaires. */}

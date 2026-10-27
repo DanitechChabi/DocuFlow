@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -135,6 +135,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
+    entree('/documents/magasins', 'Magasins', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins' }),
     entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
     entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits' }),
     entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite' }),
