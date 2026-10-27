@@ -13,6 +13,7 @@
 // ============================================================================
 const crypto = require('crypto');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const QRCode = require('qrcode');
 const db = require('../config/db');
 const aclService = require('./aclService');
 const communicabiliteService = require('./communicabiliteService');
@@ -56,6 +57,12 @@ function lignes(police, taille, texte, largeur) {
     sortie.push(courante);
   }
   return sortie;
+}
+
+/** Adresse publique de l'instance (réglage, sinon APP_URL), sans barre finale. */
+function adressePublique(reglages = {}) {
+  const brut = String(reglages.adresse_publique || process.env.APP_URL || '').trim();
+  return /^https?:\/\//.test(brut) ? brut.replace(/\/+$/, '') : null;
 }
 
 const dateFr = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Porto-Novo' });
@@ -137,9 +144,17 @@ async function construirePdf(octetsOriginal, a) {
   page.drawText(encodable(police, `${a.signataire}, ${a.qualite}`), { x: L - x - 200, y, size: 9.5, font: gras, color: rgb(0.2, 0.2, 0.2), maxWidth: 200 });
   page.drawText('Signature et cachet', { x: L - x - 200, y: y - 13, size: 8.5, font: police, color: rgb(0.45, 0.45, 0.45) });
   page.drawRectangle({ x: L - x - 200, y: y - 100, width: 200, height: 80, borderColor: rgb(0.7, 0.7, 0.7), borderWidth: 0.6 });
+  // QR code de vérification (040) : mène à la page publique de la copie.
+  if (a.verification_url) {
+    const png = await QRCode.toBuffer(a.verification_url, { type: 'png', margin: 1, width: 360, errorCorrectionLevel: 'M' });
+    const qr = await sortie.embedPng(png);
+    page.drawImage(qr, { x, y: y - 100, width: 92, height: 92 });
+    page.drawText(encodable(police, 'Scannez pour vérifier'), { x: x + 100, y: y - 30, size: 8.5, font: gras, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(encodable(police, 'cette copie en ligne'), { x: x + 100, y: y - 42, size: 8.5, font: police, color: rgb(0.35, 0.35, 0.35) });
+  }
   y -= 130;
   ecrire('Textes : décret n° 2007-532 du 2 novembre 2007 portant organisation des archives publiques, art. 36 ; loi n° 2017-20 du 20 avril 2018 portant Code du numérique en République du Bénin, art. 272.', { taille: 8, couleur: rgb(0.4, 0.4, 0.4), apres: 2 });
-  ecrire(`Vérification : le registre des copies certifiées de ${a.organisation} conserve cette copie sous le n° ${a.numero} ; une copie présentée se compare à l'exemplaire du registre par son empreinte SHA-256.`, { taille: 8, couleur: rgb(0.4, 0.4, 0.4) });
+  ecrire(`Vérification : le registre des copies certifiées de ${a.organisation} conserve cette copie sous le n° ${a.numero} ; une copie présentée se compare à l'exemplaire du registre par son empreinte SHA-256.${a.verification_url ? ` En ligne : ${a.verification_url}` : ''}`, { taille: 8, couleur: rgb(0.4, 0.4, 0.4) });
   page.drawText(encodable(police, `Copie certifiée conforme n° ${a.numero} - page ${total}/${total}`), { x: 18, y: 8, size: 7.5, font: police, color: rgb(0.2, 0.2, 0.2) });
 
   const octets = Buffer.from(await sortie.save({ useObjectStreams: false }));
@@ -180,6 +195,12 @@ async function delivrer(tenantId, documentId, corps = {}, user) {
   if (!f) throw erreur(404, 'Version introuvable.');
   if (!f.empreinte_sha256) throw erreur(409, 'Empreinte d\'archivage en cours de calcul : réessayez dans quelques minutes.', 'SANS_EMPREINTE');
 
+  // Demande liée (portail citoyen, 040) : elle doit être de l'organisation.
+  const requestId = corps.request_id ? Number(corps.request_id) : null;
+  if (requestId && !(await db.query('SELECT 1 FROM requests WHERE id = $1 AND tenant_id = $2', [requestId, tenantId])).rows[0]) {
+    throw erreur(404, 'Demande liée introuvable.');
+  }
+
   // Communicabilité (art. 32-33) : hors délai, une autorisation écrite est exigée.
   const comm = await communicabiliteService.etatDocument(tenantId, doc.id);
   const autorisation = String(corps.autorisation || '').trim() || null;
@@ -201,6 +222,9 @@ async function delivrer(tenantId, documentId, corps = {}, user) {
   const qualite = String(corps.qualite || '').trim() || (user.role === 'archiviste' ? 'archiviste' : 'responsable des archives');
   const lieu = String(corps.lieu || '').trim() || null;
   const delivreAt = new Date();
+  const jeton = crypto.randomBytes(18).toString('base64url');
+  const base = adressePublique(reglages);
+  const verificationUrl = base ? `${base}/verifier/${jeton}` : null;
 
   const client = await db.pool.connect();
   try {
@@ -210,22 +234,26 @@ async function delivrer(tenantId, documentId, corps = {}, user) {
       numero, organisation, document: { reference: doc.reference_mfile, intitule: doc.description || doc.nom_entreprise },
       fichier: { version: f.version, nom: f.original_name }, empreinte_original: attendue,
       signataire: qui.nom, qualite, destinataire, motif: corps.motif ? String(corps.motif).trim() : null,
-      lieu, delivre_at: delivreAt, autorisation,
+      lieu, delivre_at: delivreAt, autorisation, verification_url: verificationUrl,
     });
     const { rows } = await client.query(
       `INSERT INTO copies_certifiees (tenant_id, numero, document_id, document_reference, file_id, version, nom_fichier,
          empreinte_original, empreinte_copie, pages, pdf, destinataire, motif, request_id, autorisation_communication, lieu,
-         delivre_par, delivre_par_nom, qualite_signataire, delivre_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING ${COLONNES}`,
+         delivre_par, delivre_par_nom, qualite_signataire, delivre_at, jeton_verification)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING ${COLONNES}`,
       [tenantId, numero, doc.id, doc.reference_mfile, f.id, f.version, f.original_name, attendue, sha256(pdf), pages, pdf,
-        destinataire, corps.motif ? String(corps.motif).trim() : null, corps.request_id ? Number(corps.request_id) : null,
-        autorisation, lieu, qui.id, qui.nom, qualite, delivreAt]);
+        destinataire, corps.motif ? String(corps.motif).trim() : null, requestId,
+        autorisation, lieu, qui.id, qui.nom, qualite, delivreAt, jeton]);
     await client.query('COMMIT');
-    const copie = rows[0];
+    const copie = { ...rows[0], verification_url: verificationUrl };
     await documentAuditService.logAction({
       tenantId, documentId: doc.id, userId: qui.id, username: qui.username, action: 'COPIE_CERTIFIEE_DELIVREE',
-      details: { numero, version: f.version, destinataire, empreinte_original: attendue, empreinte_copie: copie.empreinte_copie, autorisation },
+      details: { numero, version: f.version, destinataire, empreinte_original: attendue, empreinte_copie: copie.empreinte_copie, autorisation, request_id: requestId },
     });
+    if (requestId) {
+      await require('./portailService').copieDelivree(tenantId, requestId, copie, user)
+        .catch((err) => console.error('[copie certifiée] suivi de la demande en ligne :', err.message));
+    }
     return { copie, pdf };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -258,4 +286,29 @@ async function verifier(tenantId, numero, empreinte = null) {
   return { trouve: true, conforme: attendue ? attendue === c.empreinte_copie : null, copie: c };
 }
 
-module.exports = { nature, encodable, construirePdf, delivrer, lister, exemplaire, verifier, RE_NUMERO };
+/**
+ * Vérification PUBLIQUE par le jeton du QR code (sans compte). Ne rend que ce
+ * qui est imprimé sur la copie elle-même, plus son empreinte pour comparer
+ * un fichier reçu. Jeton inconnu : null (pas de distinction possible).
+ */
+async function verifierPublic(jeton, empreinte = null) {
+  const j = String(jeton || '').trim();
+  if (!/^[A-Za-z0-9_-]{20,40}$/.test(j)) return null;
+  const { rows } = await db.query(
+    `SELECT c.tenant_id, c.numero, c.document_reference, c.version, c.pages, trim(c.empreinte_copie) AS empreinte_copie,
+            c.destinataire, c.delivre_par_nom, c.qualite_signataire, c.delivre_at, c.lieu, t.name AS organisation
+       FROM copies_certifiees c JOIN tenants t ON t.id = c.tenant_id WHERE c.jeton_verification = $1`, [j]);
+  const c = rows[0];
+  if (!c) return null;
+  const reglages = await require('./settingsService').getAll(c.tenant_id);
+  const attendue = String(empreinte || '').trim().toLowerCase();
+  return {
+    numero: c.numero, organisation: reglages.legal_entity || c.organisation, document: c.document_reference,
+    pages: c.pages, destinataire: c.destinataire, signataire: c.delivre_par_nom, qualite: c.qualite_signataire,
+    delivre_at: c.delivre_at, lieu: c.lieu, empreinte_copie: c.empreinte_copie,
+    conforme: attendue ? attendue === c.empreinte_copie : null,
+  };
+}
+
+module.exports = {
+  verifierPublic, adressePublique, nature, encodable, construirePdf, delivrer, lister, exemplaire, verifier, RE_NUMERO };

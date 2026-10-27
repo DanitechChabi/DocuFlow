@@ -57,7 +57,7 @@ async function etat(tenantId) {
   const [classes, sansDua, utilisateurs, emplacements, documents] = await Promise.all([
     compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE', [tenantId]),
     compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE AND dua_annees IS NULL', [tenantId]),
-    compter('SELECT count(*)::int AS n FROM users WHERE tenant_id = $1', [tenantId]),
+    compter("SELECT count(*)::int AS n FROM users WHERE tenant_id = $1 AND username NOT LIKE 'portail-citoyen-%'", [tenantId]),
     compter('SELECT count(*)::int AS n FROM emplacements WHERE tenant_id = $1', [tenantId]),
     compter('SELECT count(*)::int AS n FROM documents WHERE tenant_id = $1 AND deleted_at IS NULL', [tenantId]),
   ]);

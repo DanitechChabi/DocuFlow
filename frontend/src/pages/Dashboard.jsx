@@ -5,6 +5,7 @@ import RequestTable from '../components/RequestTable';
 import HistoryTable from '../components/HistoryTable';
 import RequestDetailsModal from '../components/RequestDetailsModal';
 import DashboardAnalytics from '../components/DashboardAnalytics';
+import PortailCarte from '../components/PortailCarte';
 import PageHeader from '../components/PageHeader';
 import { requestService } from '../services/requestService';
 import { requestDetailsService } from '../services/requestDetailsService';
@@ -328,6 +329,9 @@ const Dashboard = ({ tab = 'dashboard' }) => {
             )}
           </div>
         </div>
+
+          {/* Portail citoyen (040) */}
+          {TAB_AVEC_OVERVIEW.includes(tab) && <PortailCarte />}
 
           {/* Analytics — admin seulement */}
           {isAdmin && TAB_AVEC_OVERVIEW.includes(tab) && <DashboardAnalytics />}
