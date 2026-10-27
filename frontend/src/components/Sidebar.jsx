@@ -47,6 +47,8 @@ const DEFAULT_MARK_DARK = '/brand/docuflow-mark.png';
 const DEFAULT_MARK_LIGHT = '/brand/docuflow-mark-light.png';
 
 const STOCKAGE_REPLIE = 'docuflow:sidebar-repliee';
+const STOCKAGE_GROUPES = 'docuflow:sidebar-groupes';
+const GROUPES = { archives: 'Archives', controle: 'Contrôle', parametrage: 'Paramétrage' };
 
 // L'état du drawer mobile appartient au LAYOUT (AppLayout) : le bouton
 // d'ouverture vit dans la barre supérieure, qui est le FRÈRE de la sidebar
@@ -93,6 +95,22 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     try { localStorage.setItem(STOCKAGE_REPLIE, repliee ? '1' : '0'); } catch { /* privé */ }
   }, [repliee]);
 
+  // Familles repliables (préférence persistée).
+  const [groupesOuverts, setGroupesOuverts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STOCKAGE_GROUPES)) || {}; } catch { return {}; }
+  });
+  const basculerGroupe = (cle) => setGroupesOuverts((g) => {
+    const suivant = { ...g, [cle]: !g[cle] };
+    try { localStorage.setItem(STOCKAGE_GROUPES, JSON.stringify(suivant)); } catch { /* privé */ }
+    return suivant;
+  });
+
+  useEffect(() => {
+    const toutDeplier = () => setGroupesOuverts(Object.fromEntries(Object.keys(GROUPES).map((c) => [c, true])));
+    window.addEventListener('docuflow:deplier-menu', toutDeplier);
+    return () => window.removeEventListener('docuflow:deplier-menu', toutDeplier);
+  }, []);
+
   const primaryColor = settings.primary_color || '#0f172a';
   const sidebarLight = isLight(primaryColor);
   const tText = sidebarLight ? '#1e293b' : '#ffffff';
@@ -126,22 +144,25 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/demandes/toutes', 'Toutes les demandes', <Building2 size={18} />, { permission: 'requests.process', tourId: 'toutes-demandes' }),
     entree('/demandes/prets', 'Registre des prêts', <BookOpenCheck size={18} />, { permission: 'requests.process', tourId: 'registre-prets' }),
   ];
+  // Documents : seize vues, regroupées en familles repliables. « Au
+  // quotidien » est toujours ouvert ; les autres s'ouvrent à la demande (et
+  // d'office quand la page active leur appartient).
   const vuesDocuments = [
     entree('/documents', 'Vue d\'ensemble', <Compass size={18} />, { permission: 'documents.view', end: true }),
     entree('/documents/liste', 'Documents', <FolderOpen size={18} />, { permission: 'documents.view', tourId: 'documents' }),
-    entree('/documents/favoris', 'Mes favoris', <Star size={18} />, { permission: 'documents.view', tourId: 'favoris' }),
     entree('/documents/taches', 'Mes tâches', <ListChecks size={18} />, { tourId: 'taches', compteur: tachesOuvertes }),
+    entree('/documents/favoris', 'Mes favoris', <Star size={18} />, { permission: 'documents.view', tourId: 'favoris' }),
     entree('/documents/recherche', 'Recherche avancée', <Search size={18} />, { permission: 'search.advanced', tourId: 'recherche' }),
-    entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
-    entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view' }),
-    entree('/documents/magasins', 'Magasins', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins' }),
-    entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes' }),
-    entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits' }),
-    entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite' }),
-    entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view' }),
-    entree('/documents/archivage', 'Archivage & preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage' }),
-    entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille' }),
+    entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view', groupe: 'archives' }),
+    entree('/documents/archivage', 'Conservation et preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage', groupe: 'archives' }),
+    entree('/documents/magasins', 'Magasins (papier)', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins', groupe: 'archives' }),
+    entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances', groupe: 'archives' }),
+    entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille', groupe: 'archives' }),
+    entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite', groupe: 'controle' }),
+    entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view', groupe: 'controle' }),
+    entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes', groupe: 'parametrage' }),
+    entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits', groupe: 'parametrage' }),
   ];
 
   // Le changement de module : l'autre monde reste UN clic de distance.
@@ -279,7 +300,31 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         {section.titre && repliee && !mobile && (
           <div className="pt-4 pb-1 mx-3 border-t" style={{ borderColor: tBorder }} />
         )}
-        {section.items.map((item) => renduLien(item, mobile))}
+        {section.items.filter((i) => !i.groupe).map((item) => renduLien(item, mobile))}
+        {Object.entries(GROUPES).map(([cle, titre]) => {
+          const membres = section.items.filter((i) => i.groupe === cle && i.visible);
+          if (!membres.length) return null;
+          const actif = membres.some((i) => pathname === i.to || pathname.startsWith(`${i.to}/`));
+          // Rail replié : pas de familles, les icônes suffisent.
+          if (repliee && !mobile) return membres.map((item) => renduLien(item, mobile));
+          const ouvert = actif || groupesOuverts[cle];
+          return (
+            <div key={cle}>
+              <button
+                type="button"
+                onClick={() => basculerGroupe(cle)}
+                aria-expanded={ouvert}
+                className="w-full flex items-center gap-2 px-3 pt-3 pb-1 text-[11px] font-bold"
+                style={{ color: tMuted }}
+              >
+                <ChevronRight size={12} className={`transition-transform ${ouvert ? 'rotate-90' : ''}`} />
+                {titre}
+                {!ouvert && <span className="ml-auto text-[10px] font-semibold opacity-70">{membres.length}</span>}
+              </button>
+              {ouvert && <div className="space-y-1">{membres.map((item) => renduLien(item, mobile))}</div>}
+            </div>
+          );
+        })}
       </div>
     );
   };

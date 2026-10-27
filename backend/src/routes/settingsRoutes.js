@@ -42,6 +42,10 @@ router.get('/', optionalAuthMiddleware, settingsController.getSettings);
 // gère SA configuration ; le propriétaire de plateforme garde la vue globale).
 // GET /configuration — catalogue typé + valeurs, source de la console de configuration
 router.get('/configuration', authMiddleware, requirePermission('settings.manage'), settingsController.getConfiguration);
+// GET /demarrage — assistant de démarrage : étapes constatées sur les données.
+router.get('/demarrage', authMiddleware, requirePermission('settings.manage'), async (req, res, next) => {
+  try { res.json(await require('../services/demarrageService').etat(req.user.tenant_id)); } catch (err) { next(err); }
+});
 router.put('/', authMiddleware, requirePermission('settings.manage'), settingsController.updateSettings);
 router.post('/reset', authMiddleware, requirePermission('settings.manage'), settingsController.resetSettings);
 // POST /provision — recrée les objets par défaut manquants (idempotent)

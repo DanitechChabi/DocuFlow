@@ -166,7 +166,7 @@ function visiteDocuments({ can }) {
   if (can('archives.view')) {
     etapes.push({
       id: 'archivage', selector: '[data-tour="archivage"]', position: 'right',
-      title: 'Archivage & preuve',
+      title: 'Conservation et preuve',
       content: 'Chaque fichier porte son empreinte SHA-256 et il est relu régulièrement. Le journal est chaîné et scellé, et un gel juridique interdit toute destruction le temps d\'un contentieux. Un certificat d\'archivage s\'émet depuis la fiche ; les durées de conservation mènent aux bordereaux d\'élimination, validés par une autre personne.',
     });
   }
