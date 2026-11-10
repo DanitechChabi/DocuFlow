@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FolderOpen, Wand2, Archive, Clock } from 'lucide-react';
-import { STATUS_LABELS } from '../utils/documentStatuses';
+import { STATUS_LABELS, STATUS_CLASSES } from '../utils/documentStatuses';
+import { titreDocument } from '../utils/libelleDocument';
+import PageHeader from './PageHeader';
 
 /**
  * Vue d'ensemble du module DOCUMENTS (/documents) : cartes de synthèse
@@ -22,6 +24,8 @@ const GEDOverview = ({ data, folders, loading }) => {
   return (
     <div className="px-4 sm:px-6 md:px-8 py-6 md:py-8">
       <div className="max-w-6xl mx-auto animate-fade-in-up">
+        <PageHeader title="Documents — vue d'ensemble" subtitle="Ce que contient le référentiel et ce qui attend d'être indexé"
+          icon={FolderOpen} breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents' }]} />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="stat-card animate-fade-in-up">
             <div className="min-w-0">
@@ -87,15 +91,15 @@ const GEDOverview = ({ data, folders, loading }) => {
           ) : recents.length ? (
             <div className="space-y-2">
               {recents.map((d, idx) => (
-                <div key={d.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
+                <Link key={d.id} to={`/documents/liste?doc=${d.id}`} className="flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">{d.reference_mfile}</div>
-                    <div className="text-[11px] text-slate-400 truncate">{d.nom_entreprise}{d.type_document && ` · ${d.type_document}`}</div>
+                    <div className="text-sm font-semibold text-slate-800 truncate">{titreDocument(d)}</div>
+                    <div className="text-[11px] text-slate-400 truncate"><span className="font-mono">{d.reference_mfile}</span>{d.dossier_name && ` · ${d.dossier_name}`}</div>
                   </div>
-                  <span className={`status-badge ${d.statut === 'à indexer' ? 'status-badge-pending' : d.statut === 'archivé' ? 'status-badge-done' : 'status-badge-ok'}`}>
+                  <span className={`status-badge flex-shrink-0 ${STATUS_CLASSES[d.statut] || ''}`}>
                     {STATUS_LABELS[d.statut] || d.statut}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (

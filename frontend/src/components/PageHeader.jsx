@@ -99,7 +99,7 @@ const PageHeader = ({
           )}
         </div>
         {actions && (
-          <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>
+          <div className="flex flex-wrap items-center gap-2 max-w-full sm:flex-shrink-0">{actions}</div>
         )}
       </div>
     </header>
