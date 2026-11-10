@@ -12,6 +12,7 @@ import { authService } from '../services/authService';
 import { usePermissions } from '../hooks/usePermissions';
 import PageHeader from '../components/PageHeader';
 import AssistantDemarrage from '../components/AssistantDemarrage';
+import AbsenceCarte from '../components/AbsenceCarte';
 import { courrierService } from '../services/courrierService';
 
 // ============================================================================
@@ -79,6 +80,7 @@ const HomePage = () => {
         documentTitle="Accueil"
       />
 
+      <AbsenceCarte bandeau />
       <AssistantDemarrage />
 
       {/* Les portes — chacune n'existe que si l'utilisateur peut y entrer */}

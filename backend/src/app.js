@@ -182,6 +182,8 @@ app.use('/api', require('./routes/serviceArchivesRoutes'));
 app.use('/api', require('./routes/portailRoutes'));
 // Courrier — bureau d'ordre (041).
 app.use('/api/courriers', require('./routes/courrierRoutes'));
+// Absence et suppléance (042).
+app.use('/api/absence', require('./routes/absenceRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.

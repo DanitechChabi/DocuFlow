@@ -104,6 +104,8 @@ const EMPREINTE = crypto.createHash('sha256').update('test\n').digest('hex');
       const v2 = (await db.query('SELECT * FROM document_files WHERE id = $1', [copie.file_id])).rows[0];
       ok(copie.version === 2 && v2.pdfa && v2.copie_de_file_id === v1.id && v2.empreinte_sha256, 'copie de conservation PDF/A ajoutée en version 2, liée à sa source');
       ok((await db.query('SELECT count(*)::int AS n FROM document_files WHERE id = $1', [v1.id])).rows[0].n === 1, 'l\'original reste intact');
+      const octetsCopie = await require('./services/paquetService').lireOctets(v2);
+      ok(octetsCopie && octetsCopie.subarray(0, 5).toString() === '%PDF-', 'la copie PDF/A existe bien dans le stockage');
       ok((await attendreErreur(() => formats.copieConservation(t, doc, v1.id, archi)))?.status === 409, 'une seule copie de conservation par version');
       ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action = 'COPIE_CONSERVATION_PDFA'", [t])).rows[0].n === 1, 'conversion journalisée avec les deux empreintes');
     } else {

@@ -72,10 +72,24 @@ const lettre = { sens: 'arrivee', objet: 'Demande de permis de construire', corr
     const rep = await courrier.repondre(agent, a1.id, {});
     ok(rep.numero === `D-${annee}-00001` && rep.statut === 'brouillon' && rep.origine.id === a1.id && rep.correspondant === lettre.correspondant, `réponse préparée par l'agent : départ ${rep.numero} lié à l'arrivée`);
     ok((await attendreErreur(() => courrier.expedier(autre, rep.id, {})))?.status === 404, 'départ invisible de qui n\'y a aucun rôle');
+    // Lettre rédigée dans DocuFlow : PDF versé dans la GED, repris en nouvelle version.
+    ok((await attendreErreur(() => courrier.rediger(agent, rep.id, { lettre: 'court' })))?.status === 400, 'lettre vide : refusée');
+    const texteLettre = 'Monsieur,\n\nNous accusons réception de votre demande de permis de construire.\n\nElle est en cours d\'instruction par nos services.';
+    let l = await courrier.rediger(agent, rep.id, { lettre: texteLettre, signataire: 'Le Maire', qualite: 'Le Maire de Vallée-Verte', lieu: 'Vallée-Verte' });
+    const docLettre = (await db.query('SELECT d.statut, d.num_acte, (SELECT count(*)::int FROM document_files f WHERE f.document_id = d.id) AS n FROM documents d WHERE d.id = $1', [l.document_id])).rows[0];
+    ok(l.document_id && docLettre.num_acte === rep.numero && docLettre.n === 1 && l.lettre === texteLettre, 'lettre rédigée : PDF versé dans la GED et lié au départ');
+    const stocke = (await db.query('SELECT * FROM document_files WHERE document_id = $1', [l.document_id])).rows[0];
+    const relu = await require('./services/paquetService').lireOctets(stocke);
+    ok(relu && relu.subarray(0, 5).toString() === '%PDF-' && require('crypto').createHash('sha256').update(relu).digest('hex') === String(stocke.empreinte_sha256).trim(), 'le PDF existe dans le stockage et correspond à son empreinte');
+    l = await courrier.rediger(agent, rep.id, { lettre: `${texteLettre}\n\nVeuillez agréer nos salutations.` });
+    ok((await db.query('SELECT count(*)::int AS n FROM document_files WHERE document_id = $1', [l.document_id])).rows[0].n === 2, 'lettre reprise : nouvelle version du même document');
+    const pdfLettre = await courrier.construireLettre({ numero: 'D-2026-00001', organisation: 'Mairie', date: new Date(), correspondant: 'M. X', objet: 'Objet', corps: 'Paragraphe. '.repeat(900) });
+    ok(pdfLettre.subarray(0, 5).toString() === '%PDF-' && (await require('pdf-lib').PDFDocument.load(pdfLettre)).getPageCount() >= 2, 'lettre longue : le texte se poursuit sur une deuxième page');
     const exp = await courrier.expedier(agent, rep.id, { mode: 'Porteur' });
     c = await courrier.lire(agent, a1.id);
     ok(exp.statut === 'expedie' && c.statut === 'clos' && c.clos_motif === 'repondu' && c.reponses.length === 1, 'expédition constatée : l\'arrivée est close « répondu »');
     ok((await attendreErreur(() => courrier.affecter(chef, a1.id, { assigne_a: autre.id })))?.status === 409, 'courrier clos : plus d\'affectation');
+    ok((await attendreErreur(() => courrier.rediger(agent, rep.id, { lettre: texteLettre })))?.status === 409, 'courrier expédié : la lettre ne se reprend plus');
 
     // --- Clôture -------------------------------------------------------------------
     ok((await attendreErreur(() => courrier.clore(chef, a2.id, { motif: 'sans_suite' })))?.status === 400, 'sans suite : explication obligatoire');
