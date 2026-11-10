@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   LayoutDashboard, FileSearch, ClipboardList, PlusCircle, FolderOpen, Wand2, Archive,
   ArrowRight, Activity, Clock,
+  Mail,
 } from 'lucide-react';
 import { requestService } from '../services/requestService';
 import { documentService } from '../services/documentService';
@@ -11,6 +12,7 @@ import { authService } from '../services/authService';
 import { usePermissions } from '../hooks/usePermissions';
 import PageHeader from '../components/PageHeader';
 import AssistantDemarrage from '../components/AssistantDemarrage';
+import { courrierService } from '../services/courrierService';
 
 // ============================================================================
 // HomePage — le vestibule de la plateforme à deux modules.
@@ -24,11 +26,12 @@ import AssistantDemarrage from '../components/AssistantDemarrage';
 // ============================================================================
 
 const HomePage = () => {
-  const { can } = usePermissions();
+  const { can, charge } = usePermissions();
   const user = authService.getCurrentUser();
 
   const [aTraiter, setATraiter] = useState(null);
   const [aIndexer, setAIndexer] = useState(null);
+  const [courrier, setCourrier] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [chargement, setChargement] = useState(true);
 
@@ -49,17 +52,20 @@ const HomePage = () => {
           .catch(() => {})
       );
     }
+    if (charge && can('mail.view')) taches.push(courrierService.synthese().then(setCourrier).catch(() => {}));
     taches.push(
       notificationService.getNotifications().then((n) => setNotifications(Array.isArray(n) ? n.slice(0, 4) : [])).catch(() => {})
     );
     await Promise.all(taches);
     setChargement(false);
-  }, [can]);
+  }, [can, charge]);
 
   useEffect(() => { charger(); }, [charger]);
 
   const voitDemandes = can('requests.view');
   const voitDocuments = can('documents.view');
+  const voitCourrier = can('mail.view');
+  const portes = [voitDemandes, voitCourrier, voitDocuments].filter(Boolean).length;
 
   return (
     <div className="relative p-4 md:p-8 max-w-7xl mx-auto">
@@ -75,8 +81,8 @@ const HomePage = () => {
 
       <AssistantDemarrage />
 
-      {/* Les deux portes — chacune n'existe que si l'utilisateur peut y entrer */}
-      <div className={`grid gap-6 mt-8 ${voitDemandes && voitDocuments ? 'lg:grid-cols-2' : 'max-w-xl'}`}>
+      {/* Les portes — chacune n'existe que si l'utilisateur peut y entrer */}
+      <div className={`grid gap-6 mt-8 ${portes >= 3 ? 'md:grid-cols-2 xl:grid-cols-3' : portes === 2 ? 'lg:grid-cols-2' : 'max-w-xl'}`}>
         {/* ---- MODULE DEMANDES ---- */}
         {voitDemandes && (
           <Link
@@ -107,6 +113,42 @@ const HomePage = () => {
                 <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center gap-1.5">
                   <PlusCircle size={13} /> Nouvelle demande
                 </span>
+              )}
+            </div>
+          </Link>
+        )}
+
+        {/* ---- MODULE COURRIER (041) ---- */}
+        {voitCourrier && (
+          <Link
+            to="/courrier"
+            data-tour="module-courrier"
+            className="glass-card-premium p-8 hover:shadow-elevated transition-all group relative overflow-hidden animate-fade-in-up delay-75"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-violet-500/[0.06] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-violet-500/[0.12] transition-colors" />
+            <div className="flex items-start justify-between mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Mail size={26} />
+              </div>
+              <span className="flex items-center gap-1 text-xs font-bold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                Entrer <ArrowRight size={13} />
+              </span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-1.5">Courrier</h2>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              Le registre du courrier arrivée et départ : enregistrer, affecter, répondre, suivre les délais.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {courrier?.a_moi > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold flex items-center gap-1.5">
+                  <Mail size={13} /> {courrier.a_moi} à traiter
+                </span>
+              )}
+              {courrier?.droits?.registre && courrier.a_affecter > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">{courrier.a_affecter} à affecter</span>
+              )}
+              {courrier?.en_retard > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-xs font-bold">{courrier.en_retard} en retard</span>
               )}
             </div>
           </Link>

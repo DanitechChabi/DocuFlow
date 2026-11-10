@@ -176,9 +176,9 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                   <div
                     key={n.id}
                     // Notification liée à un document (031/033) : un clic ouvre sa fiche.
-                    onClick={n.document_id ? () => { if (!n.is_read) handleMarkAsRead(n.id); setIsOpen(false); navigate(`/documents/liste?doc=${n.document_id}`); } : undefined}
-                    role={n.document_id ? 'button' : undefined}
-                    className={`${n.document_id ? 'cursor-pointer ' : ''}px-5 py-4 border-b border-slate-50 last:border-b-0 transition-colors ${
+                    onClick={n.lien || n.document_id ? () => { if (!n.is_read) handleMarkAsRead(n.id); setIsOpen(false); navigate(n.lien && n.lien.startsWith('/') ? n.lien : `/documents/liste?doc=${n.document_id}`); } : undefined}
+                    role={n.lien || n.document_id ? 'button' : undefined}
+                    className={`${n.lien || n.document_id ? 'cursor-pointer ' : ''}px-5 py-4 border-b border-slate-50 last:border-b-0 transition-colors ${
                       !n.is_read ? 'bg-blue-50/30 border-l-2 border-l-docuflow-secondary' : 'hover:bg-slate-50'
                     }`}
                   >

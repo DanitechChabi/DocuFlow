@@ -175,6 +175,10 @@ const CATALOG = [
   { key: 'loan_require_confirmation', group: 'requests', label: 'Confirmation de réception obligatoire',
     description: 'Si activé, l\'agent doit confirmer depuis son compte avoir reçu le dossier. Sinon, la remise vaut accusé de réception tacite : l\'agent est notifié et peut la signaler.',
     type: 'boolean', default: 'false' },
+  // Courrier (migration 041).
+  { key: 'courrier_delai_reponse_jours', group: 'requests', label: 'Délai de réponse au courrier (jours)',
+    description: "Délai proposé pour répondre à un courrier arrivée qui attend une réponse (modifiable à l'enregistrement et à l'affectation). L'agent chargé est prévenu deux jours avant l'échéance, puis au dépassement.",
+    type: 'number', default: '15', min: 1, max: 365 },
   // Portail citoyen (migration 040).
   { key: 'portail_citoyen_actif', group: 'requests', label: 'Portail citoyen',
     description: "Ouvre une page publique où l'usager, sans compte, demande un acte (naissance, mariage, décès…) et suit sa demande avec un code de suivi. La demande arrive dans « À traiter » comme les autres.",
