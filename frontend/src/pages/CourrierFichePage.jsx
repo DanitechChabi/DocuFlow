@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  Mail, Loader2, UserPlus, Play, Reply, CheckCircle2, Send, FileDown, FileText, Lock, Zap, MessageSquarePlus, ArrowRight,
+  Mail, Loader2, UserPlus, Play, Reply, CheckCircle2, Send, FileDown, FileText, Lock, Zap, MessageSquarePlus, ArrowRight, PenLine,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import PastilleStatut from '../components/courrier/PastilleStatut';
@@ -30,10 +30,14 @@ const CourrierFichePage = () => {
   const [form, setForm] = useState({});
   const [note, setNote] = useState('');
   const [envoi, setEnvoi] = useState(false);
+  const [lettre, setLettre] = useState({ lettre: '', signataire: '', qualite: '', lieu: '' });
   useTitrePage(c ? `Courrier ${c.numero}` : 'Courrier');
 
   const charger = useCallback(() => {
-    courrierService.lire(id).then((r) => { setC(r); setErreur(null); }).catch((e) => setErreur(e.response?.data?.message || 'Courrier indisponible'));
+    courrierService.lire(id).then((r) => {
+      setC(r); setErreur(null);
+      setLettre({ lettre: r.lettre || '', signataire: r.lettre_signataire || '', qualite: r.lettre_qualite || '', lieu: r.lettre_lieu || '' });
+    }).catch((e) => setErreur(e.response?.data?.message || 'Courrier indisponible'));
   }, [id]);
   useEffect(() => { setC(null); charger(); }, [charger]);
 
@@ -117,6 +121,27 @@ const CourrierFichePage = () => {
               </Link>
             ))}
           </section>
+
+          {a.rediger && (
+            <form className="glass-card-premium p-5 space-y-3" data-tour="courrier-lettre"
+              onSubmit={(e) => { e.preventDefault(); faire(() => courrierService.rediger(c.id, lettre), c.lettre ? 'Lettre mise à jour : nouvelle version dans la GED' : 'Lettre enregistrée dans la GED'); }}>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-black text-slate-900 flex items-center gap-2"><PenLine size={15} /> Rédiger la lettre</h2>
+                <span className="text-[11px] text-slate-400">En-tête, numéro, date et objet sont ajoutés automatiquement</span>
+              </div>
+              <textarea className="input-premium min-h-[220px] leading-relaxed" required minLength={10} placeholder={'Madame, Monsieur,\n\nEn réponse à votre courrier…\n\nVeuillez agréer…'}
+                value={lettre.lettre} onChange={(e) => setLettre({ ...lettre, lettre: e.target.value })} aria-label="Texte de la lettre" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <input className="input-premium" placeholder="Qualité (Le Maire…)" value={lettre.qualite} onChange={(e) => setLettre({ ...lettre, qualite: e.target.value })} aria-label="Qualité du signataire" />
+                <input className="input-premium" placeholder="Nom du signataire" value={lettre.signataire} onChange={(e) => setLettre({ ...lettre, signataire: e.target.value })} aria-label="Nom du signataire" />
+                <input className="input-premium" placeholder="Fait à (ville)" value={lettre.lieu} onChange={(e) => setLettre({ ...lettre, lieu: e.target.value })} aria-label="Lieu" />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="submit" disabled={envoi} className="btn-primary flex items-center gap-2"><PenLine size={15} /> {c.lettre ? 'Mettre à jour la lettre' : 'Produire la lettre (PDF)'}</button>
+                <p className="text-[11px] text-slate-500">Le PDF est versé dans la GED. Ouvrez-le pour le relire, le soumettre à un circuit de validation ou l'imprimer.</p>
+              </div>
+            </form>
+          )}
 
           <section className="glass-card-premium p-5">
             <h2 className="text-sm font-black text-slate-900 mb-4">Historique</h2>

@@ -14,6 +14,7 @@ export const courrierService = {
   annoter: async (id, note) => (await api.post(`/courriers/${id}/notes`, { note })).data,
   clore: async (id, corps) => (await api.post(`/courriers/${id}/cloture`, corps)).data,
   repondre: async (id, corps = {}) => (await api.post(`/courriers/${id}/reponse`, corps)).data,
+  rediger: async (id, corps) => (await api.post(`/courriers/${id}/lettre`, corps)).data,
   expedier: async (id, corps = {}) => (await api.post(`/courriers/${id}/expedition`, corps)).data,
   accuseReception: async (id, numero) => {
     const r = await api.get(`/courriers/${id}/accuse-reception`, { responseType: 'blob' });
@@ -43,6 +44,7 @@ export const NATURES = { lettre: 'Lettre', note: 'Note de service', demande: 'De
 export const EVENEMENTS = {
   ENREGISTRE: 'Enregistré au registre', AFFECTE: 'Affecté', REAFFECTE: 'Réaffecté', PRIS_EN_CHARGE: 'Pris en charge', NOTE: 'Note',
   REPONSE_PREPAREE: 'Réponse préparée', EXPEDIE: 'Expédié', CLOS: 'Clos', MODIFIE: 'Fiche corrigée', ACCUSE_RECEPTION: 'Accusé de réception délivré',
+  LETTRE_REDIGEE: 'Lettre rédigée', LETTRE_REPRISE: 'Lettre reprise',
 };
 export const INSTRUCTIONS = ['Pour attribution', 'Pour étude et avis', 'Pour suite à donner', 'Pour projet de réponse', "M'en parler", 'Pour information', 'Pour classement'];
 export const dateFr = (v) => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');

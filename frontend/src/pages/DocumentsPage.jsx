@@ -10,6 +10,7 @@ import { documentService } from '../services/documentService';
 import { authService } from '../services/authService';
 import { toast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ActionsParLot from '../components/ActionsParLot';
 import DocumentFormModal from '../components/DocumentFormModal';
 import DocumentDetailsModal from '../components/DocumentDetailsModal';
 import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
@@ -197,6 +198,8 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   };
   const [editingDoc, setEditingDoc] = useState(null);
   const [detailDoc, setDetailDoc] = useState(null);
+  // Sélection multiple (actions par lot) : conservée d'une page à l'autre.
+  const [selection, setSelection] = useState(() => new Map());
   const [folderOpen, setFolderOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -355,6 +358,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
 
   const total = data?.pagination?.total || 0;
   const totalPages = data?.pagination?.total_pages || 1;
+  const pageDocs = (!loading && data?.documents) || [];
 
   // /documents sans ?vue= : la vue d'ensemble du module (cartes, accès
   // rapides, récents) — la liste détaillée reste à /documents/liste.
@@ -651,6 +655,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
                 <tr>
+                  <th className="pl-4 pr-1 py-3 w-8">
+                    <input type="checkbox" aria-label="Tout sélectionner sur cette page"
+                      checked={pageDocs.length > 0 && pageDocs.every((d) => selection.has(d.id))}
+                      onChange={(e) => setSelection((sel) => { const n = new Map(sel); pageDocs.forEach((d) => (e.target.checked ? n.set(d.id, d) : n.delete(d.id))); return n; })} />
+                  </th>
                   <th className="px-4 py-3 text-left">Référence</th>
                   <th className="px-4 py-3 text-left">Entreprise</th>
                   <th className="px-4 py-3 text-left">N° dossier / acte</th>
@@ -665,6 +674,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
               <tbody className="divide-y divide-slate-100">
                 {loading && Array.from({ length: 6 }).map((_, idx) => (
                   <tr key={idx}>
+                    <td className="pl-4 pr-1 py-3" />
                     <td className="px-4 py-3"><div className="skeleton h-4 w-20" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-28" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-24" /></td>
@@ -677,7 +687,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                   </tr>
                 ))}
                 {!loading && data?.documents?.map((d, idx) => (
-                  <tr key={d.id} onClick={() => setDetailDoc(d.id)} className="hover:bg-blue-50/40 cursor-pointer transition-colors animate-fade-in-up" style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}>
+                  <tr key={d.id} onClick={() => setDetailDoc(d.id)} className={`hover:bg-blue-50/40 cursor-pointer transition-colors animate-fade-in-up ${selection.has(d.id) ? 'bg-blue-50/60' : ''}`} style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}>
+                    <td className="pl-4 pr-1 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" aria-label={`Sélectionner ${d.reference_mfile}`} checked={selection.has(d.id)}
+                        onChange={(e) => setSelection((sel) => { const n = new Map(sel); if (e.target.checked) n.set(d.id, d); else n.delete(d.id); return n; })} />
+                    </td>
                     <td className="px-4 py-3 font-bold text-docuflow-secondary">{d.reference_mfile}</td>
                     <td className="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><Building2 size={14} className="text-slate-400" /> {d.nom_entreprise}</td>
                     <td className="px-4 py-3 text-slate-600">{d.num_dossier} / {d.num_acte}</td>
@@ -733,6 +747,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
             </div>
           )}
         </div>
+        )}
+        {/* Hors de la carte (overflow-hidden) pour rester collée au bas de l'écran. */}
+        {viewMode === 'list' && (
+          <ActionsParLot selection={[...selection.values()]} dossiers={folders} peutSupprimer={isAdmin}
+            onVider={() => setSelection(new Map())} onTermine={() => { setSelection(new Map()); load(); }} />
         )}
       </div>
 

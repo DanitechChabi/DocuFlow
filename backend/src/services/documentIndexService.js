@@ -257,4 +257,25 @@ async function indexRequestToDocuments(tenantId, requestId, userId, { dossierId 
   }
 }
 
-module.exports = { logHistory, addFileToDocument, setCanonicalReference, indexRequestToDocuments };
+/**
+ * Verse un fichier PRODUIT PAR LE SERVEUR (lettre, copie PDF/A…) comme
+ * nouvelle version d'un document. En stockage local, addFileToDocument
+ * attend le fichier déjà rangé dans FILES_DIR (comme le fait multer pour un
+ * téléversement) : un fichier écrit ailleurs serait enregistré en base sans
+ * exister sur le disque. On l'y écrit donc d'abord, sous un nom unique.
+ */
+async function ajouterFichierGenere(tenantId, documentId, userId, { octets, originalname, mimetype }, options = {}) {
+  const { FILES_DIR } = require('../config/paths');
+  const ext = path.extname(originalname || '') || '';
+  const filename = `gen-${Date.now()}-${Math.floor(Math.random() * 1e9)}${ext}`;
+  const chemin = path.join(FILES_DIR, filename);
+  fs.writeFileSync(chemin, octets);
+  try {
+    return await addFileToDocument(tenantId, documentId, userId, { path: chemin, filename, originalname, mimetype, size: octets.length }, options);
+  } catch (err) {
+    fs.rmSync(chemin, { force: true });
+    throw err;
+  }
+}
+
+module.exports = { logHistory, addFileToDocument, ajouterFichierGenere, setCanonicalReference, indexRequestToDocuments };

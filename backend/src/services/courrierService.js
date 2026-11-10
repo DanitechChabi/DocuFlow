@@ -101,7 +101,7 @@ const COLONNES = `c.id, c.sens, c.numero, c.objet, c.correspondant, c.organisme,
   to_char(c.date_courrier, 'YYYY-MM-DD') AS date_courrier, c.canal, c.nature, c.urgent, c.confidentiel, c.statut,
   c.reponse_attendue, to_char(c.echeance, 'YYYY-MM-DD') AS echeance, c.assigne_a, c.assigne_nom, c.assigne_at,
   c.instruction, c.copies, c.document_id, c.reponse_a_id, c.expedie_at, c.mode_expedition, c.accuse_reception_at,
-  c.clos_at, c.clos_motif, c.created_by, c.created_by_nom, c.created_at`;
+  c.clos_at, c.clos_motif, c.created_by, c.created_by_nom, c.created_at, c.lettre, c.lettre_signataire, c.lettre_qualite, c.lettre_lieu`;
 
 const vers = (c) => ({ ...c, en_retard: enRetard(c) });
 
@@ -155,6 +155,21 @@ async function verifierAgents(tenantId, ids) {
   return voulus.map((id) => connus.find((a) => a.id === id));
 }
 
+/**
+ * Agent chargé, compte tenu des absences (042) : si l'agent choisi est absent,
+ * son suppléant reçoit le courrier. Rend { agent, relais } (relais : texte à
+ * verser à l'historique, ou null).
+ */
+async function agentCharge(tenantId, id) {
+  const [voulu] = await verifierAgents(tenantId, [id]);
+  if (!voulu) return { agent: null, relais: null };
+  const s = await require('./absenceService').suppleant(db, tenantId, voulu.id);
+  if (!s) return { agent: voulu, relais: null };
+  const remplacant = (await agents(tenantId)).find((a) => a.id === s.id);
+  if (!remplacant) return { agent: voulu, relais: null }; // suppléant sans accès au courrier : l'agent garde la charge
+  return { agent: remplacant, relais: `suppléant de ${voulu.full_name}, absent jusqu'au ${frDate(s.jusqu_au)}` };
+}
+
 /** Enregistre un courrier au registre. Rend le courrier. */
 async function enregistrer(user, corps = {}, { reponseA = null } = {}) {
   const tenantId = user.tenant_id;
@@ -167,7 +182,7 @@ async function enregistrer(user, corps = {}, { reponseA = null } = {}) {
   if (d.document_id && !(await db.query('SELECT 1 FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL', [d.document_id, tenantId])).rows[0]) {
     throw erreur(400, 'Document lié introuvable.');
   }
-  const affecte = corps.assigne_a ? (await verifierAgents(tenantId, [corps.assigne_a]))[0] : null;
+  const { agent: affecte, relais } = corps.assigne_a ? await agentCharge(tenantId, corps.assigne_a) : { agent: null, relais: null };
   const copies = (await verifierAgents(tenantId, Array.isArray(corps.copies) ? corps.copies : [])).map((a) => a.id);
   const qui = await identite(user);
   const client = await db.pool.connect();
@@ -185,7 +200,7 @@ async function enregistrer(user, corps = {}, { reponseA = null } = {}) {
         d.urgent, d.confidentiel, statut, d.reponse_attendue, d.echeance, affecte?.id || null, affecte?.full_name || null,
         affecte ? new Date() : null, longTexte(corps.instruction, 1000) || null, copies, d.document_id, reponseA?.id || null, qui.id, qui.nom])).rows[0];
     await evenement(client, tenantId, c.id, 'ENREGISTRE', qui, reponseA ? `Réponse au courrier ${reponseA.numero}` : null);
-    if (affecte) await evenement(client, tenantId, c.id, 'AFFECTE', qui, `À ${affecte.full_name}${corps.instruction ? ` — ${longTexte(corps.instruction, 1000)}` : ''}`);
+    if (affecte) await evenement(client, tenantId, c.id, 'AFFECTE', qui, `À ${affecte.full_name}${relais ? ` (${relais})` : ''}${corps.instruction ? ` — ${longTexte(corps.instruction, 1000)}` : ''}`);
     // Le scan tout juste déposé (« à indexer ») prend le numéro pour description.
     if (d.document_id) {
       await client.query(
@@ -218,19 +233,20 @@ async function lire(user, id) {
   const [evts, reponses, origine, copies] = await Promise.all([
     db.query('SELECT id, action, par_nom, note, created_at FROM courrier_evenements WHERE courrier_id = $1 ORDER BY id', [c.id]),
     db.query('SELECT id, numero, objet, statut, expedie_at FROM courriers WHERE reponse_a_id = $1 AND tenant_id = $2 ORDER BY id', [c.id, user.tenant_id]),
-    c.reponse_a_id ? db.query('SELECT id, numero, objet, correspondant FROM courriers WHERE id = $1 AND tenant_id = $2', [c.reponse_a_id, user.tenant_id]) : { rows: [] },
+    c.reponse_a_id ? db.query("SELECT id, numero, objet, correspondant, to_char(date_courrier, 'YYYY-MM-DD') AS date_courrier FROM courriers WHERE id = $1 AND tenant_id = $2", [c.reponse_a_id, user.tenant_id]) : { rows: [] },
     c.copies.length ? db.query('SELECT id, full_name FROM users WHERE id = ANY($1) AND tenant_id = $2 ORDER BY full_name', [c.copies, user.tenant_id]) : { rows: [] },
   ]);
   const charge = c.assigne_a === user.id;
   const ouvert = OUVERTS.includes(c.statut);
   return {
-    ...vers(c), evenements: evts.rows, reponses: reponses.rows, origine: origine.rows[0] || null, copies_noms: copies.rows,
+    ...vers(c), evenements: evts.rows, reponses: reponses.rows, origine: origine.rows[0] || null, origine_date: origine.rows[0]?.date_courrier || null, copies_noms: copies.rows,
     actions: {
       affecter: ouvert && (d0.gerer || d0.enregistrer || charge),
       prendre_en_charge: c.statut === 'affecte' && charge,
       repondre: ouvert && c.sens !== 'depart' && (charge || d0.gerer || d0.enregistrer),
       clore: ouvert && (charge || d0.gerer),
       expedier: c.statut === 'brouillon' && (c.created_by === user.id || d0.gerer || d0.enregistrer),
+      rediger: c.statut === 'brouillon' && (c.created_by === user.id || d0.registre),
       accuse_reception: c.sens === 'arrivee' && (d0.enregistrer || d0.gerer),
       modifier: c.statut !== 'clos' && c.statut !== 'expedie' && (c.created_by === user.id || d0.registre),
     },
@@ -336,7 +352,7 @@ function affecter(user, id, corps = {}) {
   return action(user, id, async ({ c, d0, qui, client }) => {
     if (!OUVERTS.includes(c.statut)) throw erreur(409, 'Ce courrier ne peut plus être affecté.');
     if (!d0.gerer && !d0.enregistrer && c.assigne_a !== user.id) throw erreur(403, "Vous ne pouvez pas affecter ce courrier.");
-    const [agent] = await verifierAgents(user.tenant_id, [corps.assigne_a]);
+    const { agent, relais } = await agentCharge(user.tenant_id, corps.assigne_a);
     if (!agent) throw erreur(400, "Choisissez l'agent chargé du courrier.");
     const copies = corps.copies === undefined ? c.copies : (await verifierAgents(user.tenant_id, Array.isArray(corps.copies) ? corps.copies : [])).map((a) => a.id);
     const instruction = longTexte(corps.instruction, 1000) || null;
@@ -346,7 +362,7 @@ function affecter(user, id, corps = {}) {
       `UPDATE courriers SET assigne_a = $2, assigne_nom = $3, assigne_at = now(), instruction = $4, echeance = $5, copies = $6,
               statut = 'affecte', relance_at = NULL, retard_notifie_at = NULL WHERE id = $1`,
       [c.id, agent.id, agent.full_name, instruction, echeance, copies]);
-    await evenement(client, user.tenant_id, c.id, c.assigne_a ? 'REAFFECTE' : 'AFFECTE', qui, `À ${agent.full_name}${instruction ? ` — ${instruction}` : ''}`);
+    await evenement(client, user.tenant_id, c.id, c.assigne_a ? 'REAFFECTE' : 'AFFECTE', qui, `À ${agent.full_name}${relais ? ` (${relais})` : ''}${instruction ? ` — ${instruction}` : ''}`);
     const nouvellesCopies = copies.filter((x) => !c.copies.includes(x));
     return async () => {
       if (agent.id !== user.id) {
@@ -481,6 +497,95 @@ async function accuseReception(user, id) {
   return { numero: c.numero, pdf };
 }
 
+/** Met en page la lettre (PDF A4). Fonction sans base. `l` : voir rediger(). */
+async function construireLettre(l) {
+  const { encodable, lignes } = require('./copieCertifieeService');
+  const doc = await PDFDocument.create();
+  doc.setTitle(`Courrier ${l.numero}`);
+  doc.setSubject(l.objet);
+  doc.setProducer('DocuFlow');
+  const police = await doc.embedFont(StandardFonts.Helvetica);
+  const gras = await doc.embedFont(StandardFonts.HelveticaBold);
+  const [L, H] = [595.28, 841.89];
+  const x = 70;
+  const largeur = L - 2 * x;
+  let page = doc.addPage([L, H]);
+  let y = H - 70;
+  const noir = rgb(0.1, 0.1, 0.1);
+  const gris = rgb(0.4, 0.4, 0.4);
+  const ecrire = (t, { taille = 11, f = police, apres = 6, couleur = noir, dx = 0, max = largeur } = {}) => {
+    for (const ligne of lignes(f, taille, t, max)) {
+      if (y < 90) { page = doc.addPage([L, H]); y = H - 70; }
+      page.drawText(ligne, { x: x + dx, y, size: taille, font: f, color: couleur });
+      y -= taille * 1.45;
+    }
+    y -= apres;
+  };
+  ecrire(l.organisation.toUpperCase(), { f: gras, apres: 0 });
+  if (l.adresse) ecrire(l.adresse.replace(/\s*\n\s*/g, ' — '), { taille: 9, couleur: gris, apres: 0 });
+  y -= 14;
+  ecrire(`N° ${l.numero}`, { taille: 10, f: gras, apres: 18 });
+  ecrire(`${l.lieu ? `${l.lieu}, le ` : 'Le '}${new Date(l.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Porto-Novo' })}`, { dx: largeur / 2, max: largeur / 2, apres: 18 });
+  ecrire(l.correspondant, { f: gras, dx: largeur / 2, max: largeur / 2, apres: 0 });
+  if (l.organisme) ecrire(l.organisme, { dx: largeur / 2, max: largeur / 2, apres: 0 });
+  y -= 26;
+  ecrire(`Objet : ${l.objet}`, { f: gras, apres: l.reference ? 2 : 16 });
+  if (l.reference) ecrire(`Réf. : ${l.reference}`, { taille: 10, couleur: gris, apres: 16 });
+  for (const paragraphe of String(l.corps).split(/\n{2,}/)) ecrire(paragraphe.trim(), { apres: 10 });
+  y -= 24;
+  if (y < 150) { page = doc.addPage([L, H]); y = H - 70; }
+  if (l.qualite) ecrire(l.qualite, { dx: largeur / 2, max: largeur / 2, apres: 46 });
+  else y -= 40;
+  if (l.signataire) ecrire(encodable(gras, l.signataire), { f: gras, dx: largeur / 2, max: largeur / 2 });
+  return Buffer.from(await doc.save());
+}
+
+/**
+ * Rédige (ou reprend) la lettre d'un courrier départ : le texte devient un PDF
+ * à en-tête, versé dans la GED — premier jet, puis nouvelle version à chaque
+ * reprise. Le document peut ensuite suivre un circuit de validation.
+ */
+async function rediger(user, id, corps = {}) {
+  const c = await lire(user, id);
+  if (!c.actions.rediger) throw erreur(c.statut === 'brouillon' ? 403 : 409, c.statut === 'brouillon' ? 'Vous ne pouvez pas rédiger ce courrier.' : 'Ce courrier est déjà expédié.');
+  const lettre = longTexte(corps.lettre, 20000);
+  if (lettre.length < 10) throw erreur(400, 'Le texte de la lettre est vide.');
+  const tenantId = user.tenant_id;
+  const { ajouterFichierGenere, setCanonicalReference, logHistory } = require('./documentIndexService');
+  const reglages = await settingsService.getAll(tenantId);
+  const organisation = reglages.legal_entity || (await db.query('SELECT name FROM tenants WHERE id = $1', [tenantId])).rows[0]?.name || '';
+  const qui = await identite(user);
+  const signataire = texte(corps.signataire, 120) || null;
+  const qualite = texte(corps.qualite, 120) || null;
+  const lieu = texte(corps.lieu, 80) || null;
+  const reference = c.origine
+    ? `votre courrier${c.origine_date ? ` du ${frDate(c.origine_date)}` : ''}${c.reference_externe ? `, réf. ${c.reference_externe}` : ''} (enregistré sous le n° ${c.origine.numero})`
+    : (c.reference_externe || null);
+  const pdf = await construireLettre({
+    numero: c.numero, organisation, adresse: reglages.legal_address || null, lieu, date: new Date(), correspondant: c.correspondant,
+    organisme: c.organisme, objet: c.objet, reference, corps: lettre, signataire, qualite,
+  });
+  let documentId = c.document_id;
+  if (documentId && !(await db.query('SELECT 1 FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL AND elimine_at IS NULL', [documentId, tenantId])).rows[0]) documentId = null;
+  const nouveau = !documentId;
+  if (nouveau) {
+    documentId = (await db.query(
+      `INSERT INTO documents (tenant_id, reference_mfile, num_dossier, num_acte, nom_entreprise, annee, type_document, description, auteur, date_document, statut, version, created_by)
+       VALUES ($1, $2, 'COURRIER', $3, $4, $5, 'Courrier départ', $6, $7, CURRENT_DATE, 'disponible', 1, $8) RETURNING id`,
+      [tenantId, `DOC-${Date.now()}-${Math.floor(Math.random() * 1e6)}`, c.numero, c.organisme || c.correspondant, new Date().getFullYear(),
+        `Courrier ${c.numero} — ${c.objet}`, qui.nom, user.id])).rows[0].id;
+    await setCanonicalReference(tenantId, documentId);
+  }
+  await ajouterFichierGenere(tenantId, documentId, user.id, { octets: pdf, originalname: `${c.numero}.pdf`, mimetype: 'application/pdf' });
+  await logHistory(tenantId, documentId, user.id, nouveau ? 'Lettre rédigée depuis le courrier' : 'Lettre reprise depuis le courrier', null, null, `Courrier départ ${c.numero}`);
+  await db.query(
+    'UPDATE courriers SET lettre = $2, lettre_signataire = $3, lettre_qualite = $4, lettre_lieu = $5, document_id = $6, updated_at = now() WHERE id = $1',
+    [c.id, lettre, signataire, qualite, lieu, documentId]);
+  await db.query(`INSERT INTO courrier_evenements (tenant_id, courrier_id, action, par, par_nom) VALUES ($1, $2, $3, $4, $5)`,
+    [tenantId, c.id, nouveau ? 'LETTRE_REDIGEE' : 'LETTRE_REPRISE', qui.id, qui.nom]);
+  return lire(user, id);
+}
+
 /** Rappels : deux jours avant l'échéance, puis au dépassement. Rend le nombre de rappels. */
 async function relancer() {
   let n = 0;
@@ -508,4 +613,5 @@ function demarrerCourrier() {
 module.exports = {
   SENS, CANAUX, NATURES, MOTIFS_CLOTURE, lireSaisie, enRetard, agents, enregistrer, lire, lister, synthese, correspondants,
   affecter, prendreEnCharge, annoter, clore, repondre, expedier, modifier, accuseReception, relancer, demarrerCourrier,
+  construireLettre, rediger,
 };

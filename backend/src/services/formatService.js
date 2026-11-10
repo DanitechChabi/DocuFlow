@@ -222,7 +222,7 @@ function versPdfa(source, dossier) {
 async function copieConservation(tenantId, documentId, fileId, user) {
   const { lireOctets } = require('./paquetService');
   const integrite = require('./integriteService');
-  const { addFileToDocument } = require('./documentIndexService');
+  const { ajouterFichierGenere } = require('./documentIndexService');
   const f = (await db.query(
     `SELECT f.* FROM document_files f JOIN documents d ON d.id = f.document_id
       WHERE f.id = $1 AND f.document_id = $2 AND d.tenant_id = $3 AND d.elimine_at IS NULL`, [Number(fileId), Number(documentId), tenantId])).rows[0];
@@ -241,8 +241,10 @@ async function copieConservation(tenantId, documentId, fileId, user) {
     const produit = identifier(fs.readFileSync(pdf), 'copie.pdf');
     if (!produit.pdfa) throw new Error('La conversion n\'a pas produit un PDF/A.');
     const nom = `${path.basename(f.original_name || 'document', path.extname(f.original_name || ''))} (PDF-A).pdf`;
-    const ajoute = await addFileToDocument(tenantId, Number(documentId), user.id, {
-      path: pdf, filename: path.basename(pdf), originalname: nom, mimetype: 'application/pdf', size: fs.statSync(pdf).size,
+    // Le PDF produit dans le dossier temporaire est rangé dans le stockage
+    // (ajouterFichierGenere) : sinon il disparaîtrait avec ce dossier.
+    const ajoute = await ajouterFichierGenere(tenantId, Number(documentId), user.id, {
+      octets: fs.readFileSync(pdf), originalname: nom, mimetype: 'application/pdf',
     });
     await db.query('UPDATE document_files SET copie_de_file_id = $2 WHERE id = $1', [ajoute.id, f.id]);
     const qui = await integrite.identite(user);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AbsenceCarte from '../components/AbsenceCarte';
 import { userService } from '../services/userService';
 import { sectionService } from '../services/sectionService';
 import { authService } from '../services/authService';
@@ -237,6 +238,8 @@ const ProfilePage = () => {
         </div>
 
         {/* Section 2 : Mot de passe */}
+        <AbsenceCarte />
+
         <div className="glass-card-premium p-5 md:p-8 animate-fade-in-up delay-300">
           <div className="flex items-center gap-3 mb-6 md:mb-8">
             <div className="p-2 md:p-2.5 bg-orange-100 text-orange-600 rounded-xl">

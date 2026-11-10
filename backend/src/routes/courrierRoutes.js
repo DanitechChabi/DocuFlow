@@ -31,6 +31,7 @@ router.post('/:id/prise-en-charge', repondre((req) => courrier.prendreEnCharge(r
 router.post('/:id/notes', repondre((req) => courrier.annoter(req.user, req.params.id, req.body || {}), 'Note non enregistrée'));
 router.post('/:id/cloture', repondre((req) => courrier.clore(req.user, req.params.id, req.body || {}), 'Clôture impossible'));
 router.post('/:id/reponse', repondre((req) => courrier.repondre(req.user, req.params.id, req.body || {}), 'Réponse impossible', 201));
+router.post('/:id/lettre', repondre((req) => courrier.rediger(req.user, req.params.id, req.body || {}), 'Lettre non enregistrée'));
 router.post('/:id/expedition', repondre((req) => courrier.expedier(req.user, req.params.id, req.body || {}), 'Expédition non enregistrée'));
 router.get('/:id/accuse-reception', async (req, res) => {
   try {

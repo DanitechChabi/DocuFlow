@@ -540,12 +540,22 @@ async function ouvrirEtape(run, tenantId, instance, rang, reference, effets) {
     cibles = await gestionnaires(run, tenantId);
     if (!cibles.length && instance.demarre_par) cibles = [{ id: instance.demarre_par, nom: instance.demarre_par_nom }];
   }
+  // Absence et suppléance (042) : la tâche d'un absent va à son suppléant,
+  // « pour le compte de » l'absent. Une même personne ne reçoit qu'une tâche.
+  const absenceService = require('./absenceService');
+  const retenus = new Map();
+  for (const c of cibles) {
+    const s = await absenceService.suppleant(run, tenantId, c.id);
+    const cible = s ? { id: s.id, nom: s.nom, pour: s.pour_le_compte_de } : { ...c, pour: null };
+    if (!retenus.has(cible.id) || !cible.pour) retenus.set(cible.id, cible);
+  }
+  cibles = [...retenus.values()];
   const echeance = echeanceDe(etape.delai_jours);
   for (const c of cibles) {
     await run.query(
-      `INSERT INTO circuit_taches (tenant_id, instance_id, document_id, etape_rang, action, assigne_a, assigne_nom, echeance_at, secours)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [tenantId, instance.id, instance.document_id, rang, etape.action, c.id, c.nom, echeance, secours]
+      `INSERT INTO circuit_taches (tenant_id, instance_id, document_id, etape_rang, action, assigne_a, assigne_nom, echeance_at, secours, pour_le_compte_de)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [tenantId, instance.id, instance.document_id, rang, etape.action, c.id, c.nom, echeance, secours, c.pour]
     );
   }
   await run.query('UPDATE circuit_instances SET etape_courante = $1 WHERE id = $2', [rang, instance.id]);
