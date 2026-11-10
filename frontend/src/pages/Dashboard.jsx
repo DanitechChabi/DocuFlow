@@ -278,7 +278,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
       {TAB_AVEC_OVERVIEW.includes(tab) && (
         <>
         <div className="animate-fade-in-up">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5 mb-8 md:mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8 md:mb-10">
             {loading ? (
               <>
                 <SkeletonCard delay={0} />
@@ -319,7 +319,7 @@ const Dashboard = ({ tab = 'dashboard' }) => {
                   <div className="min-w-0">
                     <p className="stat-card-label">Délai moyen</p>
                     <p className="stat-card-value">{delaiMoyenLibelle}</p>
-                    <p className="stat-card-sublabel">{livreesAvecDelai.length} demande(s) livrée(s)</p>
+                    <p className="stat-card-sublabel whitespace-nowrap">sur {livreesAvecDelai.length} livrée{livreesAvecDelai.length > 1 ? 's' : ''}</p>
                   </div>
                   <div className="stat-card-icon" style={tons.ok} aria-hidden="true">
                     <Clock size={18} />

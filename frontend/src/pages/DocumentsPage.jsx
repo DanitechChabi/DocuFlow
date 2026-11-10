@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
-  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2,
+  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2, SlidersHorizontal,
 } from 'lucide-react';
 import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
@@ -11,6 +11,7 @@ import { authService } from '../services/authService';
 import { toast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ActionsParLot from '../components/ActionsParLot';
+import { titreDocument, detailDocument } from '../utils/libelleDocument';
 import DocumentFormModal from '../components/DocumentFormModal';
 import DocumentDetailsModal from '../components/DocumentDetailsModal';
 import DocumentAssemblyModal from '../components/DocumentAssemblyModal';
@@ -198,6 +199,8 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   };
   const [editingDoc, setEditingDoc] = useState(null);
   const [detailDoc, setDetailDoc] = useState(null);
+  // Téléphone : les filtres se replient pour laisser la liste au premier écran.
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
   // Sélection multiple (actions par lot) : conservée d'une page à l'autre.
   const [selection, setSelection] = useState(() => new Map());
   const [folderOpen, setFolderOpen] = useState(false);
@@ -359,6 +362,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   const total = data?.pagination?.total || 0;
   const totalPages = data?.pagination?.total_pages || 1;
   const pageDocs = (!loading && data?.documents) || [];
+  const nbFiltres = ['statut', 'type_document', 'annee', 'dossier_id', 'tag'].filter((k) => filters[k]).length;
 
   // /documents sans ?vue= : la vue d'ensemble du module (cartes, accès
   // rapides, récents) — la liste détaillée reste à /documents/liste.
@@ -441,6 +445,15 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                 onChange={(e) => { setQ(e.target.value); setPage(1); }}
               />
             </div>
+            {/* .btn fixe son propre display et l'emporte sur md:hidden : le masquage
+                se fait donc sur un conteneur. */}
+            <div className="md:hidden">
+              <button type="button" onClick={() => setFiltresOuverts((v) => !v)} aria-expanded={filtresOuverts}
+                className="btn btn-secondary">
+                <SlidersHorizontal size={16} /> Filtres{nbFiltres > 0 ? ` (${nbFiltres})` : ''}
+              </button>
+            </div>
+            <div className={`${filtresOuverts ? 'flex' : 'hidden'} md:contents flex-wrap items-center gap-3 w-full`}>
             <select className="input-premium w-auto" value={filters.statut} onChange={(e) => { setFilters((f) => ({ ...f, statut: e.target.value })); setPage(1); }}>
               <option value="">Statut : tous</option>
               {/* Dérivé du domaine partagé. La liste était écrite à la main et
@@ -477,11 +490,12 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
               className="btn btn-secondary" aria-pressed={folderOpen} title="Gérer l'arborescence des dossiers">
               <FolderTreeIcon size={16} /> Dossiers
             </button>
+            </div>
           </div>
 
           {/* Facettes : tags cliquables */}
           {data?.facets?.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className={`${filtresOuverts ? 'flex' : 'hidden'} md:flex flex-wrap gap-2`}>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 self-center">Tags :</span>
               {data.facets.tags.slice(0, 12).map((tag) => (
                 <button
@@ -648,10 +662,10 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
           </div>
         )}
 
-        {/* Table standard */}
+        {/* Liste : tableau à partir de md, cartes en dessous */}
         {viewMode === 'list' && (
         <div className="glass-card-premium overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
                 <tr>
@@ -660,30 +674,26 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                       checked={pageDocs.length > 0 && pageDocs.every((d) => selection.has(d.id))}
                       onChange={(e) => setSelection((sel) => { const n = new Map(sel); pageDocs.forEach((d) => (e.target.checked ? n.set(d.id, d) : n.delete(d.id))); return n; })} />
                   </th>
+                  <th className="px-4 py-3 text-left">Document</th>
                   <th className="px-4 py-3 text-left">Référence</th>
-                  <th className="px-4 py-3 text-left">Entreprise</th>
-                  <th className="px-4 py-3 text-left">N° dossier / acte</th>
-                  <th className="px-4 py-3 text-left">Type</th>
                   <th className="px-4 py-3 text-left">Année</th>
                   <th className="px-4 py-3 text-left">Dossier</th>
                   <th className="px-4 py-3 text-left">Statut</th>
                   <th className="px-4 py-3 text-center">Fichiers</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
+                  <th className="px-4 py-3 w-12"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading && Array.from({ length: 6 }).map((_, idx) => (
                   <tr key={idx}>
                     <td className="pl-4 pr-1 py-3" />
+                    <td className="px-4 py-3"><div className="skeleton h-4 w-56 mb-1.5" /><div className="skeleton h-3 w-32" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-20" /></td>
-                    <td className="px-4 py-3"><div className="skeleton h-4 w-28" /></td>
-                    <td className="px-4 py-3"><div className="skeleton h-4 w-24" /></td>
-                    <td className="px-4 py-3"><div className="skeleton h-4 w-16" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-12" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-4 w-20" /></td>
                     <td className="px-4 py-3"><div className="skeleton h-5 w-16 rounded-full" /></td>
                     <td className="px-4 py-3 text-center"><div className="skeleton h-4 w-8 mx-auto" /></td>
-                    <td className="px-4 py-3 text-center"><div className="skeleton h-8 w-8 rounded-lg mx-auto" /></td>
+                    <td className="px-4 py-3" />
                   </tr>
                 ))}
                 {!loading && data?.documents?.map((d, idx) => (
@@ -692,22 +702,23 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                       <input type="checkbox" aria-label={`Sélectionner ${d.reference_mfile}`} checked={selection.has(d.id)}
                         onChange={(e) => setSelection((sel) => { const n = new Map(sel); if (e.target.checked) n.set(d.id, d); else n.delete(d.id); return n; })} />
                     </td>
-                    <td className="px-4 py-3 font-bold text-docuflow-secondary">{d.reference_mfile}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><Building2 size={14} className="text-slate-400" /> {d.nom_entreprise}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.num_dossier} / {d.num_acte}</td>
-                    <td className="px-4 py-3">{d.type_document || '—'}</td>
-                    <td className="px-4 py-3"><Calendar size={13} className="inline mr-1 text-slate-400" />{d.annee}</td>
-                    <td className="px-4 py-3">{d.dossier_name || '—'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 max-w-[420px]">
+                      <p className="font-semibold text-slate-800 truncate" title={titreDocument(d)}>{titreDocument(d)}</p>
+                      {detailDocument(d) && <p className="text-xs text-slate-500 truncate">{detailDocument(d)}</p>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[13px] font-semibold text-docuflow-secondary whitespace-nowrap">{d.reference_mfile}</td>
+                    <td className="px-4 py-3 text-slate-600">{d.annee}</td>
+                    <td className="px-4 py-3 text-slate-600">{d.dossier_name || <span className="text-slate-300">—</span>}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`status-badge ${STATUS_CLASSES[d.statut] || ''}`}>{STATUS_LABELS[d.statut] || d.statut}</span>
                     </td>
-                    <td className="px-4 py-3 text-center"><FileText size={14} className="inline mr-1 text-slate-400" />{d.files_count || 0}</td>
+                    <td className="px-4 py-3 text-center text-slate-600 whitespace-nowrap"><FileText size={14} className="inline mr-1 text-slate-400" />{d.files_count || 0}</td>
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       {isAdmin && (
                         <button
                           onClick={() => setSupprimerDoc(d)}
-                          className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-red-400 hover:text-red-600 mx-auto transition-colors"
-                          title="Mettre à la corbeille"
+                          className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-300 hover:text-red-600 mx-auto transition-colors"
+                          title="Mettre à la corbeille" aria-label={`Mettre ${d.reference_mfile} à la corbeille`}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -717,14 +728,38 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                 ))}
               </tbody>
             </table>
-            {!loading && data?.documents?.length === 0 && (
-              <div className="py-16 text-center text-slate-400">
-                <FileText size={36} className="mx-auto mb-3 opacity-40" />
-                <p className="font-medium">Aucun document trouvé</p>
-                <p className="text-sm">Ajustez votre recherche ou créez un document.</p>
-              </div>
-            )}
           </div>
+
+          {/* Téléphone : une carte par document */}
+          <ul className="md:hidden divide-y divide-slate-100">
+            {loading && Array.from({ length: 5 }).map((_, idx) => (
+              <li key={idx} className="p-4"><div className="skeleton h-4 w-3/4 mb-2" /><div className="skeleton h-3 w-1/2" /></li>
+            ))}
+            {!loading && data?.documents?.map((d) => (
+              <li key={d.id} className={`flex items-start gap-3 p-4 ${selection.has(d.id) ? 'bg-blue-50/60' : ''}`}>
+                <input type="checkbox" className="mt-1" aria-label={`Sélectionner ${d.reference_mfile}`} checked={selection.has(d.id)}
+                  onChange={(e) => setSelection((sel) => { const n = new Map(sel); if (e.target.checked) n.set(d.id, d); else n.delete(d.id); return n; })} />
+                <button type="button" onClick={() => setDetailDoc(d.id)} className="flex-1 min-w-0 text-left">
+                  <span className="block font-semibold text-slate-800 line-clamp-2">{titreDocument(d)}</span>
+                  {detailDocument(d) && <span className="block text-xs text-slate-500 truncate">{detailDocument(d)}</span>}
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-slate-500">
+                    <span className="font-mono font-semibold text-docuflow-secondary">{d.reference_mfile}</span>
+                    <span>{d.annee}</span>
+                    {d.dossier_name && <span className="truncate max-w-[40vw]">{d.dossier_name}</span>}
+                    <span className={`status-badge ${STATUS_CLASSES[d.statut] || ''}`}>{STATUS_LABELS[d.statut] || d.statut}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {!loading && data?.documents?.length === 0 && (
+            <div className="py-16 text-center text-slate-400">
+              <FileText size={36} className="mx-auto mb-3 opacity-40" />
+              <p className="font-medium">Aucun document trouvé</p>
+              <p className="text-sm">Ajustez votre recherche ou créez un document.</p>
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (

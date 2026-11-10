@@ -248,16 +248,16 @@ const DocumentChatbot = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-[88px] right-6 z-30 group"
+          className="fixed bottom-[68px] right-3 sm:bottom-[80px] sm:right-5 z-30 group"
           title="DocuBot — Assistant documentaire"
           aria-label="Ouvrir DocuBot, l'assistant documentaire"
         >
           <div className="relative">
             {/* Halo animé */}
-            <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-docuflow-secondary to-blue-500 opacity-30 blur-lg group-hover:opacity-50 transition-opacity animate-pulse"></div>
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-docuflow-secondary to-blue-500 opacity-0 blur-lg group-hover:opacity-40 transition-opacity"></div>
             {/* Robot icon */}
-            <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="11" width="18" height="10" rx="2"/>
                 <circle cx="9" cy="16" r="1"/>
                 <circle cx="15" cy="16" r="1"/>
@@ -267,7 +267,7 @@ const DocumentChatbot = () => {
               </svg>
             </div>
             {/* Badge "IA" */}
-            <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-md border-2 border-white">
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center shadow-md border-2 border-white">
               IA
             </div>
           </div>

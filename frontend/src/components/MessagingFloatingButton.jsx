@@ -47,7 +47,7 @@ const MessagingFloatingButton = () => {
       {/* Floating button */}
       <button
         onClick={() => setIsPanelOpen(!isPanelOpen)}
-        className={`fixed bottom-6 right-6 z-30 p-4 rounded-2xl shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 group ${
+        className={`fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-30 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 group ${
           isPanelOpen
             ? 'bg-slate-800 rotate-90 shadow-lg'
             : 'bg-gradient-to-br from-docuflow-secondary to-blue-600 hover:shadow-glow-blue'
@@ -55,14 +55,14 @@ const MessagingFloatingButton = () => {
         title="Messagerie"
       >
         {isPanelOpen ? (
-          <X size={24} className="text-white" />
+          <X size={20} className="text-white" />
         ) : (
           <>
-            <MessageCircle size={24} className="text-white" />
+            <MessageCircle size={20} className="text-white" />
             {unreadCount > 0 && (
               <span
                 key={unreadCount}
-                className="absolute -top-2 -right-2 min-w-[24px] h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1.5 border-2 border-white animate-pop-in shadow-lg"
+                className="absolute -top-2 -right-2 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border-2 border-white animate-pop-in shadow-lg"
               >
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>

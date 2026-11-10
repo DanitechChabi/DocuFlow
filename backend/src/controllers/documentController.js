@@ -402,7 +402,9 @@ exports.listDocuments = async (req, res) => {
 
     const listRes = await db.query(
       `SELECT d.*, f.name AS dossier_name,
-         (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id) AS files_count
+         (SELECT COUNT(*) FROM document_files df WHERE df.document_id = d.id) AS files_count,
+         (SELECT df.original_name FROM document_files df WHERE df.document_id = d.id ORDER BY df.version DESC LIMIT 1) AS fichier_nom,
+         (SELECT c.name FROM metadata_schemas c WHERE c.id = d.classe_id AND c.tenant_id = d.tenant_id) AS classe_nom
        FROM documents d
        LEFT JOIN document_folders f ON f.id = d.dossier_id AND f.tenant_id = d.tenant_id
        WHERE ${where}
