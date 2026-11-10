@@ -180,6 +180,8 @@ app.use('/api', require('./routes/serviceArchivesRoutes'));
 // Portail citoyen et vérification publique des copies (040) : routes publiques
 // (débit limité) et volet du personnel.
 app.use('/api', require('./routes/portailRoutes'));
+// Courrier — bureau d'ordre (041).
+app.use('/api/courriers', require('./routes/courrierRoutes'));
 // Activation des licences de bureau — PUBLIC (le poste n'a pas encore de compte
 // au moment de s'activer). Voir l'en-tête de licenseRoutes.js. L'administration
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
@@ -321,6 +323,7 @@ const server = app.listen(PORT, HOST, () => {
     // contrôle périodique des fichiers stockés, sceau quotidien du journal.
     require('./services/integriteService').demarrerIntegrite();
     require('./services/horodatageService').demarrerHorodatage();
+    require('./services/courrierService').demarrerCourrier();
     // Formats de conservation (037) : identification des fichiers existants.
     require('./services/formatService').demarrerFormats();
     // Sauvegarde quotidienne de l'application de bureau (si activée).

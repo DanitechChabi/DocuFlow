@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   UserCircle, ListChecks, Star, CalendarClock, Search, FileText, Bell, ArrowRight, CheckCircle2, Pin, BellRing,
   ClipboardList, FileSearch,
+  Mail,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { circuitService } from '../services/circuitService';
@@ -11,6 +12,7 @@ import { rechercheService } from '../services/rechercheService';
 import { documentService } from '../services/documentService';
 import { notificationService } from '../services/notificationService';
 import { requestService } from '../services/requestService';
+import { courrierService } from '../services/courrierService';
 import { authService } from '../services/authService';
 import { usePermissions } from '../hooks/usePermissions';
 import { useTitrePage } from '../hooks/useTitrePage';
@@ -79,7 +81,12 @@ const objetDemande = (r) => r.description || [r.type_document, r.nom_entreprise]
 
 const MonEspacePage = () => {
   useTitrePage('Mon espace');
-  const { can } = usePermissions();
+  const { can, charge } = usePermissions();
+  const [courriers, setCourriers] = useState(null);
+  useEffect(() => {
+    if (!charge || !can('mail.view')) return;
+    courrierService.lister({ vue: 'a_moi', taille: 20 }).then((r) => setCourriers(r.courriers)).catch(() => setCourriers([]));
+  }, [can, charge]);
   const user = authService.getCurrentUser();
   const docs = can('documents.view');
   const traite = can('requests.process');
@@ -121,6 +128,16 @@ const MonEspacePage = () => {
       )}
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {can('mail.view') && courriers !== null && courriers.length > 0 && (
+          <Carte titre="Courriers à traiter" icone={Mail} teinte="bg-violet-50 text-violet-600" lien="/courrier?vue=a_moi" total={courriers.length} tour="mon-espace-courrier">
+            <ul className="space-y-0.5">
+              {courriers.slice(0, MAX).map((c) => (
+                <Ligne key={c.id} to={`/courrier/${c.id}`} titre={c.objet} detail={`${c.numero} · ${c.correspondant}`}
+                  droite={c.echeance ? c.echeance.slice(5).split('-').reverse().join('/') : ''} alerte={c.en_retard || c.urgent} />
+              ))}
+            </ul>
+          </Carte>
+        )}
         {traite && (
           <Carte titre="Demandes à traiter" icone={ClipboardList} teinte="bg-orange-50 text-orange-600" lien="/demandes/a-traiter" total={nbDemandes} tour="mon-espace-demandes">
             {demandesATraiter === null ? <Squelette /> : demandesATraiter.length === 0 ? <Vide>Aucune demande ne vous attend.</Vide> : (

@@ -74,12 +74,12 @@ console.log('\n4. Migration 019 — provisionne exactement les définitions du c
 // Permissions accordées après 019 par une migration dédiée (qui doit les poser).
 const AJOUTS_POSTERIEURS = {
   archiviste: ['requests.create', 'compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold',
-    'workflows.manage', 'workflows.start', 'archives.communicate'],
+    'workflows.manage', 'workflows.start', 'archives.communicate', 'mail.view', 'mail.register'],
   lecteur: ['requests.create'],
   admin: ['compliance.view', 'compliance.manage', 'archives.view', 'archives.manage', 'archives.hold', 'archives.validate',
-    'workflows.manage', 'workflows.start', 'archives.communicate'],
-  responsable: ['compliance.view', 'archives.view', 'archives.validate', 'workflows.start'],
-  agent: ['workflows.start'],
+    'workflows.manage', 'workflows.start', 'archives.communicate', 'mail.view', 'mail.register', 'mail.manage'],
+  responsable: ['compliance.view', 'archives.view', 'archives.validate', 'workflows.start', 'mail.view', 'mail.register', 'mail.manage'],
+  agent: ['workflows.start', 'mail.view'],
 };
 {
   const sql036 = require('fs').readFileSync(path.join(__dirname, '..', '..', 'docs', 'migrations', '036_archives_benin.sql'), 'utf8');

@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse, Mail, MailPlus, BookOpen,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -83,7 +83,8 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
   const pathname = location.pathname;
   const moduleDemandes = pathname.startsWith('/demandes') || pathname.startsWith('/dashboard');
   const moduleDocuments = pathname.startsWith('/documents');
-  const dansUnModule = moduleDemandes || moduleDocuments;
+  const moduleCourrier = pathname.startsWith('/courrier');
+  const dansUnModule = moduleDemandes || moduleDocuments || moduleCourrier;
 
   // Le repli est une préférence persistée ; en mobile (< lg) la sidebar est un
   // drawer, toujours « ouverte » en papier mais masquée à l'écran.
@@ -165,11 +166,20 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits', groupe: 'parametrage' }),
   ];
 
-  // Le changement de module : l'autre monde reste UN clic de distance.
+  // Courrier — bureau d'ordre (041).
+  const vuesCourrier = [
+    entree('/courrier', 'Registre', <Mail size={18} />, { permission: 'mail.view', end: true, tourId: 'courrier' }),
+    entree('/courrier/nouveau', 'Enregistrer un courrier', <MailPlus size={18} />, { permission: 'mail.register' }),
+    entree('/courrier/registre', 'Registre imprimable', <BookOpen size={18} />, { permission: 'mail.register' }),
+  ];
+
+  // Le changement de module : les autres mondes restent à UN clic de distance.
+  const LIBELLES_MODULES = { '/documents': 'Aller aux Documents', '/demandes': 'Aller aux Demandes', '/courrier': 'Aller au Courrier' };
   const autresModules = [
-    ...(moduleDemandes ? vuesDocuments.filter((v) => v.visible).slice(0, 1) : []),
-    ...(moduleDocuments ? vuesDemandes.filter((v) => v.visible).slice(0, 1) : []),
-  ].map((v) => ({ ...v, label: v.to.startsWith('/documents') ? 'Aller aux Documents' : 'Aller aux Demandes' }));
+    ...(!moduleDemandes ? vuesDemandes.filter((v) => v.visible).slice(0, 1) : []),
+    ...(!moduleCourrier ? vuesCourrier.filter((v) => v.visible).slice(0, 1) : []),
+    ...(!moduleDocuments ? vuesDocuments.filter((v) => v.visible).slice(0, 1) : []),
+  ].map((v) => ({ ...v, label: LIBELLES_MODULES[v.to], tourId: undefined }));
 
   const sections = dansUnModule
     ? [
@@ -179,11 +189,11 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
           items: [entree('/', 'Quitter le module', <LayoutDashboard size={18} />, { end: true, tourId: 'sidebar' })],
         },
         {
-          titre: moduleDemandes ? 'Demandes' : 'Documents',
-          items: moduleDemandes ? vuesDemandes : vuesDocuments,
+          titre: moduleDemandes ? 'Demandes' : moduleCourrier ? 'Courrier' : 'Documents',
+          items: moduleDemandes ? vuesDemandes : moduleCourrier ? vuesCourrier : vuesDocuments,
         },
         ...(autresModules.length ? [{
-          titre: 'Autre module',
+          titre: 'Autres modules',
           items: autresModules,
         }] : []),
       ]
@@ -200,6 +210,10 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
         {
           titre: 'Demandes',
           items: vuesDemandes,
+        },
+        {
+          titre: 'Courrier',
+          items: vuesCourrier,
         },
         {
           titre: 'Documents',

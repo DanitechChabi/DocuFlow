@@ -14,8 +14,9 @@ import { usePermissions } from '../hooks/usePermissions';
 const CLE_MASQUE = 'docuflow:demarrage-masque';
 
 const AssistantDemarrage = () => {
-  const { can } = usePermissions();
-  const autorise = can('settings.manage');
+  const { can, charge } = usePermissions();
+  // Tant que les permissions chargent, can() est permissif : on attend.
+  const autorise = charge && can('settings.manage');
   const [etat, setEtat] = useState(null);
   const [masque, setMasque] = useState(() => {
     try { return localStorage.getItem(CLE_MASQUE) === '1'; } catch { return false; }

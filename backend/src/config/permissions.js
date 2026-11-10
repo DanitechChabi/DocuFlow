@@ -86,6 +86,15 @@ const CATALOGUE = [
     ],
   },
   {
+    module: 'mail',
+    titre: 'Courrier',
+    permissions: [
+      { key: 'mail.view', label: 'Consulter son courrier', description: "Voir les courriers qui lui sont affectés ou dont il est en copie, les prendre en charge, y répondre et les clore." },
+      { key: 'mail.register', label: 'Enregistrer le courrier', description: "Tenir le registre : enregistrer un courrier arrivée, départ ou interne (numéro chronologique), consulter tout le registre hors courriers confidentiels, affecter à un agent, délivrer l'accusé de réception, constater l'expédition." },
+      { key: 'mail.manage', label: 'Superviser le courrier', description: "Voir tout le registre (hors courriers confidentiels), affecter et réaffecter, clore et corriger tout courrier, suivre les retards." },
+    ],
+  },
+  {
     module: 'workflows',
     titre: 'Circuits de validation',
     permissions: [
@@ -172,6 +181,7 @@ const ROLES_SYSTEME = [
       'compliance.view', 'compliance.manage',
       'archives.view', 'archives.manage', 'archives.hold', 'archives.validate', 'archives.communicate',
       'workflows.manage', 'workflows.start',
+      'mail.view', 'mail.register', 'mail.manage',
       'users.view', 'users.create', 'users.edit', 'users.disable',
       'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
       'audit.view', 'settings.manage', 'groups.view', 'groups.manage',
@@ -190,6 +200,7 @@ const ROLES_SYSTEME = [
       'compliance.view',
       'archives.view', 'archives.validate',
       'workflows.start',
+      'mail.view', 'mail.register', 'mail.manage',
       'audit.view',
     ],
     embleme: '🧑‍💼',
@@ -208,6 +219,7 @@ const ROLES_SYSTEME = [
       'compliance.view', 'compliance.manage',
       'archives.view', 'archives.manage', 'archives.hold', 'archives.communicate',
       'workflows.manage', 'workflows.start',
+      'mail.view', 'mail.register',
       'groups.view',
     ],
     embleme: '📚',
@@ -221,6 +233,7 @@ const ROLES_SYSTEME = [
       'documents.view', 'documents.upload', 'documents.download',
       'search.documents', 'search.requests',
       'workflows.start',
+      'mail.view',
     ],
     embleme: '📝',
   },

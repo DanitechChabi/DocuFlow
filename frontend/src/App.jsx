@@ -10,6 +10,10 @@ import BordereauImprimablePage from './pages/BordereauImprimablePage';
 import RapportAnnuelPage from './pages/RapportAnnuelPage';
 import PortailCitoyenPage from './pages/PortailCitoyenPage';
 import AffichePortailPage from './pages/AffichePortailPage';
+import CourrierPage from './pages/CourrierPage';
+import CourrierNouveauPage from './pages/CourrierNouveauPage';
+import CourrierFichePage from './pages/CourrierFichePage';
+import CourrierRegistrePage from './pages/CourrierRegistrePage';
 import VerificationCopiePage from './pages/VerificationCopiePage';
 import MagasinsPage from './pages/MagasinsPage';
 import RecolementPvPage from './pages/RecolementPvPage';
@@ -107,6 +111,11 @@ function App() {
               (liens partagés, favoris, tour guidé) : la page est la même. */}
           <Route path="/demandes" element={<Dashboard tab="overview" />} />
           <Route path="/demandes/portail/affiche" element={<AffichePortailPage />} />
+          {/* Courrier — bureau d'ordre (041) */}
+          <Route path="/courrier" element={<CourrierPage />} />
+          <Route path="/courrier/nouveau" element={<CourrierNouveauPage />} />
+          <Route path="/courrier/registre" element={<CourrierRegistrePage />} />
+          <Route path="/courrier/:id" element={<CourrierFichePage />} />
           <Route path="/demandes/mes-demandes" element={<Dashboard tab="requests" />} />
           <Route path="/demandes/nouvelle" element={<Dashboard tab="requests" nouveau />} />
           <Route path="/demandes/a-traiter" element={<Dashboard tab="my_tasks" />} />

@@ -10,12 +10,12 @@ import { toast } from './Toast';
  * lien à communiquer, affiche à imprimer pour le guichet, premiers chiffres.
  */
 const PortailCarte = () => {
-  const { can } = usePermissions();
+  const { can, charge } = usePermissions();
   const [p, setP] = useState(null);
   useEffect(() => {
-    if (!can('requests.process')) return;
+    if (!charge || !can('requests.process')) return;
     api.get('/portail-indicateurs').then((r) => setP(r.data)).catch(() => setP(null));
-  }, [can]);
+  }, [can, charge]);
   if (!p) return null;
   const lien = p.lien || (p.chemin ? `${window.location.origin}${p.chemin}` : null);
   return (

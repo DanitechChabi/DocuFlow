@@ -311,4 +311,4 @@ async function verifierPublic(jeton, empreinte = null) {
 }
 
 module.exports = {
-  verifierPublic, adressePublique, nature, encodable, construirePdf, delivrer, lister, exemplaire, verifier, RE_NUMERO };
+  verifierPublic, adressePublique, lignes, nature, encodable, construirePdf, delivrer, lister, exemplaire, verifier, RE_NUMERO };
