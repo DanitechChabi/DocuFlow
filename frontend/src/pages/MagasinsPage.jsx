@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  Warehouse, Plus, Trash2, ChevronRight, ChevronDown, Package, ClipboardCheck, Loader2, Printer, Check, Pencil, BookOpenText, Tags,
+  Warehouse, Plus, Trash2, ChevronRight, ChevronDown, Package, ClipboardCheck, Loader2, Printer, Check, Pencil, BookOpenText, Tags, Table2,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { physiqueService, TYPES_EMPLACEMENT, ENFANT_DE, RESULTATS, COULEURS } from '../services/physiqueService';
@@ -102,6 +102,7 @@ const Contenu = ({ id, profondeur = 0 }) => {
 const Emplacements = () => {
   const { can } = usePermissions();
   const gerer = can('archives.manage');
+  const saisir = can('documents.index') && can('documents.upload');
   const [liste, setListe] = useState(null);
   const [ouverts, setOuverts] = useState(new Set());
   const [ajout, setAjout] = useState(null); // emplacement parent | 'racine'
@@ -140,6 +141,7 @@ const Emplacements = () => {
         <span className="ml-auto flex items-center gap-2.5 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
           <Link to={`/documents/magasins/${e.id}/repertoire`} className="text-slate-400 hover:text-docuflow-secondary" title={`Répertoire de ${e.cote}`} aria-label={`Répertoire de ${e.cote}`}><BookOpenText size={14} /></Link>
           <Link to={`/documents/magasins/${e.id}/etiquettes`} className="text-slate-400 hover:text-docuflow-secondary" title={`Étiquettes des boîtes de ${e.cote}`} aria-label={`Étiquettes des boîtes de ${e.cote}`}><Tags size={14} /></Link>
+          {saisir && ['boite', 'tablette'].includes(e.type) && <Link to={`/documents/saisie?boite=${e.id}`} className="text-slate-400 hover:text-docuflow-secondary" title={`Saisir en tableau les dossiers de ${e.cote}`} aria-label={`Saisir en tableau les dossiers de ${e.cote}`}><Table2 size={14} /></Link>}
           {gerer && <button type="button" onClick={() => { setEdition(e.id); setAjout(null); }} className="text-slate-400 hover:text-docuflow-secondary" title="Modifier la description" aria-label={`Modifier ${e.cote}`}><Pencil size={13} /></button>}
           {gerer && ENFANT_DE[e.type] && <button type="button" onClick={() => { setAjout(e); setEdition(null); setOuverts((s) => new Set(s).add(e.id)); }} className="text-xs font-bold text-docuflow-secondary flex items-center gap-1"><Plus size={12} /> {TYPES_EMPLACEMENT[ENFANT_DE[e.type]]}</button>}
           {gerer && !e.nb_enfants && !e.nb_documents && <button type="button" onClick={() => supprimer(e)} className="text-slate-400 hover:text-red-600" aria-label="Supprimer"><Trash2 size={13} /></button>}
@@ -163,8 +165,11 @@ const Emplacements = () => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-600 max-w-3xl">Chaque original papier a sa place : dépôt, magasin, travée, tablette, boîte. La cote topographique (D1-M2-T03-E4-B0127) se lit de gauche à droite, du dépôt à la boîte. Décrivez chaque boîte comme sur un bordereau (intitulé, fonds, type, couleur d'étiquette) : le répertoire <BookOpenText size={13} className="inline" /> et les étiquettes <Tags size={13} className="inline" /> s'impriment à tout niveau. Rangez un document depuis sa fiche, carte « Original papier ».</p>
-        {gerer && <button type="button" onClick={() => setAjout('racine')} className="btn btn-primary btn-sm"><Plus size={14} /> Nouveau dépôt</button>}
+        <p className="text-sm text-slate-600 max-w-3xl">Chaque original papier a sa place : dépôt, magasin, travée, tablette, boîte. La cote topographique (D1-M2-T03-E4-B0127) se lit de gauche à droite, du dépôt à la boîte. Décrivez chaque boîte comme sur un bordereau (intitulé, fonds, type, couleur d'étiquette) : le répertoire <BookOpenText size={13} className="inline" /> et les étiquettes <Tags size={13} className="inline" /> s'impriment à tout niveau. Rangez un document depuis sa fiche, carte « Original papier », ou saisissez tout le contenu d'une boîte en tableau <Table2 size={13} className="inline" />.</p>
+        <span className="flex flex-wrap gap-2">
+          {saisir && <Link to="/documents/saisie" className="btn btn-secondary btn-sm"><Table2 size={14} /> Saisie en tableau</Link>}
+          {gerer && <button type="button" onClick={() => setAjout('racine')} className="btn btn-primary btn-sm"><Plus size={14} /> Nouveau dépôt</button>}
+        </span>
       </div>
       {ajout === 'racine' && <FormulaireEmplacement parent={null} suggestions={suggestions} onFait={() => { setAjout(null); charger(); }} onAnnuler={() => setAjout(null)} />}
       {liste.length === 0 ? (

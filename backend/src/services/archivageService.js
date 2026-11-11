@@ -91,17 +91,29 @@ const jourDe = (v) => {
 
 /**
  * Date de départ de la DUA.
- *  - date_document : la date du document ; absente, la date d'entrée dans la
- *    GED est retenue (plus tardive : l'échéance recule, jamais l'inverse) et
- *    signalée comme estimée ;
+ *  - date_document : la date du document. Un DOSSIER décrit par ses dates
+ *    extrêmes (migration 043) se compte de sa clôture — le 31 décembre de
+ *    l'année de fin — dès que celle-ci est postérieure à l'année du document,
+ *    ou que le document n'a pas de date. Sans date ni dates extrêmes, la date
+ *    d'entrée dans la GED est retenue (plus tardive : l'échéance recule,
+ *    jamais l'inverse) et signalée comme estimée ;
  *  - creation : l'entrée dans la GED ;
  *  - archivage : le passage au statut « archivé » ; un document non archivé
- *    n'a pas d'échéance (sa DUA n'a pas commencé).
+ *    n'a pas d'échéance (sa DUA n'a pas commencé). Un dossier clos AVANT
+ *    d'entrer dans DocuFlow (reprise d'un fonds papier, dates extrêmes
+ *    antérieures à l'archivage) se compte de sa clôture.
  */
-function departDua({ date_document: dateDoc, created_at: creation, archive_at: archive }, point = 'date_document') {
+function departDua({ date_document: dateDoc, created_at: creation, archive_at: archive, annee_debut: debut, annee_fin: fin }, point = 'date_document') {
   if (point === 'creation') return { depart: jourDe(creation), estime: false };
-  if (point === 'archivage') return { depart: jourDe(archive), estime: false };
-  if (dateDoc) return { depart: jourDe(dateDoc), estime: false };
+  const cloture = Number(fin || debut) || null;
+  if (point === 'archivage') {
+    const archivage = jourDe(archive);
+    if (archivage && cloture && `${cloture}-12-31` < archivage) return { depart: `${cloture}-12-31`, estime: false };
+    return { depart: archivage, estime: false };
+  }
+  const date = dateDoc ? jourDe(dateDoc) : null;
+  if (cloture && (!date || cloture > Number(date.slice(0, 4)))) return { depart: `${cloture}-12-31`, estime: false };
+  if (date) return { depart: date, estime: false };
   return { depart: jourDe(creation), estime: Boolean(creation) };
 }
 
@@ -299,10 +311,21 @@ const SQL_ECHEANCES = `
     LEFT JOIN LATERAL (
       SELECT CASE c.dua_point_depart
                WHEN 'creation' THEN d.created_at::date
-               WHEN 'archivage' THEN d.archive_at::date
-               ELSE COALESCE(d.date_document, d.created_at::date)
+               WHEN 'archivage' THEN CASE
+                      WHEN d.archive_at IS NOT NULL AND COALESCE(d.annee_fin, d.annee_debut) IS NOT NULL
+                           AND make_date(COALESCE(d.annee_fin, d.annee_debut), 12, 31) < d.archive_at::date
+                        THEN make_date(COALESCE(d.annee_fin, d.annee_debut), 12, 31)
+                      ELSE d.archive_at::date
+                    END
+               ELSE CASE
+                      WHEN COALESCE(d.annee_fin, d.annee_debut) IS NOT NULL
+                           AND (d.date_document IS NULL OR COALESCE(d.annee_fin, d.annee_debut) > EXTRACT(YEAR FROM d.date_document))
+                        THEN make_date(COALESCE(d.annee_fin, d.annee_debut), 12, 31)
+                      ELSE COALESCE(d.date_document, d.created_at::date)
+                    END
              END AS depart,
-             (COALESCE(c.dua_point_depart, 'date_document') = 'date_document' AND d.date_document IS NULL) AS estime
+             (COALESCE(c.dua_point_depart, 'date_document') = 'date_document' AND d.date_document IS NULL
+               AND COALESCE(d.annee_fin, d.annee_debut) IS NULL) AS estime
        WHERE c.dua_annees IS NOT NULL
     ) x ON true
     LEFT JOIN document_gels g ON g.document_id = d.id AND g.leve_at IS NULL

@@ -48,7 +48,7 @@ const normaliser = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '
 
 /**
  * Calcul pur.
- * @param {{ categorie?: string|null, date_document?: string, created_at?: string|Date, naissance?: string|null, verse_archives_publiques?: boolean }} d
+ * @param {{ categorie?: string|null, date_document?: string, created_at?: string|Date, annee_debut?: number|null, annee_fin?: number|null, naissance?: string|null, verse_archives_publiques?: boolean }} d
  * @returns {{ categorie, libelle, reference, communicable: boolean, a_partir_du: string|null, raison: string|null }}
  */
 function calculer(d, aujourdhui = jour(new Date())) {
@@ -66,7 +66,11 @@ function calculer(d, aujourdhui = jour(new Date())) {
       return { ...base, communicable: false, a_partir_du: null, raison: 'Date de naissance de la personne inconnue : renseignez la propriété « Date de naissance ».' };
     }
   } else {
-    depart = jour(d.date_document) || jour(d.created_at);
+    // Un dossier décrit par ses dates extrêmes (migration 043) se compte de sa
+    // clôture : le 31 décembre de l'année de fin (même règle que la DUA).
+    const date = jour(d.date_document);
+    const cloture = Number(d.annee_fin || d.annee_debut) || null;
+    depart = cloture && (!date || cloture > Number(date.slice(0, 4))) ? `${cloture}-12-31` : (date || jour(d.created_at));
   }
   if (!depart) return { ...base, communicable: false, a_partir_du: null, raison: 'Date du document inconnue.' };
   const libre = ajouterAnnees(depart, regle.annees);
@@ -76,7 +80,7 @@ function calculer(d, aujourdhui = jour(new Date())) {
 /** État de communicabilité d'un document (null s'il n'existe pas dans l'organisation). */
 async function etatDocument(tenantId, documentId) {
   const { rows } = await db.query(
-    `SELECT d.id, to_char(d.date_document, 'YYYY-MM-DD') AS date_document, d.created_at, c.communicabilite,
+    `SELECT d.id, to_char(d.date_document, 'YYYY-MM-DD') AS date_document, d.created_at, d.annee_debut, d.annee_fin, c.communicabilite,
             (v.destination = 'archives_publiques') AS verse_archives_publiques
        FROM documents d LEFT JOIN metadata_schemas c ON c.id = d.classe_id AND c.tenant_id = d.tenant_id
        LEFT JOIN bordereaux_versement v ON v.id = d.verse_versement_id AND v.statut = 'pris_en_charge'
@@ -95,6 +99,7 @@ async function etatDocument(tenantId, documentId) {
   }
   return calculer({
     categorie: d.communicabilite, date_document: d.date_document, created_at: d.created_at, naissance,
+    annee_debut: d.annee_debut, annee_fin: d.annee_fin,
     verse_archives_publiques: Boolean(d.verse_archives_publiques),
   });
 }

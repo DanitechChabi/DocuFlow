@@ -1109,6 +1109,29 @@ button:disabled, [disabled] { cursor: not-allowed; }
 }
 
 /* ---------------------------------------------------------------------------
+   Grille de saisie (saisie en tableau des dossiers papier) : des cellules
+   sans bordure propre, à la manière d'un tableur ; l'en-tête reste visible
+   quand la grille défile. Une cellule fautive se voit sans avoir à la survoler.
+   --------------------------------------------------------------------------- */
+.grille-saisie { border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; table-layout: fixed; width: max-content; min-width: 100%; }
+.grille-saisie th {
+  position: sticky; top: 0; z-index: 2; background: #f8fafc; color: #475569; font-size: 0.75rem; font-weight: 700;
+  text-align: left; padding: 0.5rem; border-bottom: 1px solid #cbd5e1; border-right: 1px solid #e2e8f0; white-space: nowrap;
+}
+.grille-saisie td { padding: 0; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #eef2f6; background: #fff; }
+.grille-saisie tr.doublon td { background: #fffbeb; }
+/* Le numéro de ligne reste visible quand la grille défile vers la droite. */
+.grille-saisie th:first-child { left: 0; z-index: 3; }
+.grille-saisie td:first-child { position: sticky; left: 0; z-index: 1; background: #f8fafc; }
+.grille-saisie .cellule {
+  display: block; width: 100%; height: 2.25rem; padding: 0 0.5rem; border: 0; border-radius: 0; background: transparent;
+  outline: none; font: inherit; color: #0f172a;
+}
+.grille-saisie .cellule::placeholder { color: #cbd5e1; }
+.grille-saisie .cellule:focus { background: #fff; box-shadow: inset 0 0 0 2px var(--color-docuflow-secondary); }
+.grille-saisie .cellule.fautive { background: #fef2f2; box-shadow: inset 0 0 0 2px #f87171; }
+
+/* ---------------------------------------------------------------------------
    Étiquettes de boîtes d'archives (migration 043) : deux par rangée, à
    découper et coller au dos des boîtes. La bande reprend la couleur
    d'étiquette de la boîte ; les navigateurs n'impriment pas les fonds par

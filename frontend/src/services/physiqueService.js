@@ -10,6 +10,9 @@ export const physiqueService = {
   // Description des boîtes et répertoire (043).
   suggestions: async () => (await api.get('/archives/emplacements/suggestions')).data,
   repertoire: async (id) => (await api.get(`/archives/emplacements/${id}/repertoire`)).data,
+  // Saisie en tableau des dossiers papier : la grille, puis l'enregistrement du lot.
+  modeleSaisie: async () => (await api.get('/archives/saisie/modele')).data,
+  saisir: async (corps) => (await api.post('/archives/saisie', corps)).data,
   localisation: async (documentId) => (await api.get(`/documents/${documentId}/localisation`)).data,
   placer: async (documentId, corps) => (await api.put(`/documents/${documentId}/localisation`, corps)).data,
   recolements: async () => (await api.get('/archives/recolements')).data,

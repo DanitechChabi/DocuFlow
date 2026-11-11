@@ -4,11 +4,12 @@
 // physiqueService ; ici, la traduction HTTP.
 // ============================================================================
 const physique = require('../services/physiqueService');
+const saisie = require('../services/saisieService');
 const { verifierAccesDocument, repondreRefus } = require('../helpers/accesDocument');
 
 const erreur = (res, err, message) => {
   if (err && err.status && err.status < 500) {
-    return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}) });
+    return res.status(err.status).json({ message: err.message, ...(err.code ? { code: err.code } : {}), ...(err.details || {}) });
   }
   console.error(`[physique] ${message} :`, err);
   return res.status(500).json({ message });
@@ -47,3 +48,7 @@ exports.recolement = action((req) => physique.detailRecolement(t(req), req.param
 exports.constater = action((req) => physique.constater(t(req), req.params.id, req.body?.constats || [], req.user), 'Constat impossible');
 exports.clore = action((req) => physique.clore(t(req), req.params.id, req.body || {}, req.user), 'Clôture impossible');
 exports.pvRecolement = action((req) => physique.procesVerbal(t(req), req.params.id), 'Édition du procès-verbal impossible');
+
+// Saisie en tableau des dossiers papier : une ligne, une fiche rangée.
+exports.modeleSaisie = action((req) => saisie.modele(t(req), req.user), 'Chargement de la grille impossible');
+exports.saisir = action((req) => saisie.creerLot(t(req), req.body || {}, req.user, { ip: req.ip }), 'Enregistrement de la saisie impossible', 201);
