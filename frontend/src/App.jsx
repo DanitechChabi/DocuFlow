@@ -12,6 +12,8 @@ import RepertoirePage from './pages/RepertoirePage';
 import EtiquettesPage from './pages/EtiquettesPage';
 import SaisieTableauPage from './pages/SaisieTableauPage';
 import OutilsGestionPage from './pages/OutilsGestionPage';
+import ArchivothequePage from './pages/ArchivothequePage';
+import ArchivothequeGestionPage from './pages/ArchivothequeGestionPage';
 import PortailCitoyenPage from './pages/PortailCitoyenPage';
 import AffichePortailPage from './pages/AffichePortailPage';
 import CourrierPage from './pages/CourrierPage';
@@ -97,6 +99,8 @@ function App() {
         <Route path="/partage/:jeton" element={<PartagePublicPage />} />
         {/* Portail citoyen et vérification des copies (040) : publics. */}
         <Route path="/portail/:slug" element={<PortailCitoyenPage />} />
+        {/* Archivothèque virtuelle (045) : vitrine publique, hors connexion. */}
+        <Route path="/archivotheque/:slug" element={<ArchivothequePage />} />
         <Route path="/verifier/:jeton" element={<VerificationCopiePage />} />
         <Route path="/privacy" element={<PrivacyPage type="privacy" />} />
         <Route path="/cookies" element={<PrivacyPage type="cookies" />} />
@@ -158,6 +162,7 @@ function App() {
           <Route path="/documents/magasins/:id/etiquettes" element={<EtiquettesPage />} />
           <Route path="/documents/saisie" element={<SaisieTableauPage />} />
           <Route path="/documents/outils" element={<OutilsGestionPage />} />
+          <Route path="/documents/archivotheque" element={<ArchivothequeGestionPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

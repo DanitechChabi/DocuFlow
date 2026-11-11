@@ -300,6 +300,13 @@ const CATALOG = [
     type: 'select', default: 'trimestrielle',
     options: [{ value: 'aucune', label: 'Aucune' }, { value: 'mensuelle', label: 'Chaque mois' }, { value: 'trimestrielle', label: 'Chaque trimestre' },
       { value: 'semestrielle', label: 'Chaque semestre' }, { value: 'annuelle', label: 'Chaque année' }] },
+  // --------------------------------------------------- ARCHIVOTHÈQUE (045)
+  { key: 'archivotheque_active', group: 'archives', label: 'Archivothèque publique',
+    description: "Ouvre une page publique, sans compte, où se consultent les pièces que vous choisissez de montrer. Une pièce n'y entre que communicable, sans donnée personnelle, et après autorisation. Désactivée, la page ne répond plus.",
+    type: 'boolean', default: 'false' },
+  { key: 'archivotheque_presentation', group: 'archives', label: "Texte d'accueil de l'archivothèque",
+    description: "Quelques lignes affichées en tête de la page publique : ce que l'on y trouve, et d'où viennent ces documents.",
+    type: 'text', default: '' },
   { key: 'horodatage_actif', group: 'archives', label: 'Horodatage par une autorité tierce',
     description: "Fait horodater (protocole RFC 3161) l'empreinte des sceaux du journal, des procès-verbaux d'élimination et des bordereaux de versement. Seule l'empreinte quitte DocuFlow. Code du numérique, art. 299-300 : un horodatage qualifié est présumé exact ; la qualification dépend du prestataire choisi.",
     type: 'boolean', default: 'false' },
