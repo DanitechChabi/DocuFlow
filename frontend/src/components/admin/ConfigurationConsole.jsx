@@ -570,7 +570,9 @@ const ConfigurationConsole = () => {
   const [form, setForm] = useState({});
   const [errors, setErrors] = useState({});
   const [activeGroup, setActiveGroup] = useState(null);
-  const [search, setSearch] = useState('');
+  // « ?reglage=… » : un lien venu d'ailleurs (assistant de démarrage, outils de
+  // gestion) arrive directement sur le paramètre dont il parle.
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('reglage') || '');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);

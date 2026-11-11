@@ -177,6 +177,7 @@ app.use('/api', require('./routes/rechercheRoutes'));
 app.use('/api', require('./routes/archivageRoutes'));
 app.use('/api', require('./routes/physiqueRoutes'));
 app.use('/api', require('./routes/serviceArchivesRoutes'));
+app.use('/api', require('./routes/outilsRoutes'));
 // Portail citoyen et vérification publique des copies (040) : routes publiques
 // (débit limité) et volet du personnel.
 app.use('/api', require('./routes/portailRoutes'));
@@ -326,6 +327,8 @@ const server = app.listen(PORT, HOST, () => {
     require('./services/integriteService').demarrerIntegrite();
     require('./services/horodatageService').demarrerHorodatage();
     require('./services/courrierService').demarrerCourrier();
+    // Campagnes d'archivage périodiques (044) : le rendez-vous de chaque période.
+    require('./services/campagneService').demarrer();
     // Formats de conservation (037) : identification des fichiers existants.
     require('./services/formatService').demarrerFormats();
     // Sauvegarde quotidienne de l'application de bureau (si activée).

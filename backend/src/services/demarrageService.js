@@ -5,7 +5,7 @@
 // données de l'organisation (une classe existe, une durée est posée…). La
 // liste suit l'ordre dans lequel un service d'archives béninois se met en
 // place : identité, autorité d'archives (décret n° 2007-532, art. 24 et 44),
-// plan de classement, durées de conservation (art. 38-46), équipe, magasins,
+// responsable des archives, plan de classement, durées de conservation (art. 38-46), équipe, magasins,
 // sauvegarde et horodatage (Code du numérique, art. 299-303), premier document.
 // ============================================================================
 const db = require('../config/db');
@@ -28,6 +28,9 @@ function construire(f) {
     { cle: 'autorite', titre: "Indiquer l'autorité d'archives compétente", fait: f.autorite,
       explication: "Elle vise les éliminations et reçoit les versements : DAN ou Direction des Archives Départementales (décret n° 2007-532, art. 24 et 44).",
       lien: '/admin-portal?onglet=configuration', action: 'Renseigner' },
+    { cle: 'responsable', titre: 'Désigner le responsable des archives', fait: Boolean(f.responsable),
+      explication: "Sans responsable désigné, chacun gère ses documents à sa façon et personne ne s'assure qu'ils le sont. Son nom figure en tête de la politique de gestion des documents.",
+      lien: '/admin-portal?onglet=configuration&reglage=Responsable%20des%20archives', action: 'Désigner' },
     { cle: 'plan', titre: 'Installer le plan de classement', fait: f.classes > 0,
       explication: 'Les classes de documents (actes de naissance, délibérations, marchés…) structurent le classement et l\'indexation.',
       lien: '/documents/classes', action: 'Installer un modèle', detail: f.classes ? `${f.classes} classe(s)` : null },
@@ -65,6 +68,7 @@ async function etat(tenantId) {
   const etapes = construire({
     identite: Boolean(reglages.site_logo) || (reglages.site_name && reglages.site_name !== 'DocuFlow'),
     autorite: Boolean(String(reglages.archives_autorite || '').trim()),
+    responsable: Boolean(String(reglages.archives_responsable || '').trim()),
     classes, sansDua, utilisateurs, emplacements, documents,
     sauvegardeDisponible: sauvegarde.disponible, sauvegardeActive: Boolean(sauvegarde.actif && sauvegarde.dossier),
     horodatage: reglages.horodatage_actif === true,

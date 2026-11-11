@@ -12,7 +12,8 @@ const ok = (cond, nom) => { verifs += 1; console.log(`${cond ? '  ok  ' : '  ÉC
 (async () => {
   console.log('\n1. Sans base');
   const vide = demarrage.construire({ classes: 0, sansDua: 0, utilisateurs: 1, emplacements: 0, documents: 0, sauvegardeDisponible: false });
-  ok(vide.map((e) => e.cle).join('>') === 'identite>autorite>plan>conservation>equipe>magasins>horodatage>document', 'ordre : identité, autorité, plan, durées, équipe, magasins, horodatage, document');
+  ok(vide.map((e) => e.cle).join('>') === 'identite>autorite>responsable>plan>conservation>equipe>magasins>horodatage>document', 'ordre : identité, autorité, responsable, plan, durées, équipe, magasins, horodatage, document');
+  ok(demarrage.construire({ responsable: true }).find((e) => e.cle === 'responsable').fait && !vide.find((e) => e.cle === 'responsable').facultatif, 'responsable des archives : étape obligatoire, constatée dès qu\'il est désigné');
   ok(vide.every((e) => !e.fait), 'organisation neuve : rien n\'est fait');
   ok(!vide.find((e) => e.cle === 'conservation').fait, 'pas de classe : les durées ne sont pas « faites »');
   const avecSauvegarde = demarrage.construire({ classes: 3, sansDua: 1, utilisateurs: 2, sauvegardeDisponible: true, sauvegardeActive: false });
@@ -36,6 +37,10 @@ const ok = (cond, nom) => { verifs += 1; console.log(`${cond ? '  ok  ' : '  ÉC
     e = await demarrage.etat(t);
     ok(e.etapes.find((x) => x.cle === 'plan').fait && e.etapes.find((x) => x.cle === 'conservation').fait, 'classe avec durée : plan et durées constatés');
     ok(e.etapes.find((x) => x.cle === 'equipe').fait, 'deux comptes : équipe constatée');
+    ok(!e.etapes.find((x) => x.cle === 'responsable').fait, 'aucun responsable désigné : étape ouverte');
+    await db.query("INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'archives_responsable', 'Mme Archi, archiviste')", [t]);
+    require('./services/settingsService').invalidate(t);
+    ok((await demarrage.etat(t)).etapes.find((x) => x.cle === 'responsable').fait, 'responsable désigné dans les réglages : étape constatée');
     const cx = await db.pool.connect();
     try {
       await cx.query('BEGIN');
