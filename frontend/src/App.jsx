@@ -8,6 +8,8 @@ import HomePage from './pages/HomePage';
 import MonEspacePage from './pages/MonEspacePage';
 import BordereauImprimablePage from './pages/BordereauImprimablePage';
 import RapportAnnuelPage from './pages/RapportAnnuelPage';
+import RepertoirePage from './pages/RepertoirePage';
+import EtiquettesPage from './pages/EtiquettesPage';
 import PortailCitoyenPage from './pages/PortailCitoyenPage';
 import AffichePortailPage from './pages/AffichePortailPage';
 import CourrierPage from './pages/CourrierPage';
@@ -150,6 +152,8 @@ function App() {
           <Route path="/documents/archivage/rapport/:annee" element={<RapportAnnuelPage />} />
           <Route path="/documents/magasins" element={<MagasinsPage />} />
           <Route path="/documents/magasins/recolements/:id/pv" element={<RecolementPvPage />} />
+          <Route path="/documents/magasins/:id/repertoire" element={<RepertoirePage />} />
+          <Route path="/documents/magasins/:id/etiquettes" element={<EtiquettesPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />

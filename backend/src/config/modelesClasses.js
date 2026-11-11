@@ -14,6 +14,15 @@
 
 const PAIEMENT = ['À payer', 'Payée', 'Payée partiellement', 'En litige'];
 
+// Marchés publics : les rubriques des bordereaux de traitement d'un fonds de
+// PRMP (personne responsable des marchés publics). Les sigles sont ceux du
+// terrain : ils figurent sur la lettre de soumission ou la page de garde.
+const MODES_PASSATION = [
+  "DAO — Dossier d'appel d'offres", 'DRP — Demande de renseignements et de prix', 'DC — Demande de cotation',
+  'DP — Demande de proposition', 'DFP — Demande de facture proforma', "AMI — Avis à manifestation d'intérêt", 'Autre',
+];
+const TYPES_MARCHE = ['Travaux', 'Fournitures', 'Services', 'Prestations intellectuelles'];
+
 const CLASSES = [
   // --- Finances ------------------------------------------------------------
   { code: 'FACF', nom: 'Facture fournisseur', categorie: 'Finances', mots_cles: 'facture, invoice', nature: 'facture',
@@ -114,9 +123,41 @@ const CLASSES = [
   { code: 'DPA', nom: 'Dossier individuel d\'agent', categorie: 'Ressources humaines', mots_cles: 'dossier individuel, dossier du personnel, fiche signaletique',
     modele_nom: 'DPA — {Agent} — {Matricule}', dossiers: ['Dossiers du personnel', 'Ressources humaines'],
     champs: [['Agent', 'text', true], ['Matricule', 'text', true], ['Date de naissance', 'date', true], ['Date de prise de service', 'date'], ['Date de cessation', 'date']] },
-  { code: 'MP', nom: 'Marché public', categorie: 'Finances et marchés', mots_cles: 'marche public, appel d\'offres, dossier d\'appel d\'offres, attribution du marche',
-    modele_nom: 'MP-{année}-{N° du marché} — {Titulaire}', dossiers: ['Marchés et contrats', 'Contrats'], annee: true,
-    champs: [['N° du marché', 'text', true], ['Objet', 'text', true], ['Titulaire', 'text', true], ['Montant TTC', 'number'], ['Date d\'attribution', 'date'], ['Date de réception définitive', 'date']] },
+  // --- Marchés publics (PRMP) -------------------------------------------------
+  // MP décrit le DOSSIER de marché, une ligne de bordereau : c'est lui que l'on
+  // met en boîte et que l'on cote. Les classes suivantes décrivent ses pièces.
+  { code: 'MP', nom: 'Dossier de marché public', categorie: 'Marchés publics (PRMP)', mots_cles: 'marche public, dossier de marche, attribution du marche',
+    modele_nom: 'MP-{année}-{Référence du dossier} — {Objet du marché}', dossiers: ['Marchés et contrats', 'Contrats'], annee: true,
+    champs: [['Référence du dossier', 'text', true], ['Objet du marché', 'text', true], ['Mode de passation', 'select', false, MODES_PASSATION],
+      ['Type de marché', 'select', false, TYPES_MARCHE], ['N° SIGMAP', 'text'], ['N° de contrat', 'text'], ['Attributaire', 'text'],
+      ['Montant TTC', 'number'], ['Pièces constitutives', 'text']] },
+  { code: 'DAC', nom: "Dossier d'appel à concurrence", categorie: 'Marchés publics (PRMP)',
+    mots_cles: "dossier d'appel d'offres, appel d'offres, demande de renseignements et de prix, demande de cotation, demande de proposition, avis a manifestation d'interet",
+    modele_nom: 'DAC-{année}-{Référence} — {Objet du marché}', dossiers: ["Dossiers d'appel à concurrence", 'Marchés et contrats'], annee: true,
+    champs: [['Référence', 'text', true], ['Objet du marché', 'text', true], ['Mode de passation', 'select', true, MODES_PASSATION],
+      ['Type de marché', 'select', false, TYPES_MARCHE], ['N° SIGMAP', 'text'], ['Date de publication', 'date'], ['Date limite de dépôt', 'date']] },
+  { code: 'SMP', nom: 'Offre de soumissionnaire', categorie: 'Marchés publics (PRMP)', mots_cles: 'lettre de soumission, offre technique, offre financiere, soumissionnaire',
+    modele_nom: 'SMP-{année}-{Référence du dossier} — {Soumissionnaire}', dossiers: ['Soumissions', 'Marchés et contrats'], annee: true,
+    champs: [['Référence du dossier', 'text', true], ['Soumissionnaire', 'text', true], ['Objet du marché', 'text'],
+      ['Mode de passation', 'select', false, MODES_PASSATION], ['Type de marché', 'select', false, TYPES_MARCHE], ['N° SIGMAP', 'text'],
+      ['Date de soumission', 'date'], ['Montant', 'number']] },
+  { code: 'RMP', nom: 'Rapport ou procès-verbal de marché', categorie: 'Marchés publics (PRMP)',
+    mots_cles: "proces-verbal d'ouverture, rapport d'evaluation, analyse des offres, attribution provisoire",
+    modele_nom: 'RMP-{année}-{Référence du dossier} — {Nature}', dossiers: ['Rapports et procès-verbaux', 'Procès-verbaux', 'Marchés et contrats'], annee: true,
+    champs: [['Référence du dossier', 'text', true],
+      ['Nature', 'select', true, ["Procès-verbal d'ouverture des plis", "Rapport d'évaluation des offres", "Procès-verbal d'attribution", "Rapport d'exécution", 'Procès-verbal de réception', 'Autre']],
+      ['Date', 'date'], ['N° SIGMAP', 'text']] },
+  { code: 'CMP', nom: 'Contrat de marché', categorie: 'Marchés publics (PRMP)', mots_cles: 'contrat de marche, lettre de commande, marche numero',
+    modele_nom: 'CMP-{année}-{N° de contrat} — {Attributaire}', dossiers: ['Marchés et contrats', 'Contrats'], annee: true,
+    champs: [['N° de contrat', 'text', true], ['Objet du marché', 'text', true], ['Attributaire', 'text', true], ['Type de marché', 'select', false, TYPES_MARCHE],
+      ['N° SIGMAP', 'text'], ['Montant TTC', 'number'], ['Date de signature', 'date'], ['Date de réception définitive', 'date']] },
+  { code: 'DCP', nom: 'Décompte ou facture de marché', categorie: 'Marchés publics (PRMP)', mots_cles: 'decompte, attachement, facture de marche',
+    modele_nom: 'DCP-{année}-{N° de contrat} — {N° du décompte}', dossiers: ['Décomptes et factures', 'Factures fournisseurs', 'Marchés et contrats'], annee: true,
+    champs: [['N° de contrat', 'text', true], ['N° du décompte', 'text'], ['Attributaire', 'text'], ['Montant', 'number'], ['Date', 'date']] },
+  { code: 'AVP', nom: 'Avis publié (journal)', categorie: 'Marchés publics (PRMP)', mots_cles: 'journal des marches publics, avis d\'appel d\'offres, avis d\'attribution',
+    modele_nom: 'AVP-{année} — {Journal} — {Date de parution}', dossiers: ['Publications et avis', 'Marchés et contrats'], annee: true,
+    champs: [['Journal', 'text', true], ['Date de parution', 'date', true], ['Objet du marché', 'text'], ['Mode de passation', 'select', false, MODES_PASSATION],
+      ['N° SIGMAP', 'text'], ['Page', 'text']] },
   { code: 'AFF', nom: 'Dossier foncier', categorie: 'Domaines et urbanisme', mots_cles: 'titre foncier, certificat de propriete fonciere, attestation de detention coutumiere, lotissement, parcelle',
     modele_nom: 'AFF — {N° de parcelle} — {Titulaire}', dossiers: ['Affaires foncières', 'Domaines et urbanisme'],
     champs: [['N° de parcelle', 'text', true], ['Titulaire', 'text', true], ['Nature de l\'acte', 'text'], ['Date de l\'acte', 'date'], ['Localisation', 'text']] },
@@ -158,6 +199,33 @@ const PLANS = [
       ['900 Pré-archivage et versements', []],
     ],
   },
+  {
+    // Le fonds d'une personne responsable des marchés publics, tel qu'il se
+    // traite sur le terrain : par étape de la procédure, puis par année.
+    code: 'prmp', nom: 'Marchés publics (PRMP)',
+    arbre: [
+      ['100 Planification', ['110 Plans de passation des marchés', '120 Avis généraux']],
+      ['200 Passation', ["210 Dossiers d'appel à concurrence", '220 Soumissions', '230 Rapports et procès-verbaux', '240 Publications et avis']],
+      ['300 Contrats et exécution', ['310 Marchés et contrats', '320 Décomptes et factures', '330 Réceptions']],
+      ['400 Correspondances', ['410 Courrier arrivé', '420 Courrier départ']],
+      ['500 Contrôles et audits', []],
+      ['900 Pré-archivage et versements', []],
+    ],
+  },
+  {
+    // Les archives d'un cabinet lui-même (conseil, archivage, informatique) :
+    // ses marchés, ses projets, ses propres outils de gestion documentaire.
+    code: 'cabinet', nom: 'Cabinet de conseil / prestataire de services',
+    arbre: [
+      ['100 Direction et administration', ['110 Courrier arrivé', '120 Courrier départ', '130 Notes et décisions', '140 Procès-verbaux et réunions', '150 Statuts et actes']],
+      ['200 Marchés et clients', ["210 Dossiers d'appel à concurrence", '220 Soumissions', '230 Contrats', '240 Références et attestations']],
+      ['300 Projets et missions', ['310 Projets', '320 Rapports', '330 Livrables']],
+      ['400 Ressources humaines', ['410 Dossiers du personnel', '420 Paie', '430 Congés et absences', '440 Stagiaires']],
+      ['500 Finances et comptabilité', ['510 Factures fournisseurs', '520 Factures clients', '530 Banque et trésorerie', '540 Fiscalité']],
+      ['600 Moyens généraux', ['610 Commandes', '620 Patrimoine et équipements']],
+      ['700 Gestion documentaire', ['710 Politique et procédures', '720 Plan de classement et tableau de gestion', '730 Formation']],
+    ],
+  },
 ];
 
-module.exports = { CLASSES, PLANS };
+module.exports = { CLASSES, PLANS, MODES_PASSATION, TYPES_MARCHE };

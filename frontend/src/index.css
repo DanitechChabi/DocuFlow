@@ -1107,3 +1107,24 @@ button:disabled, [disabled] { cursor: not-allowed; }
   .portail-portrait .certificat { font-size: 10.5px; }
   .portail-portrait .certificat td, .portail-portrait .certificat th { border: none; border-bottom: 1px solid #cbd5e1; }
 }
+
+/* ---------------------------------------------------------------------------
+   Étiquettes de boîtes d'archives (migration 043) : deux par rangée, à
+   découper et coller au dos des boîtes. La bande reprend la couleur
+   d'étiquette de la boîte ; les navigateurs n'impriment pas les fonds par
+   défaut, d'où print-color-adjust.
+   --------------------------------------------------------------------------- */
+.etiquettes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; }
+.etiquette {
+  border: 1.5px solid #0f172a; border-radius: 3mm; overflow: hidden; break-inside: avoid;
+  background: #fff; color: #0f172a; min-height: 74mm; display: flex; flex-direction: column;
+}
+.etiquette-bande { height: 10mm; border-bottom: 1.5px solid #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.etiquette-corps { padding: 4mm 5mm; display: flex; flex-direction: column; gap: 1.5mm; flex: 1; }
+.etiquette-organisme { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #475569; }
+.etiquette-fonds { font-size: 11pt; font-weight: 800; text-transform: uppercase; }
+.etiquette-cote { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 19pt; font-weight: 900; line-height: 1.1; word-break: break-word; }
+.etiquette-intitule { font-size: 11pt; font-weight: 600; line-height: 1.25; }
+.etiquette-pied { margin-top: auto; display: flex; justify-content: space-between; gap: 4mm; font-size: 9pt; color: #334155; border-top: 1px solid #cbd5e1; padding-top: 2mm; }
+.etiquette-dates { font-size: 13pt; font-weight: 800; }
+@media (max-width: 640px) { .etiquettes { grid-template-columns: 1fr; } }
