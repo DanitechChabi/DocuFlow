@@ -23,6 +23,8 @@ exports.creerEmplacement = action((req) => physique.creer(t(req), req.body || {}
 exports.modifierEmplacement = action((req) => physique.modifier(t(req), req.params.id, req.body || {}, req.user), "Modification de l'emplacement impossible");
 exports.supprimerEmplacement = action((req) => physique.supprimer(t(req), req.params.id, req.user), "Suppression de l'emplacement impossible");
 exports.contenu = action((req) => physique.contenu(t(req), req.params.id, req.user), 'Chargement du contenu impossible');
+exports.suggestions = action((req) => physique.suggestions(t(req)), 'Chargement impossible');
+exports.repertoire = action((req) => physique.repertoire(t(req), req.params.id, req.user), 'Édition du répertoire impossible');
 
 exports.localisation = async (req, res) => {
   try {

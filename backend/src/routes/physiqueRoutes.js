@@ -1,6 +1,7 @@
 // ============================================================================
 // Routes des archives papier (migration 038), montées sous /api :
-//   /api/archives/emplacements[...]     dépôts, magasins, travées, tablettes, boîtes
+//   /api/archives/emplacements[...]     dépôts, magasins, travées, tablettes, boîtes ;
+//                                       description des boîtes et répertoire (043)
 //   /api/documents/:id/localisation     support, boîte, cote d'un document
 //   /api/archives/recolements[...]      campagnes de récolement et PV
 // ============================================================================
@@ -18,7 +19,9 @@ router.get('/archives/emplacements', consulter, ctrl.emplacements);
 router.post('/archives/emplacements', gerer, ctrl.creerEmplacement);
 router.patch('/archives/emplacements/:id', gerer, ctrl.modifierEmplacement);
 router.delete('/archives/emplacements/:id', gerer, ctrl.supprimerEmplacement);
+router.get('/archives/emplacements/suggestions', consulter, ctrl.suggestions);
 router.get('/archives/emplacements/:id/documents', consulter, ctrl.contenu);
+router.get('/archives/emplacements/:id/repertoire', consulter, ctrl.repertoire);
 
 router.get('/documents/:id/localisation', consulter, ctrl.localisation);
 router.put('/documents/:id/localisation', [auth, requirePermission('documents.edit')], ctrl.placer);

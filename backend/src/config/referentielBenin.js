@@ -22,6 +22,16 @@
 //                 art. 224 (preuve du paiement du salaire), art. 232
 //                 (prescription de l'action en paiement : 3 ans).
 //
+// MARCHÉS PUBLICS — texte NON LU en entier (armp.bj et sgg.gouv.bj étaient
+// inaccessibles lors de la rédaction). D'après les extraits publiés du décret
+// n° 2020-596 du 23 décembre 2020 (attributions de la PRMP), la personne
+// responsable des marchés publics enregistre les phases de la passation et
+// procède à l'archivage des dossiers de marchés « par des méthodes modernes
+// et efficientes ». AUCUNE DURÉE LÉGALE de conservation propre aux dossiers
+// de marchés n'a été trouvée : les 10 ans proposés ci-dessous le sont par
+// analogie avec les pièces comptables (OHADA). À confirmer sur le texte et
+// auprès de la DAN avant toute élimination.
+//
 // CE N'EST PAS UN TABLEAU DE GESTION OFFICIEL. L'art. 40 confie à chaque
 // organisme l'établissement de ses tableaux en liaison avec la DAN : ces
 // valeurs sont une PROPOSITION de départ, chacune avec sa justification, que
@@ -44,6 +54,7 @@ const OHADA = 'OHADA, Acte uniforme relatif au droit comptable (2017) : pièces 
 const DROIT = 'D. 2007-532, art. 44 : pièce établissant un droit, à conserver indéfiniment';
 const HISTO = "D. 2007-532, art. 44 : intérêt historique ; versement à 10 ans (art. 46)";
 const ACTIFS = 'D. 2007-532, art. 38-39 : archives actives 3-5 ans, semi-actives jusqu\'à 10 ans';
+const MARCHES = "Dossier de marché public, archivé par la PRMP (décret n° 2020-596) : 10 ans proposés par analogie avec les pièces comptables (OHADA), aucune durée propre n'ayant été trouvée — à valider avec la DAN";
 
 /**
  * Règle proposée par code de classe : dua (années), depart (point de départ),
@@ -84,7 +95,14 @@ const CONSERVATION = {
   ECM: { dua: 10, depart: 'date_document', sort: 'conservation', ref: `${DROIT} ; état civil`, communicabilite: 'etat_civil' },
   ECD: { dua: 10, depart: 'date_document', sort: 'conservation', ref: `${DROIT} ; état civil`, communicabilite: 'etat_civil' },
   DCC: { dua: 10, depart: 'date_document', sort: 'conservation', ref: HISTO, communicabilite: 'libre' },
-  MP: { dua: 10, depart: 'archivage', sort: 'tri', ref: `${OHADA} ; ${ACTIFS}`, communicabilite: 'general' },
+  // Marchés publics (PRMP) : voir l'avertissement en tête de fichier.
+  MP: { dua: 10, depart: 'archivage', sort: 'tri', ref: MARCHES, communicabilite: 'general' },
+  DAC: { dua: 10, depart: 'date_document', sort: 'tri', ref: MARCHES, communicabilite: 'general' },
+  SMP: { dua: 10, depart: 'date_document', sort: 'tri', ref: `${MARCHES} ; offres retenues à garder avec le marché`, communicabilite: 'general' },
+  RMP: { dua: 10, depart: 'date_document', sort: 'tri', ref: MARCHES, communicabilite: 'general' },
+  CMP: { dua: 10, depart: 'archivage', sort: 'tri', ref: `${MARCHES} ; trier à l'échéance (D. 2007-532, art. 43)`, communicabilite: 'general' },
+  DCP: { dua: 10, depart: 'date_document', sort: 'tri', ref: MARCHES, communicabilite: 'general' },
+  AVP: { dua: 5, depart: 'date_document', sort: 'elimination', ref: `${ACTIFS} ; publication dont l'éditeur conserve la collection`, communicabilite: 'libre' },
   AFF: { dua: 10, depart: 'archivage', sort: 'conservation', ref: `${DROIT} (propriété foncière)`, communicabilite: 'general' },
 };
 

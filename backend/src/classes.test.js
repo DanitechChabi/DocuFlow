@@ -81,6 +81,31 @@ const ok = (cond, nom) => { verifs += 1; console.log(`${cond ? '  ok  ' : '  ÉC
     ok(journal.rows[0].n === 1, 'la règle proposée est journalisée comme une saisie');
     const commune = await classeService.installerPlan(t2, 'commune', null);
     ok(commune.crees === 28, `plan « Commune (Bénin) » : 28 dossiers créés (${commune.crees})`);
+    // Marchés publics (PRMP) : le plan et les classes des bordereaux de traitement.
+    const t3 = await nouveauTenant('c');
+    const prmp = await classeService.installerPlan(t3, 'prmp', null);
+    ok(prmp.crees === 17, `plan « Marchés publics (PRMP) » : 17 dossiers créés (${prmp.crees})`);
+    const marches = await classeService.installerClasses(t3, ['MP', 'DAC', 'SMP', 'RMP', 'CMP', 'DCP', 'AVP']);
+    ok(marches.installees.length === 7, 'sept classes de marchés publics installées');
+    const schemasMp = await metadataService.getSchemas(t3);
+    const mp = schemasMp.find((x) => x.code === 'MP');
+    const dossierDe = async (nom) => (await db.query('SELECT id FROM document_folders WHERE tenant_id = $1 AND name = $2', [t3, nom])).rows[0]?.id;
+    ok(mp.name === 'Dossier de marché public' && mp.dossier_defaut_id === await dossierDe('310 Marchés et contrats') && mp.sous_dossier_annee,
+      'dossier de marché : rangé dans « 310 Marchés et contrats », par année');
+    const libelles = mp.fields.map((f) => f.label);
+    ok(['Référence du dossier', 'Objet du marché', 'Mode de passation', 'Type de marché', 'N° SIGMAP', 'N° de contrat', 'Attributaire'].every((l) => libelles.includes(l)),
+      'dossier de marché : les rubriques du bordereau (mode de passation, type, SIGMAP, contrat, attributaire)');
+    const mode = mp.fields.find((f) => f.label === 'Mode de passation');
+    ok(mode.type === 'select' && JSON.stringify(mode.options_json).includes('DRP') && JSON.stringify(mode.options_json).includes('AMI'), 'mode de passation : liste des sigles du terrain (DAO, DRP, DC, DP, DFP, AMI)');
+    ok(schemasMp.find((x) => x.code === 'DAC').dossier_defaut_id === await dossierDe("210 Dossiers d'appel à concurrence")
+      && schemasMp.find((x) => x.code === 'SMP').dossier_defaut_id === await dossierDe('220 Soumissions')
+      && schemasMp.find((x) => x.code === 'AVP').dossier_defaut_id === await dossierDe('240 Publications et avis'), 'pièces de marché : chacune dans son dossier du plan');
+    ok(mp.dua_annees === 10 && mp.sort_final === 'tri' && /à valider avec la DAN/.test(mp.dua_reference) && /analogie/.test(mp.dua_reference),
+      'marché : 10 ans puis tri, proposés par analogie et signalés comme à valider');
+    ok(classeService.rendreNom(mp.modele_nom, { annee: 2021, proprietes: { [classeService.cle('Référence du dossier')]: '012/PRMP', [classeService.cle('Objet du marché')]: 'Entretien routier' } })
+      === 'MP-2021-012/PRMP — Entretien routier', 'charte de nommage du dossier de marché');
+    ok((await classeService.installerPlan(t3, 'cabinet', null)).crees >= 28, 'plan « Cabinet / prestataire » installable à côté');
+
     const catal = await classeService.catalogue(t);
     ok(catal.classes.find((c) => c.code === 'ECN').conservation.communicabilite === 'etat_civil' && /Archives Nationales/.test(catal.avertissement_conservation),
       'catalogue : règle et communicabilité proposées, avec l\'avertissement de validation par la DAN');

@@ -7,6 +7,9 @@ export const physiqueService = {
   modifier: async (id, corps) => (await api.patch(`/archives/emplacements/${id}`, corps)).data,
   supprimer: async (id) => (await api.delete(`/archives/emplacements/${id}`)).data,
   contenu: async (id) => (await api.get(`/archives/emplacements/${id}/documents`)).data,
+  // Description des boîtes et répertoire (043).
+  suggestions: async () => (await api.get('/archives/emplacements/suggestions')).data,
+  repertoire: async (id) => (await api.get(`/archives/emplacements/${id}/repertoire`)).data,
   localisation: async (documentId) => (await api.get(`/documents/${documentId}/localisation`)).data,
   placer: async (documentId, corps) => (await api.put(`/documents/${documentId}/localisation`, corps)).data,
   recolements: async () => (await api.get('/archives/recolements')).data,
@@ -26,3 +29,8 @@ export const RESULTATS = {
   en_pret: ['En prêt', 'bg-blue-50 text-blue-700'],
 };
 export const NATURES_PRET = { original: "Original", copie: 'Copie', consultation: 'Consultation sur place' };
+// Couleur de l'étiquette collée au dos de la boîte : [libellé, teinte].
+export const COULEURS = {
+  blanc: ['Blanc', '#ffffff'], jaune: ['Jaune', '#facc15'], vert: ['Vert', '#22c55e'], bleu: ['Bleu', '#3b82f6'], rouge: ['Rouge', '#ef4444'],
+  rose: ['Rose', '#f472b6'], orange: ['Orange', '#fb923c'], violet: ['Violet', '#a78bfa'], gris: ['Gris', '#94a3b8'],
+};

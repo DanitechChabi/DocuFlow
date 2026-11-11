@@ -7,7 +7,12 @@
 //                 emplacement est la suite des codes depuis le dépôt
 //                 (D1-M2-T03-E4-B0127). Un emplacement ne se supprime que vide.
 //   DOCUMENTS     support (numérique, papier, hybride), boîte, cote dans la
-//                 boîte ; tout déplacement est journalisé.
+//                 boîte, dates extrêmes ; tout déplacement est journalisé et
+//                 la fiche dit qui a rangé le dossier, et quand.
+//   DESCRIPTION   (043) une boîte porte son fonds (service producteur), son
+//                 type et la couleur de son étiquette, comme sur un bordereau
+//                 de traitement. Le RÉPERTOIRE d'un périmètre — l'instrument
+//                 de recherche — se tire de ces descriptions.
 //   RÉCOLEMENT    instantané à l'ouverture (boîtes et documents attendus du
 //                 périmètre, prêts en cours notés « en prêt »), constats ligne
 //                 à ligne, clôture quand tout est constaté : procès-verbal figé
@@ -20,6 +25,8 @@ const integrite = require('./integriteService');
 const TYPES = ['depot', 'magasin', 'travee', 'tablette', 'boite'];
 const LIBELLES_TYPE = { depot: 'Dépôt', magasin: 'Magasin', travee: 'Travée', tablette: 'Tablette', boite: 'Boîte' };
 const SUPPORTS = ['numerique', 'papier', 'hybride'];
+const COULEURS = ['blanc', 'jaune', 'vert', 'bleu', 'rouge', 'rose', 'orange', 'violet', 'gris'];
+const TYPES_BOITE = ["Boîte d'archives (dos 10 cm)", "Boîte d'archives (dos 8 cm)", 'Boîte à pans coupés', 'Carton', 'Chemise à sangle', 'Liasse', 'Registre'];
 const RESULTATS = ['present', 'absent', 'deplace', 'abime', 'en_pret'];
 const LIBELLES_RESULTAT = { present: 'Présent', absent: 'Absent', deplace: 'Déplacé', abime: 'Abîmé', en_pret: 'En prêt' };
 
@@ -40,10 +47,12 @@ async function journaliser(run, tenantId, user, action, objectType, objectId, de
 async function lister(tenantId) {
   const { rows } = await db.query(
     `WITH RECURSIVE arbre AS (
-       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.capacite_ml, e.observations, e.code::text AS cote, 0 AS profondeur
+       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.capacite_ml, e.observations, e.fonds, e.type_boite, e.couleur_etiquette,
+              e.code::text AS cote, 0 AS profondeur
          FROM emplacements e WHERE e.tenant_id = $1 AND e.parent_id IS NULL
        UNION ALL
-       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.capacite_ml, e.observations, a.cote || '-' || e.code, a.profondeur + 1
+       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.capacite_ml, e.observations, e.fonds, e.type_boite, e.couleur_etiquette,
+              a.cote || '-' || e.code, a.profondeur + 1
          FROM emplacements e JOIN arbre a ON e.parent_id = a.id WHERE e.tenant_id = $1
      )
      SELECT a.*, (SELECT count(*)::int FROM documents d WHERE d.emplacement_id = a.id AND d.tenant_id = $1 AND d.elimine_at IS NULL) AS nb_documents,
@@ -70,6 +79,22 @@ async function coteDe(run, tenantId, id) {
   return rows[0]?.cote || null;
 }
 
+/**
+ * Description d'un emplacement lue dans la saisie (043). Le type de boîte et la
+ * couleur d'étiquette n'ont de sens que pour une boîte ; le fonds peut se
+ * porter à tout niveau (un magasin réservé à un service). `actuel` : valeurs
+ * conservées quand la saisie ne les mentionne pas.
+ */
+function lireDescription(corps, type, actuel = {}) {
+  const texte = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max) || null;
+  const fonds = corps.fonds === undefined ? (actuel.fonds ?? null) : texte(corps.fonds, 150);
+  let typeBoite = corps.type_boite === undefined ? (actuel.type_boite ?? null) : texte(corps.type_boite, 60);
+  let couleur = corps.couleur_etiquette === undefined ? (actuel.couleur_etiquette ?? null) : (corps.couleur_etiquette || null);
+  if (couleur !== null && !COULEURS.includes(couleur)) throw erreur(400, `Couleur d'étiquette inconnue (attendu : ${COULEURS.join(', ')}).`);
+  if (type !== 'boite') { typeBoite = null; couleur = null; }
+  return { fonds, type_boite: typeBoite, couleur_etiquette: couleur };
+}
+
 function validerCode(code) {
   const c = String(code || '').trim();
   if (!c) throw erreur(400, 'Le code est obligatoire (ex. M2, T03, B0127).');
@@ -92,12 +117,13 @@ async function creer(tenantId, corps = {}, user) {
   }
   const capacite = corps.capacite_ml === undefined || corps.capacite_ml === null || corps.capacite_ml === '' ? null : Number(corps.capacite_ml);
   if (capacite !== null && (!Number.isFinite(capacite) || capacite < 0 || capacite > 100000)) throw erreur(400, 'Capacité en mètres linéaires invalide.');
+  const d = lireDescription(corps, type);
   try {
     const { rows } = await db.query(
-      `INSERT INTO emplacements (tenant_id, parent_id, type, code, libelle, capacite_ml, observations)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO emplacements (tenant_id, parent_id, type, code, libelle, capacite_ml, observations, fonds, type_boite, couleur_etiquette)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [tenantId, parentId, type, code, String(corps.libelle || '').trim().slice(0, 150) || null, capacite,
-        String(corps.observations || '').trim().slice(0, 2000) || null]);
+        String(corps.observations || '').trim().slice(0, 2000) || null, d.fonds, d.type_boite, d.couleur_etiquette]);
     await journaliser(db, tenantId, user, 'EMPLACEMENT_CREE', 'emplacement', rows[0].id, { type, cote: await coteDe(db, tenantId, rows[0].id) });
     return { ...rows[0], cote: await coteDe(db, tenantId, rows[0].id) };
   } catch (err) {
@@ -111,12 +137,14 @@ async function modifier(tenantId, id, corps = {}, user) {
   const code = corps.code === undefined ? e.code : validerCode(corps.code);
   const libelle = corps.libelle === undefined ? e.libelle : (String(corps.libelle || '').trim().slice(0, 150) || null);
   const capacite = corps.capacite_ml === undefined ? e.capacite_ml : (corps.capacite_ml === null || corps.capacite_ml === '' ? null : Number(corps.capacite_ml));
+  const d = lireDescription(corps, e.type, e);
   try {
     const { rows } = await db.query(
-      'UPDATE emplacements SET code = $3, libelle = $4, capacite_ml = $5, updated_at = now() WHERE id = $1 AND tenant_id = $2 RETURNING *',
-      [e.id, tenantId, code, libelle, capacite]);
+      `UPDATE emplacements SET code = $3, libelle = $4, capacite_ml = $5, fonds = $6, type_boite = $7, couleur_etiquette = $8, updated_at = now()
+        WHERE id = $1 AND tenant_id = $2 RETURNING *`,
+      [e.id, tenantId, code, libelle, capacite, d.fonds, d.type_boite, d.couleur_etiquette]);
     if (code !== e.code) await journaliser(db, tenantId, user, 'EMPLACEMENT_RECOTE', 'emplacement', e.id, { avant: e.code, apres: code });
-    return rows[0];
+    return { ...rows[0], cote: await coteDe(db, tenantId, e.id) };
   } catch (err) {
     if (err.code === '23505') throw erreur(409, `Le code « ${code} » existe déjà à cet endroit.`);
     throw err;
@@ -143,19 +171,54 @@ async function contenu(tenantId, id, user) {
   const { lisibles } = await aclService.dossiersAccessibles(tenantId, user.id);
   const { rows } = await db.query(
     `SELECT d.id, d.reference_mfile, d.description, d.nom_entreprise, d.cote_physique, d.support, d.statut, d.dossier_id,
+            d.annee, d.annee_debut, d.annee_fin, ${SQL_FICHIER},
             EXISTS (SELECT 1 FROM request_loans l WHERE l.document_id = d.id AND l.retourne_at IS NULL) AS en_pret
        FROM documents d WHERE d.emplacement_id = $1 AND d.tenant_id = $2 AND d.elimine_at IS NULL AND d.deleted_at IS NULL
       ORDER BY d.cote_physique NULLS LAST, d.id`, [e.id, tenantId]);
-  const visibles = rows.filter((r) => r.dossier_id === null || lisibles.has(Number(r.dossier_id)));
+  const visibles = rows.filter((r) => r.dossier_id === null || lisibles.has(Number(r.dossier_id)))
+    .map((r) => ({ ...r, intitule: intitule(r), dates_extremes: datesExtremes(r) }));
   return { emplacement: { ...e, cote: await coteDe(db, tenantId, e.id) }, documents: visibles, masques: rows.length - visibles.length };
 }
 
 /**
- * Place un document : support, boîte, cote dans la boîte. L'accès en écriture
- * au document est vérifié par le contrôleur.
+ * Intitulé d'un dossier pour un répertoire : sa description (le titre calculé
+ * par la charte de nommage), sinon l'entreprise, sinon le nom de son fichier.
+ * « À indexer » est le repli des versements en masse, pas un intitulé.
+ */
+function intitule(d) {
+  const utile = (v) => (v && String(v).trim() !== 'À indexer' ? String(v).trim() : '');
+  return utile(d.description) || utile(d.nom_entreprise) || utile(d.fichier_nom) || 'Sans intitulé';
+}
+const SQL_FICHIER = '(SELECT df.original_name FROM document_files df WHERE df.document_id = d.id ORDER BY df.version DESC LIMIT 1) AS fichier_nom';
+
+/** Dates extrêmes lisibles : « 2019-2021 », « 2019 », ou l'année de la fiche. */
+function datesExtremes(d) {
+  const debut = d.annee_debut || d.annee_fin || null;
+  const fin = d.annee_fin || d.annee_debut || null;
+  if (!debut) return d.annee ? String(d.annee) : '';
+  return debut === fin ? String(debut) : `${debut}-${fin}`;
+}
+
+/** Dates extrêmes saisies (années) ; `actuel` quand la saisie ne les mentionne pas. */
+function lireDatesExtremes(corps, actuel = {}) {
+  const annee = (v, nom) => {
+    if (v === null || v === '') return null;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1000 || n > 2200) throw erreur(400, `${nom} : une année sur quatre chiffres est attendue.`);
+    return n;
+  };
+  const debut = corps.annee_debut === undefined ? (actuel.annee_debut ?? null) : annee(corps.annee_debut, 'Date extrême de début');
+  const fin = corps.annee_fin === undefined ? (actuel.annee_fin ?? null) : annee(corps.annee_fin, 'Date extrême de fin');
+  if (debut !== null && fin !== null && fin < debut) throw erreur(400, 'Dates extrêmes : la fin précède le début.');
+  return [debut, fin];
+}
+
+/**
+ * Place un document : support, boîte, cote dans la boîte, dates extrêmes.
+ * L'accès en écriture au document est vérifié par le contrôleur.
  */
 async function placer(tenantId, documentId, corps = {}, user) {
-  const { rows } = await db.query('SELECT id, support, emplacement_id, cote_physique FROM documents WHERE id = $1 AND tenant_id = $2', [Number(documentId), tenantId]);
+  const { rows } = await db.query('SELECT id, support, emplacement_id, cote_physique, annee_debut, annee_fin FROM documents WHERE id = $1 AND tenant_id = $2', [Number(documentId), tenantId]);
   const d = rows[0];
   if (!d) throw erreur(404, 'Document introuvable.');
   const support = corps.support === undefined ? d.support : corps.support;
@@ -167,8 +230,17 @@ async function placer(tenantId, documentId, corps = {}, user) {
   }
   if (support === 'numerique') emplacementId = null;
   const cote = corps.cote_physique === undefined ? d.cote_physique : (String(corps.cote_physique || '').trim().slice(0, 60) || null);
-  await db.query('UPDATE documents SET support = $3, emplacement_id = $4, cote_physique = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND tenant_id = $2',
-    [d.id, tenantId, support, emplacementId, support === 'numerique' ? null : cote]);
+  const [debut, fin] = lireDatesExtremes(corps, d);
+  const deplace = (d.emplacement_id || null) !== (emplacementId || null);
+  const qui = deplace && emplacementId ? await integrite.identite(user) : null;
+  await db.query(
+    `UPDATE documents SET support = $3, emplacement_id = $4, cote_physique = $5, annee_debut = $6, annee_fin = $7,
+            range_par = CASE WHEN $8 THEN $9::int ELSE range_par END,
+            range_par_nom = CASE WHEN $8 THEN $10 ELSE range_par_nom END,
+            range_at = CASE WHEN $8 THEN (CASE WHEN $9::int IS NULL THEN NULL ELSE now() END) ELSE range_at END,
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1 AND tenant_id = $2`,
+    [d.id, tenantId, support, emplacementId, support === 'numerique' ? null : cote, debut, fin, deplace, qui?.id ?? null, qui?.nom ?? null]);
   const avant = d.emplacement_id ? await coteDe(db, tenantId, d.emplacement_id) : null;
   const apres = emplacementId ? await coteDe(db, tenantId, emplacementId) : null;
   if (avant !== apres || d.support !== support || d.cote_physique !== cote) {
@@ -176,19 +248,113 @@ async function placer(tenantId, documentId, corps = {}, user) {
     await require('./documentIndexService').logHistory(tenantId, d.id, user.id,
       apres ? `Rangé en ${apres}${cote ? ` (${cote})` : ''}` : `Support : ${support}`, null, null, avant ? `Auparavant en ${avant}` : null);
   }
-  return { support, emplacement_id: emplacementId, cote_topographique: apres, cote_physique: support === 'numerique' ? null : cote };
+  return {
+    support, emplacement_id: emplacementId, cote_topographique: apres, cote_physique: support === 'numerique' ? null : cote,
+    annee_debut: debut, annee_fin: fin,
+  };
 }
 
 /** Localisation d'un document (fiche). */
 async function localisation(tenantId, documentId) {
   const { rows } = await db.query(
-    `SELECT d.support, d.emplacement_id, d.cote_physique,
+    `SELECT d.support, d.emplacement_id, d.cote_physique, d.annee, d.annee_debut, d.annee_fin, d.range_par_nom, d.range_at,
+            (SELECT json_build_object('fonds', e.fonds, 'type_boite', e.type_boite, 'couleur_etiquette', e.couleur_etiquette, 'libelle', e.libelle)
+               FROM emplacements e WHERE e.id = d.emplacement_id) AS boite,
             (SELECT json_build_object('nature', l.nature, 'remis_at', l.remis_at, 'retour_prevu', l.date_retour_prevue, 'emprunteur', u.full_name)
                FROM request_loans l LEFT JOIN users u ON u.id = l.emprunteur_id
               WHERE l.document_id = d.id AND l.retourne_at IS NULL ORDER BY l.remis_at DESC LIMIT 1) AS pret
        FROM documents d WHERE d.id = $1 AND d.tenant_id = $2`, [Number(documentId), tenantId]);
   if (!rows[0]) return null;
-  return { ...rows[0], cote_topographique: rows[0].emplacement_id ? await coteDe(db, tenantId, rows[0].emplacement_id) : null };
+  return {
+    ...rows[0], dates_extremes: datesExtremes(rows[0]),
+    cote_topographique: rows[0].emplacement_id ? await coteDe(db, tenantId, rows[0].emplacement_id) : null,
+  };
+}
+
+/** Fonds et types de boîte déjà employés par l'organisation (saisie assistée). */
+async function suggestions(tenantId) {
+  const [fonds, types, services] = await Promise.all([
+    db.query("SELECT DISTINCT fonds AS v FROM emplacements WHERE tenant_id = $1 AND fonds IS NOT NULL ORDER BY 1", [tenantId]),
+    db.query("SELECT DISTINCT type_boite AS v FROM emplacements WHERE tenant_id = $1 AND type_boite IS NOT NULL ORDER BY 1", [tenantId]),
+    db.query('SELECT name AS v FROM sections WHERE tenant_id = $1 ORDER BY 1', [tenantId]).catch(() => ({ rows: [] })),
+  ]);
+  const uniques = (l) => [...new Map(l.map((v) => [v.toLowerCase(), v])).values()];
+  return {
+    fonds: uniques([...fonds.rows.map((r) => r.v), ...services.rows.map((r) => r.v)]),
+    types_boite: uniques([...types.rows.map((r) => r.v), ...TYPES_BOITE]),
+    couleurs: COULEURS,
+  };
+}
+
+/**
+ * Répertoire d'un périmètre (dépôt, magasin, travée, tablette ou boîte) :
+ * l'instrument de recherche. Chaque boîte avec sa description (fonds, type,
+ * étiquette, dates extrêmes tirées de son contenu) et ses dossiers (cote,
+ * analyse, dates extrêmes, propriétés de la classe). Les dossiers hors du
+ * périmètre de lecture de l'utilisateur sont comptés, pas décrits.
+ */
+async function repertoire(tenantId, id, user) {
+  const racine = await charger(db, tenantId, id);
+  const coteRacine = await coteDe(db, tenantId, racine.id);
+  const { rows: noeuds } = await db.query(
+    `WITH RECURSIVE arbre AS (
+       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.fonds, e.type_boite, e.couleur_etiquette, $3::text AS cote
+         FROM emplacements e WHERE e.id = $1 AND e.tenant_id = $2
+       UNION ALL
+       SELECT e.id, e.parent_id, e.type, e.code, e.libelle, e.fonds, e.type_boite, e.couleur_etiquette, a.cote || '-' || e.code
+         FROM emplacements e JOIN arbre a ON e.parent_id = a.id WHERE e.tenant_id = $2
+     ) SELECT * FROM arbre ORDER BY cote`, [racine.id, tenantId, coteRacine]);
+  const ids = noeuds.map((n) => n.id);
+  const { lisibles } = await aclService.dossiersAccessibles(tenantId, user.id);
+  const { rows: docs } = await db.query(
+    `SELECT d.id, d.emplacement_id, d.reference_mfile, d.description, d.nom_entreprise, d.cote_physique, d.statut, d.dossier_id,
+            d.annee, d.annee_debut, d.annee_fin, d.range_par_nom, c.name AS classe, ${SQL_FICHIER}
+       FROM documents d LEFT JOIN metadata_schemas c ON c.id = d.classe_id AND c.tenant_id = d.tenant_id
+      WHERE d.tenant_id = $1 AND d.emplacement_id = ANY($2) AND d.elimine_at IS NULL AND d.deleted_at IS NULL
+      ORDER BY d.cote_physique NULLS LAST, d.id`, [tenantId, ids]);
+  const visibles = docs.filter((d) => d.dossier_id === null || lisibles.has(Number(d.dossier_id)));
+  // Propriétés de classe de chaque dossier, dans l'ordre de la classe.
+  const { lisible } = require('./classeService');
+  const details = new Map();
+  if (visibles.length) {
+    const { rows: valeurs } = await db.query(
+      `SELECT v.document_id, f.label, f.type, f.options_json, v.value_json
+         FROM metadata_values v JOIN metadata_fields f ON f.id = v.field_id
+         JOIN metadata_schemas s ON s.id = f.schema_id AND s.tenant_id = $1
+        WHERE v.document_id = ANY($2) ORDER BY f.display_order NULLS LAST, f.id`, [tenantId, visibles.map((d) => d.id)]);
+    for (const v of valeurs) {
+      // [libellé, valeur lisible, type] : le type laisse l'affichage formater un nombre.
+      const texte = lisible(v.value_json, v);
+      if (texte) details.set(v.document_id, [...(details.get(v.document_id) || []), [v.label, texte, v.type]]);
+    }
+  }
+  const parBoite = new Map();
+  for (const d of visibles) parBoite.set(d.emplacement_id, [...(parBoite.get(d.emplacement_id) || []), d]);
+  const masques = new Map();
+  for (const d of docs) if (!visibles.includes(d)) masques.set(d.emplacement_id, (masques.get(d.emplacement_id) || 0) + 1);
+  // Le fonds se lit sur la boîte, sinon sur le plus proche parent qui en porte un.
+  const parId = new Map(noeuds.map((n) => [n.id, n]));
+  const fondsDe = (n) => { for (let x = n; x; x = parId.get(x.parent_id)) if (x.fonds) return x.fonds; return null; };
+  const boites = noeuds
+    .filter((n) => n.type === 'boite' || (n.type === 'tablette' && (parBoite.has(n.id) || masques.has(n.id))))
+    .map((n) => {
+      const dossiers = (parBoite.get(n.id) || []).map((d) => ({
+        id: d.id, reference: d.reference_mfile, cote: d.cote_physique, analyse: intitule(d), classe: d.classe,
+        dates_extremes: datesExtremes(d), details: details.get(d.id) || [], range_par: d.range_par_nom,
+      }));
+      const annees = (parBoite.get(n.id) || []).flatMap((d) => [d.annee_debut || d.annee_fin || d.annee, d.annee_fin || d.annee_debut || d.annee]).filter(Boolean).map(Number);
+      const min = annees.length ? Math.min(...annees) : null;
+      const max = annees.length ? Math.max(...annees) : null;
+      return {
+        id: n.id, type: n.type, cote: n.cote, libelle: n.libelle, fonds: fondsDe(n), type_boite: n.type_boite, couleur_etiquette: n.couleur_etiquette,
+        dates_extremes: min === null ? '' : (min === max ? String(min) : `${min}-${max}`), dossiers, masques: masques.get(n.id) || 0,
+      };
+    });
+  const org = await require('./archivageService').internes.organisationDe(tenantId);
+  return {
+    organisation: org, perimetre: { id: racine.id, type: racine.type, cote: coteRacine, libelle: racine.libelle },
+    boites, total_dossiers: visibles.length, masques: docs.length - visibles.length, etabli_at: new Date().toISOString(),
+  };
 }
 
 // ------------------------------------------------------------------ récolement
@@ -357,7 +523,7 @@ async function procesVerbal(tenantId, id) {
 }
 
 module.exports = {
-  TYPES, LIBELLES_TYPE, SUPPORTS, RESULTATS, LIBELLES_RESULTAT,
-  lister, creer, modifier, supprimer, contenu, coteDe, placer, localisation,
+  TYPES, LIBELLES_TYPE, SUPPORTS, RESULTATS, LIBELLES_RESULTAT, COULEURS, TYPES_BOITE,
+  lister, creer, modifier, supprimer, contenu, coteDe, placer, localisation, suggestions, repertoire, datesExtremes, intitule,
   ouvrirRecolement, detailRecolement, listerRecolements, constater, clore, procesVerbal, corpsRecolement,
 };
