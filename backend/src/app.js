@@ -178,6 +178,7 @@ app.use('/api', require('./routes/archivageRoutes'));
 app.use('/api', require('./routes/physiqueRoutes'));
 app.use('/api', require('./routes/serviceArchivesRoutes'));
 app.use('/api', require('./routes/outilsRoutes'));
+app.use('/api', require('./routes/archivothequeRoutes'));
 // Portail citoyen et vérification publique des copies (040) : routes publiques
 // (débit limité) et volet du personnel.
 app.use('/api', require('./routes/portailRoutes'));

@@ -19,6 +19,7 @@ import LocalisationDocument from './archives/LocalisationDocument';
 import FavoriSuivi from './collaboration/FavoriSuivi';
 import CommentairesDocument from './collaboration/CommentairesDocument';
 import PartagesDocument from './collaboration/PartagesDocument';
+import ArchivothequeCarte from './archives/ArchivothequeCarte';
 import { collaborationService } from '../services/collaborationService';
 import { usePermissions } from '../hooks/usePermissions';
 import CircuitDocument from './circuits/CircuitDocument';
@@ -315,9 +316,10 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                   <IntegriteDocument documentId={doc.id} onChanged={onChanged} />
                 </SectionRepliable>
 
-                <SectionRepliable cle="fiche-partage" titre="Communication et suivi" resume="Copies certifiées, liens, commentaires">
+                <SectionRepliable cle="fiche-partage" titre="Communication et suivi" resume="Copies certifiées, liens, archivothèque, commentaires">
                   <CopiesCertifiees documentId={doc.id} fichiers={doc.files || []} />
                   <PartagesDocument documentId={doc.id} fichiers={doc.files || []} />
+                  <ArchivothequeCarte documentId={doc.id} titre={doc.description || ''} fichiers={doc.files || []} />
                   <CommentairesDocument documentId={doc.id} />
                   <EcheancesDocument documentId={doc.id} />
                 </SectionRepliable>
