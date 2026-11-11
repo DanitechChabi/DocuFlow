@@ -356,6 +356,16 @@ async function lireEcheances(run, tenantId, ids) {
   return new Map(rows.map((r) => [r.id, r]));
 }
 
+/** Documents dont la durée de conservation est échue et le sort final non décidé. */
+async function compterEchus(tenantId) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM (${SQL_ECHEANCES} AND d.deleted_at IS NULL AND d.elimine_at IS NULL AND c.dua_annees IS NOT NULL
+        AND x.depart IS NOT NULL AND (x.depart + make_interval(years => c.dua_annees))::date <= CURRENT_DATE AND ds.id IS NULL) echus`,
+    [tenantId]
+  );
+  return rows[0].n;
+}
+
 // --------------------------------------------------------- règle des classes
 
 async function definirDua(tenantId, classeId, body, user) {
@@ -1204,7 +1214,7 @@ async function procesVerbal(tenantId, id, user) {
 module.exports = {
   POINTS_DEPART, SORTS, STATUTS_BORDEREAU, MOTIFS, LIBELLES_SORT, LIBELLES_POINT_DEPART,
   ajouterAnnees, departDua, calculerEcheance, validerRegle, intituleDe, motifNonEligible, actionsPermises, corpsPv, empreintePv,
-  migrationPassee, definirDua, vueSortFinal, echeanceDocument, decider, annulerDecision,
+  migrationPassee, definirDua, vueSortFinal, echeanceDocument, compterEchus, decider, annulerDecision,
   listerBordereaux, detailBordereau, creerBordereau, modifierBordereau, ajouterDocuments, retirerDocument,
   proposer, valider: (t, id, u) => statuer(t, id, u, { valider: true }), rejeter: (t, id, u, motif) => statuer(t, id, u, { valider: false, motif }),
   retirerProposition, reprendre, annuler, executer, procesVerbal, transmettre, enregistrerVisa,

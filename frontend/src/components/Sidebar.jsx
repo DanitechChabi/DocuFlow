@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse, Mail, MailPlus, BookOpen, Table2,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse, Mail, MailPlus, BookOpen, Table2, ScrollText,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -157,6 +157,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view', groupe: 'archives' }),
     entree('/documents/archivage', 'Conservation et preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage', groupe: 'archives' }),
+    entree('/documents/outils', 'Outils de gestion', <ScrollText size={18} />, { permission: 'documents.view', tourId: 'outils', groupe: 'archives' }),
     entree('/documents/magasins', 'Magasins (papier)', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins', groupe: 'archives' }),
     entree('/documents/saisie', 'Saisie en tableau', <Table2 size={18} />, { permission: 'documents.index', tourId: 'saisie', groupe: 'archives' }),
     entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances', groupe: 'archives' }),

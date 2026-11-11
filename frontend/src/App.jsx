@@ -11,6 +11,7 @@ import RapportAnnuelPage from './pages/RapportAnnuelPage';
 import RepertoirePage from './pages/RepertoirePage';
 import EtiquettesPage from './pages/EtiquettesPage';
 import SaisieTableauPage from './pages/SaisieTableauPage';
+import OutilsGestionPage from './pages/OutilsGestionPage';
 import PortailCitoyenPage from './pages/PortailCitoyenPage';
 import AffichePortailPage from './pages/AffichePortailPage';
 import CourrierPage from './pages/CourrierPage';
@@ -156,6 +157,7 @@ function App() {
           <Route path="/documents/magasins/:id/repertoire" element={<RepertoirePage />} />
           <Route path="/documents/magasins/:id/etiquettes" element={<EtiquettesPage />} />
           <Route path="/documents/saisie" element={<SaisieTableauPage />} />
+          <Route path="/documents/outils" element={<OutilsGestionPage />} />
           <Route path="/documents/archives" element={<DocumentsPage statutFiltre="archivé" />} />
           <Route path="/documents/corbeille" element={<CorbeillePage />} />
           <Route path="/profile" element={<ProfilePage />} />
