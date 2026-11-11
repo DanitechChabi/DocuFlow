@@ -6,7 +6,7 @@ import {
   User as UserIcon, ChevronLeft, ChevronRight, X,
   LogOut, ShieldCheck, Info, Compass, BookOpenCheck,
   Layers,
-  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse, Mail, MailPlus, BookOpen,
+  Fingerprint, Star, ListChecks, GitBranch, Search, CalendarClock, UserCircle, Warehouse, Mail, MailPlus, BookOpen, Table2,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -158,6 +158,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view', groupe: 'archives' }),
     entree('/documents/archivage', 'Conservation et preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage', groupe: 'archives' }),
     entree('/documents/magasins', 'Magasins (papier)', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins', groupe: 'archives' }),
+    entree('/documents/saisie', 'Saisie en tableau', <Table2 size={18} />, { permission: 'documents.index', tourId: 'saisie', groupe: 'archives' }),
     entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances', groupe: 'archives' }),
     entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille', groupe: 'archives' }),
     entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite', groupe: 'controle' }),

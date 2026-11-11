@@ -4,6 +4,7 @@
 //                                       description des boîtes et répertoire (043)
 //   /api/documents/:id/localisation     support, boîte, cote d'un document
 //   /api/archives/recolements[...]      campagnes de récolement et PV
+//   /api/archives/saisie[...]           saisie en tableau des dossiers papier
 // ============================================================================
 const express = require('express');
 const router = express.Router();
@@ -25,6 +26,11 @@ router.get('/archives/emplacements/:id/repertoire', consulter, ctrl.repertoire);
 
 router.get('/documents/:id/localisation', consulter, ctrl.localisation);
 router.put('/documents/:id/localisation', [auth, requirePermission('documents.edit')], ctrl.placer);
+
+// Saisie en tableau : créer des fiches ET les décrire — les deux permissions.
+const saisir = [auth, requirePermission('documents.upload'), requirePermission('documents.index')];
+router.get('/archives/saisie/modele', saisir, ctrl.modeleSaisie);
+router.post('/archives/saisie', saisir, ctrl.saisir);
 
 router.get('/archives/recolements', voir, ctrl.recolements);
 router.post('/archives/recolements', gerer, ctrl.ouvrirRecolement);
