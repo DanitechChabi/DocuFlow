@@ -2,7 +2,8 @@
 // saisie.test.js — saisie en tableau des dossiers papier.
 // Lecture des cellules (nombres, dates, listes, dates extrêmes), fiche déduite
 // des propriétés, contrôle de TOUTES les lignes avant la moindre création,
-// doublons, boîtes désignées par leur code, fiches créées (titre de la charte,
+// doublons, boîtes désignées par leur code, import d'un classeur (vérification
+// d'ensemble, classe créée d'après ses colonnes), fiches créées (titre de la charte,
 // boîte, cote, « rangé par »), archivage à la saisie, départ de la durée de
 // conservation à la clôture du dossier, cloisonnement entre organisations.
 // Exécution : npm run test:saisie
@@ -50,6 +51,11 @@ const attendreErreur = async (fn) => { try { await fn(); return null; } catch (e
     'fiche déduite : attributaire, référence, n° de contrat, année d\'ouverture, date du document (pas l\'expiration)');
   const f2 = saisie.ficheDe(colonnes, new Map([[2, 'Pistes']]), {}, new Date('2026-05-05'));
   ok(f2.nom_entreprise === 'À indexer' && f2.num_dossier === 'À indexer' && f2.annee === 2026 && f2.date_document === null, 'fiche sans tiers ni numéro : repli « À indexer », année courante');
+  const f3 = saisie.ficheDe([{ id: 7, libelle: 'Promoteur', type: 'text' }, { id: 8, libelle: 'Quartier', type: 'text' }, { id: 9, libelle: 'Lot', type: 'text' }],
+    new Map([[7, 'COOPÉRATIVE FICTIVE'], [8, 'Les Palmiers'], [9, 'L-204']]), {}, new Date('2026-05-05'), { entreprise: 8, dossier: 9 });
+  ok(f3.nom_entreprise === 'Les Palmiers' && f3.num_dossier === 'L-204' && f3.num_acte === 'À indexer'
+    && saisie.ficheDe([{ id: 7, libelle: 'Promoteur', type: 'text' }], new Map([[7, 'COOPÉRATIVE FICTIVE']])).nom_entreprise === 'COOPÉRATIVE FICTIVE',
+    'repères : la colonne désignée l\'emporte ; « promoteur », « dénomination », « structure » sont reconnus comme le tiers');
   const boites = [{ id: 1, code: 'B0001', cote: 'D1-M1-B0001' }, { id: 2, code: 'B0001', cote: 'D1-M2-B0001' }, { id: 3, code: 'B0002', cote: 'D1-M1-B0002' }];
   ok(saisie.trouverBoite(boites, 'b0002').boite.id === 3 && saisie.trouverBoite(boites, 'd1-m2-b0001').boite.id === 2 && /cote complète/.test(saisie.trouverBoite(boites, 'B0001').erreur)
     && saisie.trouverBoite(boites, 'B0099').inconnue === 'B0099', 'boîte désignée par son code, sa cote complète si le code est porté deux fois ; inconnue : signalée');
@@ -207,6 +213,90 @@ const attendreErreur = async (fn) => { try { await fn(); return null; } catch (e
     ok(o1.nom_entreprise === 'SOCIÉTÉ FICTIVE A' && String(o1.date_document.getFullYear()) === '2019' && e1.depart === '2020-12-31' && e2.depart === '2019-03-16' && e1.depart_estime === false,
       'offres : la date de soumission date le document ; des dates extrêmes plus tardives repoussent le départ à la clôture');
     ok(o1.description === 'SMP-2019-AOO-001 — SOCIÉTÉ FICTIVE A', `charte de nommage d'une autre classe (${o1.description})`);
+
+    // --- Import d'un classeur : tout vérifier, puis créer par lots -----------------------
+    const classeur = Array.from({ length: 250 }, (_, i) => ligne(`IMP-${String(i + 1).padStart(3, '0')}`, `Dossier importé ${i + 1}`, i === 7 ? { [col(mp, 'Montant TTC')]: 'inconnu' } : {}));
+    classeur.push(ligne('IMP-001', 'Dossier importé 1'), ligne('AOO-001', 'Pistes rurales'));
+    const avantImport = await nbDocs();
+    const verif = await saisie.verifier(t, { classe_id: mp.id, lignes: classeur }, archi);
+    ok(verif.lignes === 252 && verif.erreurs.length === 1 && verif.erreurs[0].ligne === 7 && verif.doublons.length === 2 && (await nbDocs()) === avantImport,
+      'vérification d\'un classeur de 252 lignes : l\'erreur est désignée, les doublons aussi, rien n\'est créé');
+    classeur[7] = ligne('IMP-008', 'Dossier importé 8');
+    const verif2 = await saisie.verifier(t, { classe_id: mp.id, lignes: classeur }, archi);
+    ok(verif2.erreurs.length === 0 && verif2.doublons.map((x) => x.ligne).join() === '250,251' && !verif2.doublons[0].document_id && /^Déjà saisi/.test(verif2.doublons[1].motif),
+      'doublons vus sur tout le classeur : ligne répétée (250) et dossier déjà saisi (251)');
+    ok((await attendreErreur(() => saisie.creerLot(t, { classe_id: mp.id, lignes: classeur }, archi)))?.status === 400
+      && (await attendreErreur(() => saisie.verifier(t, { classe_id: mp.id, lignes: Array.from({ length: 5001 }, (_, i) => ligne(`X-${i}`, 'O')) }, archi)))?.status === 400,
+      'la création reste bornée à 200 lignes par appel, la vérification à 5 000 par classeur');
+
+    // --- Classe créée d'après les colonnes d'un classeur quelconque ---------------------
+    const creee = await saisie.creerClasse(t, {
+      nom: 'Registre des entreprises', titre: 'Dénomination',
+      colonnes: [{ libelle: 'Dénomination' }, { libelle: 'N° IFU', type: 'text' }, { libelle: 'Date de création', type: 'date' }, { libelle: 'Effectif', type: 'number' }, { libelle: 'Quartier', type: 'bidule' }, { libelle: '  ' }],
+    }, archi);
+    ok(creee.code === 'RDE' && creee.modele_nom === '{Dénomination}' && creee.colonnes.map((c) => `${c.libelle}:${c.type}`).join() === 'Dénomination:text,N° IFU:text,Date de création:date,Effectif:number,Quartier:text',
+      `classe créée d'après les colonnes : code tiré du nom, types retenus, colonne sans titre écartée (${creee.code})`);
+    ok((await attendreErreur(() => saisie.creerClasse(t, { nom: 'Registre des entreprises', colonnes: [{ libelle: 'A' }] }, archi)))?.status === 409
+      && (await attendreErreur(() => saisie.creerClasse(t, { nom: 'Autre registre', colonnes: [{ libelle: 'Nom' }, { libelle: 'nom ' }] }, archi)))?.status === 400
+      && (await attendreErreur(() => saisie.creerClasse(t, { nom: '', colonnes: [{ libelle: 'A' }] }, archi)))?.status === 400
+      && (await attendreErreur(() => saisie.creerClasse(t, { nom: 'Vide', colonnes: [] }, archi)))?.status === 400,
+      'classe déjà nommée ainsi, deux colonnes de même titre, nom ou colonnes absents : refusés');
+    ok((await saisie.creerClasse(t, { nom: 'Répertoire des dossiers en instance', colonnes: [{ libelle: 'Objet' }] }, archi)).code === 'RDDEI'
+      && (await saisie.creerClasse(t, { nom: 'Registre des élus', colonnes: [{ libelle: 'Nom' }] }, archi)).code === 'RDE2', 'codes de classe uniques dans l\'organisation');
+    const cc = (libelle) => creee.colonnes.find((c) => c.libelle === libelle).id;
+    const importees = await saisie.creerLot(t, {
+      classe_id: creee.id, reperes: { dossier: cc('N° IFU') },
+      lignes: [
+        { valeurs: { [cc('Dénomination')]: 'ENTREPRISE FICTIVE DU LAC', [cc('N° IFU')]: '3201900000001', [cc('Date de création')]: '12/04/2019', [cc('Effectif')]: '24', [cc('Quartier')]: 'Centre' } },
+        { valeurs: { [cc('Dénomination')]: 'COOPÉRATIVE FICTIVE DES PALMIERS', [cc('Effectif')]: '1 250' } },
+      ],
+    }, archi);
+    const ent = await fiche(importees.crees[0].id);
+    ok(importees.crees.length === 2 && ent.description === 'ENTREPRISE FICTIVE DU LAC' && ent.nom_entreprise === 'ENTREPRISE FICTIVE DU LAC' && ent.num_dossier === '3201900000001'
+      && ent.type_document === 'Registre des entreprises' && (await fiche(importees.crees[1].id)).description === 'COOPÉRATIVE FICTIVE DES PALMIERS',
+      'lignes importées dans la nouvelle classe : le titre vient de la colonne choisie, l\'entreprise et le n° de dossier sont repris');
+    const redite2 = await saisie.verifier(t, { classe_id: creee.id, lignes: [{ valeurs: { [cc('Dénomination')]: 'entreprise fictive du lac' } }, { valeurs: { [cc('Effectif')]: '3' } }] }, archi);
+    ok(creee.colonnes[0].obligatoire === true && redite2.doublons.length === 1 && redite2.doublons[0].ligne === 0 && redite2.erreurs.length === 1 && redite2.erreurs[0].ligne === 1,
+      'la colonne qui nomme les fiches est obligatoire : un second import du même classeur est reconnu, une ligne sans nom est signalée');
+    const m3 = await saisie.modele(t, archi);
+    ok(m3.classes.some((c) => c.id === creee.id && c.colonnes.length === 5) && m3.peut_creer_classe === true && m3.limite_import === 5000 && (await saisie.modele(t, agent)).peut_creer_classe === false,
+      'la nouvelle classe est proposée dans la grille ; créer une classe demande le droit de configurer les classes');
+
+    // --- Référentiel : ce qui a été importé aide à indexer et à chercher ---------------
+    const referentiel = require('./services/referentielService');
+    const suggestions = require('./services/indexSuggestionService');
+    const connues = await referentiel.fiches(t, archi.id);
+    ok(creee.referentiel === true && m3.classes.find((c) => c.id === creee.id).referentiel === true && m3.classes.find((c) => c.id === mp.id).referentiel === false
+      && connues.length === 2 && connues.some((x) => x.nom === 'ENTREPRISE FICTIVE DU LAC' && x.identifiants.includes('3201900000001')),
+      'classe créée à l\'import : c\'est un référentiel, ses fiches sont connues avec leurs identifiants');
+    const facf = (await classeService.installerClasses(t, ['FACF'])) && (await saisie.modele(t, archi)).classes.find((c) => c.code === 'FACF');
+    const aIndexer = (await db.query(
+      `INSERT INTO documents (tenant_id, reference_mfile, num_dossier, num_acte, nom_entreprise, annee, statut, created_by, contenu_texte)
+       VALUES ($1, $2, 'À indexer', 'À indexer', 'À indexer', 2026, 'à indexer', $3, $4) RETURNING id`,
+      [t, `SCAN-${s}`, archi.id, 'FACTURE N° F-2026-118\nDoit : Mairie\nÉmise par Entreprise fictive du Lac SARL — IFU 3201900000001\nNet à payer : 250 000 FCFA'])).rows[0].id;
+    const props = (await suggestions.propositionsPour(t, aIndexer, { userId: archi.id })).propositions;
+    const prop = (champ) => props.find((x) => x.champ === champ);
+    const fournisseur = facf.colonnes.find((c) => c.libelle === 'Fournisseur');
+    ok(prop('nom_entreprise')?.valeur === 'ENTREPRISE FICTIVE DU LAC' && prop('nom_entreprise').source === 'referentiel' && prop('nom_entreprise').confiance === 'haute'
+      && /Reconnu dans « Registre des entreprises »/.test(prop('nom_entreprise').extrait) && prop('num_dossier')?.valeur === '3201900000001',
+      'document à indexer qui cite un numéro du référentiel : le nom est proposé, écrit comme dans le référentiel');
+    ok(fournisseur && prop(`meta:${fournisseur.id}`)?.valeur === 'ENTREPRISE FICTIVE DU LAC' && prop(`meta:${cc('N° IFU')}`)?.valeur === '3201900000001' && !prop(`meta:${cc('Effectif')}`),
+      'la propriété « Fournisseur » de la facture reçoit le nom ; un nombre du référentiel n\'est pas recopié sur le document');
+    const parIndice = (await suggestions.propositionsPour(t, lot.crees[1].id, { userId: archi.id, indice: 'coopérative fictive des palmiers' })).propositions;
+    ok(parIndice.some((x) => x.champ === 'nom_entreprise' && x.valeur === 'COOPÉRATIVE FICTIVE DES PALMIERS' && x.source === 'referentiel')
+      && !(await suggestions.propositionsPour(t, lot.crees[1].id, { userId: archi.id })).propositions.some((x) => x.source === 'referentiel'),
+      'un nom tapé par l\'archiviste suffit à retrouver la fiche ; sans indice ni texte, rien n\'est inventé');
+    ok((await suggestions.propositionsPour(t, importees.crees[0].id, { userId: archi.id })).propositions.every((x) => x.source !== 'referentiel'), 'une fiche du référentiel ne se reconnaît pas elle-même');
+    ok((await suggestions.propositionsPour(t, aIndexer, { userId: archi.id, indice: 'Coopérative fictive des Palmiers' })).propositions.find((x) => x.champ === 'nom_entreprise').valeur === 'COOPÉRATIVE FICTIVE DES PALMIERS',
+      'ce que l\'archiviste tape l\'emporte sur ce que le texte du document laisse reconnaître');
+    const noms = await referentiel.valeurs(t, archi.id, { fiche: 'nom_entreprise', q: 'fict' });
+    ok(noms.includes('ENTREPRISE FICTIVE DU LAC') && noms.includes('ENTREPRISE FICTIVE BTP') && (await referentiel.valeurs(t, archi.id, { champ_id: fournisseur.id, q: 'coop' })).join() === 'COOPÉRATIVE FICTIVE DES PALMIERS'
+      && (await referentiel.valeurs(t, archi.id, { champ_id: cc('N° IFU'), q: '3201' })).join() === '3201900000001' && (await referentiel.valeurs(t2, autre.id, { fiche: 'nom_entreprise', q: 'fict' })).length === 0,
+      'valeurs proposées à la frappe : noms connus pour un champ « tiers », valeurs de même libellé pour les autres ; rien d\'une autre organisation');
+    await referentiel.definir(t, creee.id, false, archi);
+    ok((await referentiel.fiches(t, archi.id)).length === 0 && !(await suggestions.propositionsPour(t, aIndexer, { userId: archi.id })).propositions.some((x) => x.source === 'referentiel')
+      && (await attendreErreur(() => referentiel.definir(t2, creee.id, true, autre)))?.status === 404, 'classe démarquée : ses fiches ne servent plus à reconnaître ; une autre organisation n\'y touche pas');
+    await referentiel.definir(t, creee.id, true, archi);
 
     // --- Propriétés communes obligatoires ----------------------------------------------
     const commun = (await db.query("INSERT INTO metadata_schemas (tenant_id, name, is_default) VALUES ($1, 'Document standard', true) RETURNING id", [t])).rows[0].id;

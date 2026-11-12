@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Table2, Plus, Trash2, Save, Loader2, ArrowDownToLine, ClipboardPaste, CheckCircle2, AlertTriangle, BookOpenText, Tags, Package, Eraser } from 'lucide-react';
+import { Table2, Plus, Trash2, Save, Loader2, ArrowDownToLine, ClipboardPaste, CheckCircle2, AlertTriangle, BookOpenText, Tags, Package, Eraser, FileSpreadsheet } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import { toast } from '../components/Toast';
 import { physiqueService, COULEURS } from '../services/physiqueService';
+import ImportClasseur from '../components/archives/ImportClasseur';
 
 /**
  * Saisie en tableau des dossiers papier. Une ligne par dossier : sa cote, ses
@@ -118,6 +119,7 @@ const SaisieTableauPage = () => {
   const [envoi, setEnvoi] = useState(false);
   const [faits, setFaits] = useState([]);
   const [reprise, setReprise] = useState(false);
+  const [importOuvert, setImportOuvert] = useState(false);
   const grille = useRef(null);
 
   const charger = useCallback(() => physiqueService.modeleSaisie().then((m) => { setModele(m); return m; }), []);
@@ -135,8 +137,11 @@ const SaisieTableauPage = () => {
         setLignes(brouillon.lignes.map((l) => ({ ...ligneVide(), ...l, cle: ligneVide().cle })));
         setLot(brouillon.lot || {});
         setReprise(true);
+        if (params.get('import') === '1') setImportOuvert(true);
         return;
       }
+      // « ?import=1 » : on arrive pour importer un classeur — l'assistant s'ouvre d'emblée.
+      if (params.get('import') === '1' && (m.classes.length > 0 || m.peut_creer_classe)) setImportOuvert(true);
       if (voulue && m.classes.some((c) => String(c.id) === voulue)) setClasseId(voulue);
       if (boiteVoulue && m.boites.some((b) => String(b.id) === boiteVoulue)) setBoite(boiteVoulue);
     }).catch((err) => { toast.error(err.response?.data?.message || 'Chargement impossible'); setModele({ classes: [], communes: [], boites: [], tablettes: [] }); });
@@ -337,14 +342,25 @@ const SaisieTableauPage = () => {
   return (
     <div className="px-4 sm:px-8 pt-6 pb-28 max-w-[1500px] mx-auto">
       <PageHeader title="Saisie en tableau" subtitle="Une ligne par dossier papier : la fiche est créée, nommée et rangée dans sa boîte"
-        icon={Table2} breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents', to: '/documents' }, { label: 'Magasins', to: '/documents/magasins' }, { label: 'Saisie en tableau' }]} />
+        icon={Table2} breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents', to: '/documents' }, { label: 'Magasins', to: '/documents/magasins' }, { label: 'Saisie en tableau' }]}
+        actions={modele && (modele.classes.length > 0 || modele.peut_creer_classe) && (
+          <button type="button" onClick={() => setImportOuvert(true)} className="btn btn-secondary"><FileSpreadsheet size={16} className="text-emerald-600" /> Importer un classeur Excel</button>
+        )} />
+      {importOuvert && (
+        <ImportClasseur modele={modele} emplacementInitial={boite && boite !== 'plusieurs' ? boite : ''} lotInitial={lot} onLot={setLot}
+          onFerme={() => setImportOuvert(false)}
+          onImporte={({ crees, classe: c }) => { setFaits((f) => [...crees.map((x) => ({ ...x, classe: c.nom })), ...f]); charger().catch(() => {}); }} />
+      )}
 
       {modele === null ? <div className="h-40 skeleton rounded-2xl" /> : modele.classes.length === 0 ? (
         <div className="glass-card-premium p-10 text-center">
           <Table2 size={34} className="mx-auto text-slate-300 mb-2" />
           <p className="font-bold text-slate-800">Aucune classe de documents</p>
-          <p className="text-sm text-slate-500 mt-1 max-w-xl mx-auto">Les colonnes du tableau sont les propriétés d'une classe (dossier de marché, contrat, acte…). Installez d'abord les classes dont vous avez besoin.</p>
-          <Link to="/documents/classes" className="btn btn-primary btn-sm mt-4 inline-flex">Classes et plan</Link>
+          <p className="text-sm text-slate-500 mt-1 max-w-xl mx-auto">Les colonnes du tableau sont les propriétés d'une classe (dossier de marché, contrat, acte…). Installez les classes dont vous avez besoin{modele.peut_creer_classe ? ', ou importez un classeur Excel : la classe sera créée d\'après ses colonnes' : ''}.</p>
+          <div className="flex flex-wrap justify-center gap-2 mt-4">
+            <Link to="/documents/classes" className="btn btn-primary btn-sm">Classes et plan</Link>
+            {modele.peut_creer_classe && <button type="button" onClick={() => setImportOuvert(true)} className="btn btn-secondary btn-sm"><FileSpreadsheet size={14} className="text-emerald-600" /> Importer un classeur Excel</button>}
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -424,7 +440,7 @@ const SaisieTableauPage = () => {
           ) : (
             <>
               <p className="text-xs text-slate-500 px-1">
-                <kbd className="px-1 rounded border border-slate-300 bg-white">Entrée</kbd> descend d'une ligne. Vous pouvez <strong>coller un tableau</strong> copié depuis Excel ou Word : avec sa ligne de titres, les colonnes sont reconnues par leur nom ; sans titres, le collage part de la cellule active. <ArrowDownToLine size={12} className="inline" /> recopie une valeur vers le bas.
+                <kbd className="px-1 rounded border border-slate-300 bg-white">Entrée</kbd> descend d'une ligne. Vous pouvez <strong>coller un tableau</strong> copié depuis Excel ou Word (ou importer tout un classeur, bouton en haut) : avec sa ligne de titres, les colonnes sont reconnues par leur nom ; sans titres, le collage part de la cellule active. <ArrowDownToLine size={12} className="inline" /> recopie une valeur vers le bas.
               </p>
               <div className="glass-card-premium overflow-auto max-h-[62vh]" ref={grille}>
                 <table className="grille-saisie">
@@ -541,13 +557,14 @@ const SaisieTableauPage = () => {
                 </span>
               </div>
               <ul className="divide-y divide-slate-100 text-sm max-h-72 overflow-auto">
-                {faits.map((f) => (
+                {faits.slice(0, 200).map((f) => (
                   <li key={f.id} className="py-1.5 flex flex-wrap items-baseline gap-x-3">
                     <Link to={`/documents/liste?doc=${f.id}`} className="font-bold text-docuflow-secondary hover:underline">{f.titre || f.classe}</Link>
                     <span className="text-xs text-slate-400 font-mono">{f.reference}</span>
                     <span className="text-xs text-slate-500 ml-auto">{f.boite ? <>Boîte <span className="font-mono">{f.boite}</span>{f.cote ? ` · cote ${f.cote}` : ''}</> : 'Pas encore rangé'}</span>
                   </li>
                 ))}
+                {faits.length > 200 && <li className="py-1.5 text-xs text-slate-500">… et {(faits.length - 200).toLocaleString('fr-FR')} autres, à retrouver dans <Link to="/documents/liste" className="font-bold text-docuflow-secondary hover:underline">Documents</Link>.</li>}
               </ul>
             </section>
           )}

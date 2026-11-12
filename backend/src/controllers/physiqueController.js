@@ -52,3 +52,10 @@ exports.pvRecolement = action((req) => physique.procesVerbal(t(req), req.params.
 // Saisie en tableau des dossiers papier : une ligne, une fiche rangée.
 exports.modeleSaisie = action((req) => saisie.modele(t(req), req.user), 'Chargement de la grille impossible');
 exports.saisir = action((req) => saisie.creerLot(t(req), req.body || {}, req.user, { ip: req.ip }), 'Enregistrement de la saisie impossible', 201);
+// Import d'un classeur : tout vérifier sans rien créer ; créer une classe d'après ses colonnes.
+exports.verifierSaisie = action((req) => saisie.verifier(t(req), req.body || {}, req.user), 'Vérification du classeur impossible');
+exports.creerClasseSaisie = action((req) => saisie.creerClasse(t(req), req.body || {}, req.user), 'Création de la classe impossible', 201);
+// Référentiel (046) : classe dont les fiches aident à indexer ; valeurs déjà connues d'un champ.
+const referentiel = require('../services/referentielService');
+exports.definirReferentiel = action((req) => referentiel.definir(t(req), req.params.id, req.body?.actif === true, req.user), 'Réglage du référentiel impossible');
+exports.valeursConnues = action((req) => referentiel.valeurs(t(req), req.user.id, { champ_id: req.query.champ, fiche: req.query.fiche, q: req.query.q }), 'Suggestions indisponibles');

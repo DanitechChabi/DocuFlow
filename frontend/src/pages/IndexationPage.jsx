@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { documentService } from '../services/documentService';
 import { metadataApi } from '../services/metadataApi';
+import { physiqueService } from '../services/physiqueService';
 import { toast } from '../components/Toast';
 import { useTitrePage } from '../hooks/useTitrePage';
 
@@ -90,13 +91,34 @@ const IndexationPage = () => {
 
   const idCourant = file?.[position];
 
-  const chargerPropositions = useCallback(async (id) => {
+  const chargerPropositions = useCallback(async (id, indice) => {
     try {
-      setProps(await documentService.getSuggestions(id));
+      setProps(await documentService.getSuggestions(id, indice));
     } catch {
       setProps({ texte: 'aucun', propositions: [] });
     }
   }, []);
+
+  // Valeurs déjà connues de l'organisation (référentiel importé, fiches
+  // existantes), proposées à la frappe dans le champ que l'on remplit.
+  const [connues, setConnues] = useState([]);
+  const minuterieConnues = useRef(null);
+  const dernierIndice = useRef('');
+  const chercherConnues = (critere, q) => {
+    clearTimeout(minuterieConnues.current);
+    if (String(q || '').trim().length < 2) { setConnues([]); return; }
+    minuterieConnues.current = setTimeout(() => {
+      physiqueService.valeursConnues({ ...critere, q }).then((l) => setConnues(Array.isArray(l) ? l : [])).catch(() => setConnues([]));
+    }, 220);
+  };
+  // En quittant un champ, ce qu'on y a tapé sert d'indice : si le référentiel
+  // connaît ce nom ou ce numéro, ses informations sont proposées.
+  const indiceSaisi = (valeur) => {
+    const v = String(valeur || '').trim();
+    if (!idCourant || v.length < 4 || v === dernierIndice.current) return;
+    dernierIndice.current = v;
+    chargerPropositions(idCourant, v);
+  };
 
   // Document courant : fiche, métadonnées, propositions.
   useEffect(() => {
@@ -105,6 +127,8 @@ const IndexationPage = () => {
     setChargement(true);
     setErreurs({});
     setAcceptes(new Set());
+    dernierIndice.current = '';
+    setConnues([]);
     (async () => {
       try {
         const [d, valeurs] = await Promise.all([
@@ -295,6 +319,9 @@ const IndexationPage = () => {
     );
   };
 
+  // La fiche du référentiel que le document (ou la saisie) a fait reconnaître.
+  const reconnu = props.propositions.find((x) => x.source === 'referentiel') || null;
+
   const champClasse = (cle) => `input-premium ${erreurs[cle] ? '!border-red-400' : ''} ${acceptes.has(cle) ? '!border-emerald-300 !bg-emerald-50/40' : ''}`;
 
   return (
@@ -361,7 +388,10 @@ const IndexationPage = () => {
                 </p>
               ) : enAttente.length > 0 ? (
                 <div className="mt-2 text-xs text-violet-800 bg-violet-50 border border-violet-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
-                  <span><Sparkles size={13} className="inline mr-1" /> {enAttente.length} proposition{enAttente.length > 1 ? 's' : ''} tirée{enAttente.length > 1 ? 's' : ''} du document</span>
+                  <span>
+                    <Sparkles size={13} className="inline mr-1" /> {enAttente.length} proposition{enAttente.length > 1 ? 's' : ''}
+                    {reconnu ? <> — déjà connu : <strong>{reconnu.extrait.replace(/^Reconnu dans /, '')}</strong></> : ` tirée${enAttente.length > 1 ? 's' : ''} du document`}
+                  </span>
                   <button onClick={toutAccepter} className="font-bold flex items-center gap-1 hover:underline" data-tour="tout-accepter"><CheckCheck size={13} /> Tout accepter</button>
                 </div>
               ) : props.texte === 'aucun' && !chargement ? (
@@ -369,6 +399,7 @@ const IndexationPage = () => {
               ) : null}
             </div>
 
+            <datalist id="idx-connues">{connues.map((v) => <option key={v} value={v} />)}</datalist>
             <form className="p-5 grid grid-cols-2 gap-x-4 gap-y-4" onSubmit={(e) => { e.preventDefault(); valider({ indexer: true }); }}>
               {avecClasses && (
                 <div className="col-span-2">
@@ -399,7 +430,14 @@ const IndexationPage = () => {
                     </select>
                   ) : (
                     <input id={`idx-${c.cle}`} type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'}
-                      className={champClasse(c.cle)} value={fiche[c.cle] || ''} onChange={(e) => setFiche({ ...fiche, [c.cle]: e.target.value })} />
+                      className={champClasse(c.cle)} value={fiche[c.cle] || ''}
+                      {...(['nom_entreprise', 'num_dossier', 'num_acte'].includes(c.cle) ? {
+                        list: 'idx-connues', autoComplete: 'off', onFocus: () => setConnues([]), onBlur: (e) => indiceSaisi(e.target.value),
+                      } : {})}
+                      onChange={(e) => {
+                        setFiche({ ...fiche, [c.cle]: e.target.value });
+                        if (['nom_entreprise', 'num_dossier', 'num_acte'].includes(c.cle)) chercherConnues({ fiche: c.cle }, e.target.value);
+                      }} />
                   )}
                   {erreurs[c.cle] && <p className="text-[11px] text-red-500 mt-1">{erreurs[c.cle]}</p>}
                   <Proposition champ={c.cle} />
@@ -442,7 +480,9 @@ const IndexationPage = () => {
                       </select>
                     ) : (
                       <input id={`idx-${cle}`} type={c.type === 'date' ? 'date' : c.type === 'number' ? 'number' : 'text'}
-                        className={champClasse(cle)} value={v} onChange={(e) => setMeta({ ...meta, [c.id]: e.target.value })} />
+                        className={champClasse(cle)} value={v}
+                        {...(c.type === 'text' ? { list: 'idx-connues', autoComplete: 'off', onFocus: () => setConnues([]), onBlur: (e) => indiceSaisi(e.target.value) } : {})}
+                        onChange={(e) => { setMeta({ ...meta, [c.id]: e.target.value }); if (c.type === 'text') chercherConnues({ champ: c.id }, e.target.value); }} />
                     )}
                     {erreurs[cle] && <p className="text-[11px] text-red-500 mt-1">{erreurs[cle]}</p>}
                     <Proposition champ={cle} />

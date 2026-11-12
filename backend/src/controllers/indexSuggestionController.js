@@ -16,7 +16,7 @@ exports.propositions = async (req, res) => {
     if (d.rows[0].dossier_id && !(await aclService.peutLire(tenantId, req.user.id, d.rows[0].dossier_id))) {
       return res.status(403).json({ message: 'Ce document est dans un dossier qui ne vous est pas ouvert.', code: 'HORS_PERIMETRE' });
     }
-    res.json(await suggestions.propositionsPour(tenantId, id));
+    res.json(await suggestions.propositionsPour(tenantId, id, { userId: req.user.id, indice: req.query.indice }));
   } catch (err) {
     if (err.code === '42703') return res.json({ texte: 'aucun', propositions: [] }); // base non migrée (027)
     console.error('[indexation] propositions :', err);

@@ -27,9 +27,14 @@ const metadataService = require('./metadataService');
 const physique = require('./physiqueService');
 const documentAuditService = require('./documentAuditService');
 const { logHistory, setCanonicalReference } = require('./documentIndexService');
+const referentielService = require('./referentielService');
 
 const { cle } = classeService;
 const LIMITE = 200;
+// Un classeur entier se VÉRIFIE d'un coup (doublons compris) ; il se crée
+// ensuite par lots de LIMITE lignes au plus.
+const LIMITE_IMPORT = 5000;
+const TYPES_CLASSE = ['text', 'number', 'date', 'boolean'];
 const TYPES_SAISIS = ['text', 'number', 'date', 'boolean', 'select', 'multiselect'];
 const A_INDEXER = 'À indexer';
 
@@ -185,7 +190,7 @@ function lireDates(brut) {
 // propriétés de la classe : la recherche par tiers ou par numéro continue de
 // trouver les dossiers saisis ici.
 const MOTIFS_FICHE = {
-  nom_entreprise: /\b(attributaire|titulaire|soumissionnaire|fournisseur|prestataire|entreprise|societe|raison sociale|cocontractant|beneficiaire|expediteur|destinataire|employe|salarie|demandeur|client)\b/,
+  nom_entreprise: /\b(attributaire|titulaire|soumissionnaire|fournisseur|prestataire|entreprise|societe|raison sociale|denomination|etablissement|structure|promoteur|cocontractant|beneficiaire|expediteur|destinataire|employe|salarie|demandeur|client)\b/,
   num_dossier: /^(reference( du dossier| du marche)?|(n|numero)( de| du)? (dossier|marche))$/,
   num_acte: /^(n|numero)( de| du| d)? (contrat|acte|facture|arrete|decision|commande|bon de commande|piece|courrier|enregistrement)$/,
 };
@@ -197,17 +202,22 @@ const DATE_HORS_DOCUMENT = /\b(expiration|echeance|fin|limite|validite|naissance
  * @param {Map<number, any>} valeurs valeurs lues, par identifiant de propriété
  * @param {{ debut: number|null, fin: number|null }} dates
  */
-function ficheDe(colonnes, valeurs, dates = {}, aujourdhui = new Date()) {
-  const texte = (motif) => {
+function ficheDe(colonnes, valeurs, dates = {}, aujourdhui = new Date(), reperes = {}) {
+  // `reperes` : colonne désignée expressément (import d'un classeur dont les
+  // titres ne disent pas « entreprise » ou « n° de dossier »).
+  const designe = { nom_entreprise: reperes.entreprise, num_dossier: reperes.dossier, num_acte: reperes.acte };
+  const texte = (motif, champ) => {
+    const voulu = Number(designe[champ]);
+    if (voulu && !vide(valeurs.get(voulu))) return String(valeurs.get(voulu));
     const c = colonnes.find((x) => x.type === 'text' && motif.test(cle(x.libelle)) && !vide(valeurs.get(x.id)));
     return c ? String(valeurs.get(c.id)) : null;
   };
   const dateDoc = colonnes.find((x) => x.type === 'date' && !x.est_echeance && !DATE_HORS_DOCUMENT.test(cle(x.libelle)) && !vide(valeurs.get(x.id)));
   const date = dateDoc ? valeurs.get(dateDoc.id) : null;
   return {
-    nom_entreprise: (texte(MOTIFS_FICHE.nom_entreprise) || A_INDEXER).slice(0, 255),
-    num_dossier: (texte(MOTIFS_FICHE.num_dossier) || A_INDEXER).slice(0, 50),
-    num_acte: (texte(MOTIFS_FICHE.num_acte) || A_INDEXER).slice(0, 50),
+    nom_entreprise: (texte(MOTIFS_FICHE.nom_entreprise, 'nom_entreprise') || A_INDEXER).slice(0, 255),
+    num_dossier: (texte(MOTIFS_FICHE.num_dossier, 'num_dossier') || A_INDEXER).slice(0, 50),
+    num_acte: (texte(MOTIFS_FICHE.num_acte, 'num_acte') || A_INDEXER).slice(0, 50),
     annee: dates.debut || (date ? Number(date.slice(0, 4)) : null) || dates.fin || aujourdhui.getFullYear(),
     date_document: date,
   };
@@ -252,7 +262,7 @@ const versBoite = (e) => ({
 async function modele(tenantId, user = null) {
   const [schemas, champs, emplacements] = await Promise.all([
     db.query(
-      `SELECT id, name, code, modele_nom, COALESCE(is_default, false) AS commune, dua_annees, sort_final
+      `SELECT id, name, code, modele_nom, COALESCE(is_default, false) AS commune, dua_annees, sort_final, referentiel
          FROM metadata_schemas WHERE tenant_id = $1 ORDER BY name`, [tenantId]),
     db.query(
       `SELECT f.id, f.schema_id, f.label, f.type, f.required, f.options_json, f.default_value_json, f.est_echeance
@@ -264,7 +274,7 @@ async function modele(tenantId, user = null) {
   const defaut = schemas.rows.find((s) => s.commune);
   return {
     classes: schemas.rows.filter((s) => !s.commune).map((s) => ({
-      id: s.id, nom: s.name, code: s.code || null, modele_nom: s.modele_nom || null,
+      id: s.id, nom: s.name, code: s.code || null, modele_nom: s.modele_nom || null, referentiel: Boolean(s.referentiel),
       conservation: s.dua_annees === null || s.dua_annees === undefined ? null : { dua_annees: s.dua_annees, sort_final: s.sort_final },
       colonnes: de(s.id, false),
     })),
@@ -273,7 +283,8 @@ async function modele(tenantId, user = null) {
     tablettes: emplacements.filter((e) => e.type === 'tablette').map((e) => ({ id: e.id, cote: e.cote, libelle: e.libelle || null })),
     peut_archiver: user ? await roleService.possede(tenantId, user.role, 'documents.archive') : false,
     peut_creer_boites: user ? await roleService.possede(tenantId, user.role, 'archives.manage') : false,
-    limite: LIMITE,
+    peut_creer_classe: user ? await roleService.possede(tenantId, user.role, 'documents.edit') : false,
+    limite: LIMITE, limite_import: LIMITE_IMPORT,
   };
 }
 
@@ -327,7 +338,7 @@ async function chercherDoublons(tenantId, classeId, colonnes, lignes) {
  * @param {{ classe_id, emplacement_id?, dossier_id?, archiver?: boolean, lignes: Array<{ valeurs?: object, cote?, dates?, boite?, emplacement_id? }> }} corps
  * @returns {Promise<{ classe, colonnes, dossierId, lignes: Array, erreurs: Array<{ligne, colonne, message}>, doublons: Array, boites_inconnues: string[] }>}
  */
-async function preparer(tenantId, corps = {}, user) {
+async function preparer(tenantId, corps = {}, user, { limite = LIMITE } = {}) {
   const saisies = Array.isArray(corps.lignes) ? corps.lignes : [];
   const cls = await classeService.classe(tenantId, corps.classe_id);
   if (!cls) throw erreur(400, 'Choisissez la classe des dossiers à saisir.');
@@ -356,6 +367,7 @@ async function preparer(tenantId, corps = {}, user) {
     throw erreur(403, "Vous n'avez pas la permission d'archiver : décochez « Dossiers clos ».", { code: 'PERMISSION_REFUSEE' });
   }
 
+  const reperes = corps.reperes && typeof corps.reperes === 'object' ? corps.reperes : {};
   const erreurs = [];
   const lignes = [];
   const inconnues = new Set();
@@ -397,14 +409,20 @@ async function preparer(tenantId, corps = {}, user) {
       index, valeurs, emplacement, cote,
       debut: dates.debut ?? null, fin: dates.fin ?? null,
       metadata: [...valeurs].map(([fieldId, value]) => ({ fieldId, value })),
-      fiche: ficheDe(colonnes, valeurs, dates.erreur ? {} : dates),
+      fiche: ficheDe(colonnes, valeurs, dates.erreur ? {} : dates, new Date(), reperes),
     });
   });
 
   if (!lignes.length) throw erreur(400, 'Aucune ligne à enregistrer : remplissez au moins un dossier.');
-  if (lignes.length > LIMITE) throw erreur(400, `${LIMITE} lignes au plus par enregistrement : enregistrez en plusieurs fois.`);
+  if (lignes.length > limite) {
+    throw erreur(400, limite === LIMITE ? `${LIMITE} lignes au plus par enregistrement : enregistrez en plusieurs fois.`
+      : `${limite} lignes au plus par classeur : partagez-le en plusieurs fichiers.`);
+  }
 
-  const doublons = erreurs.length ? [] : await chercherDoublons(tenantId, cls.id, colonnes, lignes);
+  // Les doublons se cherchent parmi les lignes lisibles : une cellule fautive
+  // ailleurs dans le classeur ne doit pas les masquer.
+  const fautives = new Set(erreurs.map((e) => e.ligne));
+  const doublons = await chercherDoublons(tenantId, cls.id, colonnes, lignes.filter((l) => !fautives.has(l.index)));
   return { classe: cls, colonnes, dossierId, archiver: corps.archiver === true, lignes, erreurs, doublons, boites_inconnues: [...inconnues] };
 }
 
@@ -489,6 +507,7 @@ async function creerLot(tenantId, corps = {}, user, { ip = null } = {}) {
     }
   }
   if (crees.length) {
+    referentielService.invalider(tenantId);
     // Une propriété « échéance » a pu être saisie : l'échéancier suit (035).
     await require('./echeanceService').deriver({ tenantId }).catch(() => {});
     await db.query(
@@ -501,8 +520,75 @@ async function creerLot(tenantId, corps = {}, user, { ip = null } = {}) {
   return { crees, classe: { id: prep.classe.id, nom: prep.classe.name }, ...(interrompu ? { interrompu } : {}) };
 }
 
+/**
+ * Vérifie un classeur entier sans rien créer : erreurs cellule par cellule,
+ * doublons (dans le classeur et avec les dossiers déjà saisis), boîtes inconnues.
+ * @returns {Promise<{ lignes: number, erreurs: Array, doublons: Array, boites_inconnues: string[] }>}
+ */
+async function verifier(tenantId, corps = {}, user) {
+  const prep = await preparer(tenantId, corps, user, { limite: LIMITE_IMPORT });
+  return { lignes: prep.lignes.length, erreurs: prep.erreurs, doublons: prep.doublons, boites_inconnues: prep.boites_inconnues };
+}
+
+/**
+ * Crée une classe d'après les colonnes d'un classeur : chaque colonne devient
+ * une propriété, et la colonne « titre » nomme les dossiers. C'est ce qui
+ * rend importable un classeur que rien, dans DocuFlow, n'attendait.
+ * @param {{ nom: string, colonnes: Array<{ libelle: string, type?: string }>, titre?: string }} corps
+ */
+async function creerClasse(tenantId, corps = {}, user) {
+  const nom = String(corps.nom || '').trim().slice(0, 100);
+  if (!nom) throw erreur(400, 'Donnez un nom à la nouvelle classe.');
+  const vues = new Set();
+  const colonnes = (Array.isArray(corps.colonnes) ? corps.colonnes : []).map((c) => ({
+    libelle: String(c?.libelle || '').trim().replace(/\s+/g, ' ').slice(0, 150), type: TYPES_CLASSE.includes(c?.type) ? c.type : 'text',
+  })).filter((c) => c.libelle);
+  if (!colonnes.length) throw erreur(400, 'La classe doit avoir au moins une propriété.');
+  if (colonnes.length > 40) throw erreur(400, '40 propriétés au plus par classe : écartez les colonnes inutiles.');
+  for (const c of colonnes) {
+    const k = cle(c.libelle);
+    if (!k) throw erreur(400, `La colonne « ${c.libelle} » n'a pas de titre lisible.`);
+    if (vues.has(k)) throw erreur(400, `Deux colonnes portent le titre « ${c.libelle} » : renommez l'une d'elles dans le classeur.`);
+    vues.add(k);
+  }
+  const titre = colonnes.find((c) => cle(c.libelle) === cle(corps.titre || ''));
+  // Code : les initiales du nom, rendues uniques dans l'organisation.
+  const pris = new Set((await db.query('SELECT upper(code) AS c FROM metadata_schemas WHERE tenant_id = $1 AND code IS NOT NULL', [tenantId])).rows.map((r) => r.c));
+  const mots = cle(nom).split(' ').filter(Boolean);
+  const racine = (mots.length > 1 ? mots.map((m) => m[0]).join('') : (mots[0] || 'cl').slice(0, 3)).toUpperCase().slice(0, 6) || 'CL';
+  let code = racine;
+  for (let i = 2; pris.has(code); i += 1) code = `${racine}${i}`;
+  let schema;
+  try {
+    schema = await metadataService.createSchema(tenantId, {
+      name: nom, description: 'Classe créée à l\'import d\'un classeur', code,
+      modele_nom: titre ? `{${titre.libelle}}` : `${nom} n° {compteur}`,
+    });
+  } catch (err) {
+    if (/porte déjà ce nom/.test(err.message)) throw erreur(409, `Une classe s'appelle déjà « ${nom} » : choisissez-la, ou donnez un autre nom.`, { code: 'CLASSE_EXISTANTE' });
+    throw erreur(400, err.message);
+  }
+  // Un classeur importé est ce que l'organisation sait déjà : ses fiches
+  // servent à reconnaître et pré-remplir les documents à indexer.
+  const referentiel = corps.referentiel !== false;
+  if (referentiel) await db.query('UPDATE metadata_schemas SET referentiel = true WHERE id = $1 AND tenant_id = $2', [schema.id, tenantId]);
+  let ordre = 0;
+  for (const c of colonnes) {
+    ordre += 1;
+    // La colonne qui nomme les fiches est obligatoire : c'est elle aussi qui fait reconnaître un doublon.
+    await metadataService.createField(tenantId, schema.id, { label: c.libelle, type: c.type, required: c === titre, displayOrder: ordre });
+  }
+  await db.query(
+    `INSERT INTO audit_logs (tenant_id, actor_id, actor_username, action, object_type, object_id, details_json)
+     VALUES ($1, $2, $3, 'CLASSE_CREEE_A_L_IMPORT', 'classe', $4, $5)`,
+    [tenantId, user.id, user.username || null, schema.id, JSON.stringify({ classe: nom, code, proprietes: colonnes.map((c) => c.libelle) })]
+  ).catch((e) => console.error('[saisie] journal :', e.message));
+  referentielService.invalider(tenantId);
+  return { id: schema.id, nom, code, modele_nom: schema.modele_nom || null, referentiel, conservation: null, colonnes: await colonnesDe(db, tenantId, schema.id).then((l) => l.filter((c) => !c.commune)) };
+}
+
 module.exports = {
-  LIMITE, TYPES_SAISIS,
+  LIMITE, LIMITE_IMPORT, TYPES_SAISIS, verifier, creerClasse,
   trouverChoix, lireNombre, lireDate, lireBooleen, lireValeur, lireDates, ficheDe, trouverBoite,
   modele, preparer, creerLot,
 };

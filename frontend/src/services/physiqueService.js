@@ -13,6 +13,12 @@ export const physiqueService = {
   // Saisie en tableau des dossiers papier : la grille, puis l'enregistrement du lot.
   modeleSaisie: async () => (await api.get('/archives/saisie/modele')).data,
   saisir: async (corps) => (await api.post('/archives/saisie', corps)).data,
+  // Import d'un classeur : tout vérifier sans rien créer ; créer une classe d'après ses colonnes.
+  verifierSaisie: async (corps) => (await api.post('/archives/saisie/verification', corps)).data,
+  creerClasseSaisie: async (corps) => (await api.post('/archives/saisie/classes', corps)).data,
+  // Référentiel (046) : classe dont les fiches aident à indexer ; valeurs déjà connues d'un champ.
+  definirReferentiel: async (classeId, actif) => (await api.put(`/archives/saisie/classes/${classeId}/referentiel`, { actif })).data,
+  valeursConnues: async (critere) => (await api.get('/archives/referentiel/valeurs', { params: critere })).data,
   localisation: async (documentId) => (await api.get(`/documents/${documentId}/localisation`)).data,
   placer: async (documentId, corps) => (await api.put(`/documents/${documentId}/localisation`, corps)).data,
   recolements: async () => (await api.get('/archives/recolements')).data,

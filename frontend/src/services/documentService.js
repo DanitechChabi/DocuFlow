@@ -199,8 +199,10 @@ export const documentService = {
     return response.data;
   },
   /** Indexation assistée : valeurs proposées d'après le texte du document. */
-  getSuggestions: async (id) => {
-    const response = await api.get(`/documents/${id}/suggestions`);
+  // `indice` : ce que l'archiviste vient de taper (un nom, un numéro) — de quoi
+  // retrouver la fiche du référentiel que le texte du document ne cite pas.
+  getSuggestions: async (id, indice) => {
+    const response = await api.get(`/documents/${id}/suggestions`, indice ? { params: { indice } } : undefined);
     return response.data;
   },
   /** Métadonnées typées d'un document : [{ fieldId, value }]. */

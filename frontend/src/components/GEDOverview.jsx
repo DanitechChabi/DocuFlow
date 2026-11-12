@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FolderOpen, Wand2, Archive, Clock } from 'lucide-react';
+import { FolderOpen, Wand2, Archive, Clock, FileSpreadsheet, Table2, ScrollText } from 'lucide-react';
+import { usePermissions } from '../hooks/usePermissions';
 import { STATUS_LABELS, STATUS_CLASSES } from '../utils/documentStatuses';
 import { titreDocument } from '../utils/libelleDocument';
 import PageHeader from './PageHeader';
@@ -14,6 +15,8 @@ const GEDOverview = ({ data, folders, loading }) => {
   const documents = data?.documents || [];
   const aIndexer = documents.filter((d) => d.statut === 'à indexer').length;
   const recents = documents.slice(0, 6);
+  const { can, charge } = usePermissions();
+  const peutSaisir = charge && can('documents.index') && can('documents.upload');
 
   const formatTaille = (octets) => {
     if (!octets) return '0 o';
@@ -77,6 +80,35 @@ const GEDOverview = ({ data, folders, loading }) => {
             <div>
               <div className="font-bold text-slate-900">Archives</div>
               <div className="text-xs text-slate-500">Les documents archivés du référentiel</div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Ce que l'on vient faire le plus souvent, sans passer par le menu. */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+          {peutSaisir && (
+            <Link to="/documents/saisie?import=1" className="glass-card-premium p-5 hover:shadow-elevated transition-all flex items-center gap-4 group">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform"><FileSpreadsheet size={20} /></div>
+              <div>
+                <div className="font-bold text-slate-900">Importer un classeur Excel</div>
+                <div className="text-xs text-slate-500">Entreprises, dossiers, numéros : ils serviront à chercher et à indexer</div>
+              </div>
+            </Link>
+          )}
+          {peutSaisir && (
+            <Link to="/documents/saisie" className="glass-card-premium p-5 hover:shadow-elevated transition-all flex items-center gap-4 group">
+              <div className="w-11 h-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Table2 size={20} /></div>
+              <div>
+                <div className="font-bold text-slate-900">Saisir des dossiers papier</div>
+                <div className="text-xs text-slate-500">Un tableau à remplir ou à coller, rangé boîte par boîte</div>
+              </div>
+            </Link>
+          )}
+          <Link to="/documents/outils" className="glass-card-premium p-5 hover:shadow-elevated transition-all flex items-center gap-4 group">
+            <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center group-hover:scale-110 transition-transform"><ScrollText size={20} /></div>
+            <div>
+              <div className="font-bold text-slate-900">Outils de gestion</div>
+              <div className="text-xs text-slate-500">Politique, plan de classement, tableau de gestion, charte de nommage</div>
             </div>
           </Link>
         </div>
