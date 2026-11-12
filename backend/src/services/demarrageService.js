@@ -49,6 +49,9 @@ function construire(f) {
     { cle: 'horodatage', titre: 'Activer l\'horodatage par un tiers', fait: f.horodatage, facultatif: true,
       explication: 'Une autorité RFC 3161 date les sceaux et les procès-verbaux (Code du numérique, art. 299-300).',
       lien: '/admin-portal?onglet=configuration', action: 'Activer' },
+    { cle: 'referentiel', titre: 'Importer vos listes existantes', fait: f.referentiels > 0, facultatif: true,
+      explication: "Un registre d'entreprises ou une liste de dossiers tenus dans Excel : une fois importés, ils servent à chercher et à pré-remplir l'indexation.",
+      lien: '/documents/saisie?import=1', action: 'Importer un classeur' },
     { cle: 'document', titre: 'Enregistrer un premier document', fait: f.documents > 0,
       explication: 'Numérisez ou déposez un acte : il est indexé, empreinté et rangé dans sa classe.',
       lien: '/documents/liste', action: 'Ajouter un document' },
@@ -57,19 +60,23 @@ function construire(f) {
 
 async function etat(tenantId) {
   const reglages = await settingsService.getAll(tenantId);
-  const [classes, sansDua, utilisateurs, emplacements, documents] = await Promise.all([
+  const [classes, sansDua, utilisateurs, emplacements, documents, referentiels] = await Promise.all([
     compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE', [tenantId]),
-    compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE AND dua_annees IS NULL', [tenantId]),
+    // Un référentiel importé (registre, liste) est un outil de travail : il n'attend pas de durée de conservation.
+    compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE AND dua_annees IS NULL AND referentiel IS NOT TRUE', [tenantId])
+      .catch(() => compter('SELECT count(*)::int AS n FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE AND dua_annees IS NULL', [tenantId])),
     compter("SELECT count(*)::int AS n FROM users WHERE tenant_id = $1 AND username NOT LIKE 'portail-citoyen-%'", [tenantId]),
     compter('SELECT count(*)::int AS n FROM emplacements WHERE tenant_id = $1', [tenantId]),
     compter('SELECT count(*)::int AS n FROM documents WHERE tenant_id = $1 AND deleted_at IS NULL', [tenantId]),
+    compter(`SELECT count(*)::int AS n FROM documents d JOIN metadata_schemas s ON s.id = d.classe_id AND s.referentiel
+              WHERE d.tenant_id = $1 AND d.deleted_at IS NULL`, [tenantId]),
   ]);
   const sauvegarde = sauvegardeService.etat();
   const etapes = construire({
     identite: Boolean(reglages.site_logo) || (reglages.site_name && reglages.site_name !== 'DocuFlow'),
     autorite: Boolean(String(reglages.archives_autorite || '').trim()),
     responsable: Boolean(String(reglages.archives_responsable || '').trim()),
-    classes, sansDua, utilisateurs, emplacements, documents,
+    classes, sansDua, utilisateurs, emplacements, documents, referentiels,
     sauvegardeDisponible: sauvegarde.disponible, sauvegardeActive: Boolean(sauvegarde.actif && sauvegarde.dossier),
     horodatage: reglages.horodatage_actif === true,
   });

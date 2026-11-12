@@ -105,6 +105,9 @@ const retentionService = {
            AND d.date_document IS NOT NULL
            AND d.date_document < (CURRENT_DATE - make_interval(years => $2))
            AND d.statut <> 'archivé'${scope}
+           -- Une fiche de référentiel (registre importé, migration 046) décrit
+           -- une entreprise ou un dossier vivant : elle ne s'archive pas d'office.
+           AND NOT EXISTS (SELECT 1 FROM metadata_schemas rs WHERE rs.id = d.classe_id AND rs.referentiel IS TRUE)
          ORDER BY d.date_document ASC`,
         params
       );

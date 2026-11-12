@@ -341,8 +341,8 @@ const SaisieTableauPage = () => {
 
   return (
     <div className="px-4 sm:px-8 pt-6 pb-28 max-w-[1500px] mx-auto">
-      <PageHeader title="Saisie en tableau" subtitle="Une ligne par dossier papier : la fiche est créée, nommée et rangée dans sa boîte"
-        icon={Table2} breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents', to: '/documents' }, { label: 'Magasins', to: '/documents/magasins' }, { label: 'Saisie en tableau' }]}
+      <PageHeader title="Saisie et import Excel" subtitle="Un tableau à remplir ou à coller, ou un classeur à importer : chaque ligne devient une fiche"
+        icon={Table2} breadcrumb={[{ label: 'Accueil', to: '/' }, { label: 'Documents', to: '/documents' }, { label: 'Saisie et import Excel' }]}
         actions={modele && (modele.classes.length > 0 || modele.peut_creer_classe) && (
           <button type="button" onClick={() => setImportOuvert(true)} className="btn btn-secondary"><FileSpreadsheet size={16} className="text-emerald-600" /> Importer un classeur Excel</button>
         )} />

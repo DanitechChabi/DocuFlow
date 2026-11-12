@@ -48,7 +48,8 @@ const DEFAULT_MARK_LIGHT = '/brand/docuflow-mark-light.png';
 
 const STOCKAGE_REPLIE = 'docuflow:sidebar-repliee';
 const STOCKAGE_GROUPES = 'docuflow:sidebar-groupes';
-const GROUPES = { archives: 'Archives', controle: 'Contrôle', parametrage: 'Paramétrage' };
+// Familles courtes : au-delà de quatre ou cinq entrées, on ne lit plus un menu, on le fouille.
+const GROUPES = { archives: 'Archives', papier: 'Papier et saisie', controle: 'Contrôle', organisation: 'Organisation' };
 
 // L'état du drawer mobile appartient au LAYOUT (AppLayout) : le bouton
 // d'ouverture vit dans la barre supérieure, qui est le FRÈRE de la sidebar
@@ -155,18 +156,18 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     entree('/documents/favoris', 'Mes favoris', <Star size={18} />, { permission: 'documents.view', tourId: 'favoris' }),
     entree('/documents/recherche', 'Recherche avancée', <Search size={18} />, { permission: 'search.advanced', tourId: 'recherche' }),
     entree('/documents/a-indexer', 'À indexer', <Wand2 size={18} />, { permission: 'documents.index', tourId: 'a-indexer' }),
-    entree('/documents/archives', 'Archives', <Archive size={18} />, { permission: 'documents.view', groupe: 'archives' }),
+    entree('/documents/archives', 'Documents archivés', <Archive size={18} />, { permission: 'documents.view', groupe: 'archives' }),
     entree('/documents/archivage', 'Conservation et preuve', <Fingerprint size={18} />, { permission: 'archives.view', tourId: 'archivage', groupe: 'archives' }),
-    entree('/documents/outils', 'Outils de gestion', <ScrollText size={18} />, { permission: 'documents.view', tourId: 'outils', groupe: 'archives' }),
-    entree('/documents/archivotheque', 'Archivothèque', <Landmark size={18} />, { permission: 'archives.view', tourId: 'archivotheque', groupe: 'archives' }),
-    entree('/documents/magasins', 'Magasins (papier)', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins', groupe: 'archives' }),
-    entree('/documents/saisie', 'Saisie en tableau', <Table2 size={18} />, { permission: 'documents.index', tourId: 'saisie', groupe: 'archives' }),
     entree('/documents/echeances', 'Échéancier', <CalendarClock size={18} />, { permission: 'documents.view', tourId: 'echeances', groupe: 'archives' }),
     entree('/documents/corbeille', 'Corbeille', <Trash2 size={18} />, { permission: 'documents.view', tourId: 'corbeille', groupe: 'archives' }),
+    entree('/documents/magasins', 'Magasins (papier)', <Warehouse size={18} />, { permission: 'documents.view', tourId: 'magasins', groupe: 'papier' }),
+    entree('/documents/saisie', 'Saisie et import Excel', <Table2 size={18} />, { permission: 'documents.index', tourId: 'saisie', groupe: 'papier' }),
     entree('/documents/conformite', 'Conformité', <ShieldCheck size={18} />, { permission: 'compliance.view', tourId: 'conformite', groupe: 'controle' }),
     entree('/documents/fournisseurs', 'Fournisseurs', <Building2 size={18} />, { permission: 'compliance.view', groupe: 'controle' }),
-    entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes', groupe: 'parametrage' }),
-    entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits', groupe: 'parametrage' }),
+    entree('/documents/outils', 'Outils de gestion', <ScrollText size={18} />, { permission: 'documents.view', tourId: 'outils', groupe: 'organisation' }),
+    entree('/documents/archivotheque', 'Archivothèque', <Landmark size={18} />, { permission: 'archives.view', tourId: 'archivotheque', groupe: 'organisation' }),
+    entree('/documents/classes', 'Classes et plan', <Layers size={18} />, { permission: 'documents.edit', tourId: 'classes', groupe: 'organisation' }),
+    entree('/documents/circuits', 'Circuits de validation', <GitBranch size={18} />, { permission: 'workflows.manage', tourId: 'circuits', groupe: 'organisation' }),
   ];
 
   // Courrier — bureau d'ordre (041).

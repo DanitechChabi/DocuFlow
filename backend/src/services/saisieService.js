@@ -288,6 +288,16 @@ async function modele(tenantId, user = null) {
   };
 }
 
+/**
+ * Une fiche de RÉFÉRENTIEL (migration 046) décrit une entreprise, une personne,
+ * un dossier : ses dates (création, naissance…) sont des propriétés, pas la
+ * date d'un document. Elles ne deviennent donc pas « date du document », qui
+ * déclencherait durées de conservation et archivage d'office. Fonction pure.
+ */
+function sansDateDocument(fiche, cls) {
+  return cls && cls.referentiel ? { ...fiche, date_document: null } : fiche;
+}
+
 // --------------------------------------------------------------- contrôle
 
 const texteDe = (v) => String(v ?? '').trim().toLowerCase();
@@ -409,7 +419,7 @@ async function preparer(tenantId, corps = {}, user, { limite = LIMITE } = {}) {
       index, valeurs, emplacement, cote,
       debut: dates.debut ?? null, fin: dates.fin ?? null,
       metadata: [...valeurs].map(([fieldId, value]) => ({ fieldId, value })),
-      fiche: ficheDe(colonnes, valeurs, dates.erreur ? {} : dates, new Date(), reperes),
+      fiche: sansDateDocument(ficheDe(colonnes, valeurs, dates.erreur ? {} : dates, new Date(), reperes), cls),
     });
   });
 
