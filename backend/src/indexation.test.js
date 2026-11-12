@@ -43,6 +43,10 @@ const TYPES = ['Arrêté', 'Attestation', 'Contrat', 'PV', 'Autre'];
   ok(val(p, 'description') === 'Arrêté municipal n° 2019/045 portant budget primitif', 'arrêté : titre (en-têtes institutionnels sautés)');
   ok(val(p, 'date_document') === '2019-04-02', 'arrêté : date de signature préférée à celle d\'une pièce citée');
   ok(val(p, 'annee') === 2019 && val(p, 'num_acte') === '2019/045', 'arrêté : année et n° d\'acte');
+  const lettre = 'RÉPUBLIQUE DU BÉNIN\nMAIRIE DE VALLÉE-VERTE\nVallée-Verte, le 4 novembre 2026\nObjet : demande d\'attestation de non-redevance\nMonsieur le Maire, nous avons l\'honneur de solliciter…';
+  ok(val(proposer(lettre, { types: TYPES }), 'description') === 'Demande d\'attestation de non-redevance'
+    && val(proposer('MAIRIE DE VALLÉE-VERTE\nCotonou, le 12 mars 2022\nRapport annuel d\'activité du service\nLe service a…', { types: TYPES }), 'description') === 'Rapport annuel d\'activité du service',
+    'lettre : son objet fait le titre ; la ligne de lieu et de date est sautée');
   p = proposer(ATTESTATION, { types: TYPES, champs: CHAMPS });
   ok(val(p, 'meta:1') === '4521', 'métadonnée texte trouvée par son libellé, coupée au séparateur');
   ok(val(p, 'meta:2') === '2022-03-01', 'métadonnée date : « 1er mars 2022 » lue');

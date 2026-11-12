@@ -107,11 +107,19 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
     ? (indice && referentielService.reconnaitre(indice, referentiel)) || referentielService.reconnaitre(`${nomFichier}\n${texte}`, referentiel) : null;
   const connu = reconnu ? referentielService.propositionsDe(reconnu, champs) : null;
 
-  // --- Titre : la première ligne qui dit ce qu'est le document. Les en-têtes
-  // institutionnels (« RÉPUBLIQUE DU BÉNIN », « MAIRIE DE … ») sont sautés.
+  // --- Titre : l'objet d'une lettre (« Objet : demande d'attestation… ») s'il
+  // y en a un ; sinon la première ligne qui dit ce qu'est le document. Les
+  // en-têtes institutionnels (« RÉPUBLIQUE DU BÉNIN », « MAIRIE DE … ») et la
+  // ligne de lieu et de date (« Vallée-Verte, le 4 novembre 2026 ») sont sautés.
   const lignes = texte.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= 8).slice(0, 12);
   const entete = /^(republique|ministere|mairie|prefecture|direction|service|commune|departement|cabinet|fraternite|liberte)\b/;
-  const titre = lignes.find((l) => !entete.test(normaliser(l)) && l.length >= 15)
+  const lieuDate = /^[^,]{2,40},?\s+le\s+\d{1,2}(er)?\s/;
+  const objet = /(?:^|\n)\s*objet\s*:\s*([^\n]{6,150})/i.exec(texte);
+  if (objet) {
+    const valeur = objet[1].trim().replace(/[.;]+$/, '');
+    proposerUne({ champ: 'description', libelle: 'Titre / description', valeur: valeur.charAt(0).toUpperCase() + valeur.slice(1), confiance: 'haute', extrait: extrait(texte, objet.index, objet.index + objet[0].length) });
+  }
+  const titre = lignes.find((l) => !entete.test(normaliser(l)) && !lieuDate.test(normaliser(l)) && l.length >= 15)
     || lignes.find((l) => l.length >= 15);
   if (titre) {
     const i = texte.indexOf(titre);
