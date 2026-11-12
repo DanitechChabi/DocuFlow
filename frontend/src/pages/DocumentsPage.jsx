@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, Plus, FolderOpen, FileText, Building2, Calendar,
   FolderPlus, ChevronLeft, ChevronRight, AlertCircle, Layers,
-  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2, SlidersHorizontal,
+  FolderTree as FolderTreeIcon, List, LayoutGrid, Wand2, Trash2, SlidersHorizontal, FileSpreadsheet,
 } from 'lucide-react';
 import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { documentService } from '../services/documentService';
@@ -46,7 +46,7 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
   // garde le dernier mot. isAdmin commande les gestes de l'arbre ; les ACL ont
   // leur propre permission, plus fine : un rôle personnalisé « gardien des
   // archives RH » peut administrer les accès sans créer un seul dossier.
-  const { can } = usePermissions();
+  const { can, charge } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Recherche globale depuis la topbar → pré-remplir ?q=
@@ -225,11 +225,14 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
     }
   }, [search, filters, page, pageSize]);
 
+  // L'arborescence ne se demande qu'à qui peut la voir : sinon, un refus (403) à chaque visite.
+  const voitDossiers = charge && can('folders.view');
   const loadFolders = useCallback(async () => {
+    if (!voitDossiers) return;
     try {
       setFolders(await documentService.getFolders());
     } catch { /* silencieux */ }
-  }, []);
+  }, [voitDossiers]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadFolders(); }, [loadFolders]);
@@ -414,6 +417,11 @@ const DocumentsPage = ({ vue = null, statutFiltre = null }) => {
                   <LayoutGrid size={14} /> Vues dynamiques
                 </button>
               </div>
+              {can('documents.index') && can('documents.upload') && !statutFiltre && (
+                <Link to="/documents/saisie?import=1" className="btn btn-secondary" title="Importer un registre, une liste d'entreprises ou de dossiers">
+                  <FileSpreadsheet size={15} className="text-emerald-600" /> Importer un classeur Excel
+                </Link>
+              )}
               {isAdmin && (
                 <>
                   <button onClick={() => setShowAssembly(true)} className="btn btn-secondary">

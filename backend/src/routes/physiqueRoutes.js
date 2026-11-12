@@ -31,6 +31,11 @@ router.put('/documents/:id/localisation', [auth, requirePermission('documents.ed
 const saisir = [auth, requirePermission('documents.upload'), requirePermission('documents.index')];
 router.get('/archives/saisie/modele', saisir, ctrl.modeleSaisie);
 router.post('/archives/saisie', saisir, ctrl.saisir);
+router.post('/archives/saisie/verification', saisir, ctrl.verifierSaisie);
+router.post('/archives/saisie/classes', [...saisir, requirePermission('documents.edit')], ctrl.creerClasseSaisie);
+// Référentiel (046) : marquer une classe, proposer les valeurs déjà connues d'un champ.
+router.put('/archives/saisie/classes/:id/referentiel', [...saisir, requirePermission('documents.edit')], ctrl.definirReferentiel);
+router.get('/archives/referentiel/valeurs', consulter, ctrl.valeursConnues);
 
 router.get('/archives/recolements', voir, ctrl.recolements);
 router.post('/archives/recolements', gerer, ctrl.ouvrirRecolement);

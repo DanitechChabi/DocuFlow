@@ -15,6 +15,7 @@
 //   moyenne — déduite (premier mot-clé, année la plus fréquente…).
 // ============================================================================
 const db = require('../config/db');
+const referentielService = require('./referentielService');
 
 const MOIS = {
   janvier: 1, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7,
@@ -89,7 +90,7 @@ function dateDans(valeur) {
  * @param {object} ctx   { nomFichier, types: string[], champs: [{ id, label, type, options }] }
  * @returns {Array<{ champ, libelle, valeur, confiance, extrait }>}
  */
-function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = [], classes = [] } = {}) {
+function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = [], classes = [], referentiel = [], indice = '' } = {}) {
   const texte = String(brut || '').slice(0, LONGUEUR_ANALYSEE);
   const norm = normaliser(texte);
   const props = [];
@@ -97,6 +98,14 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
     if (p.valeur === null || p.valeur === undefined || String(p.valeur).trim() === '') return;
     if (!props.some((x) => x.champ === p.champ)) props.push({ ...p, valeur: typeof p.valeur === 'string' ? p.valeur.trim() : p.valeur });
   };
+
+  // --- Référentiel (migration 046) : le document — son texte, le nom de son
+  // fichier, ou ce que l'archiviste vient de taper — cite-t-il une entreprise
+  // ou un numéro que l'organisation connaît déjà ?
+  // Ce que l'archiviste a tapé l'emporte sur ce que le texte laisse reconnaître.
+  const reconnu = referentiel.length
+    ? (indice && referentielService.reconnaitre(indice, referentiel)) || referentielService.reconnaitre(`${nomFichier}\n${texte}`, referentiel) : null;
+  const connu = reconnu ? referentielService.propositionsDe(reconnu, champs) : null;
 
   // --- Titre : la première ligne qui dit ce qu'est le document. Les en-têtes
   // institutionnels (« RÉPUBLIQUE DU BÉNIN », « MAIRIE DE … ») sont sautés.
@@ -206,7 +215,9 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
   reference('num_dossier', 'N° de dossier', /\b(?:dossier|r[ée]f[ée]rence|r[ée]f\.?)\s*(?:n[°o]\.?\s*)?[:.]?\s*([A-Z0-9][A-Z0-9/\-.]{2,30})/i);
   reference('num_acte', 'N° d\'acte', /\b(?:acte|arr[êe]t[ée]|d[ée]cision|d[ée]lib[ée]ration|contrat)[^\n]{0,30}?\bn[°o]\.?\s*[:.]?\s*([A-Z0-9][A-Z0-9/\-.]{1,30})/i);
 
-  // --- Nom (entreprise, sujet) : derrière son libellé, ou une forme sociale.
+  // --- Nom (entreprise, sujet) : celui du référentiel d'abord, écrit comme
+  // l'organisation l'écrit ; sinon derrière son libellé, ou une forme sociale.
+  if (connu) connu.tiers.forEach(proposerUne);
   const libelleNom = /\b(?:soci[ée]t[ée]|entreprise|raison sociale|d[ée]nomination|bailleur|preneur|employeur|fournisseur|b[ée]n[ée]ficiaire|soumissionnaire|cocontractant|demandeur)\s*:\s*([^\n,;]{2,60})/i.exec(texte);
   if (libelleNom) {
     proposerUne({ champ: 'nom_entreprise', libelle: 'Entreprise / sujet', valeur: libelleNom[1].replace(/[.]+$/, ''), confiance: 'haute', extrait: extrait(texte, libelleNom.index, libelleNom.index + libelleNom[0].length) });
@@ -268,6 +279,9 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
     }
   }
 
+  // Numéros et propriétés du référentiel, là où le document n'a rien dit lui-même.
+  if (connu) connu.complements.forEach(proposerUne);
+
   return props;
 }
 
@@ -275,7 +289,7 @@ function proposer(brut, { nomFichier = '', types = TYPES_PAR_DEFAUT, champs = []
  * Propositions pour un document de l'organisation.
  * @returns {Promise<{ texte: 'disponible'|'en_attente'|'aucun', propositions: Array }|null>} null si absent
  */
-async function propositionsPour(tenantId, documentId) {
+async function propositionsPour(tenantId, documentId, { userId = null, indice = '' } = {}) {
   const d = await db.query(
     'SELECT id, dossier_id, contenu_texte, description FROM documents WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL',
     [documentId, tenantId]
@@ -315,9 +329,12 @@ async function propositionsPour(tenantId, documentId) {
        FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE ORDER BY name`, [tenantId])).rows;
 
   const texte = doc.contenu_texte || '';
+  // Ce que l'organisation sait déjà — sauf le document lui-même, s'il en fait partie.
+  const referentiel = userId
+    ? (await referentielService.fiches(tenantId, userId).catch(() => [])).filter((f) => f.id !== Number(documentId)) : [];
   return {
     texte: texte ? 'disponible' : enAttente ? 'en_attente' : 'aucun',
-    propositions: proposer(texte, { nomFichier: fichiers[0]?.original_name || '', types, champs, classes }),
+    propositions: proposer(texte, { nomFichier: fichiers[0]?.original_name || '', types, champs, classes, referentiel, indice: String(indice || '').slice(0, 300) }),
     // La liste que la fiche propose : la même que celle dont l'assistant tire
     // ses propositions — une proposition est toujours choisissable.
     types,

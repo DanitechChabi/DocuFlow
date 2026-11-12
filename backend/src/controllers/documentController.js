@@ -335,7 +335,10 @@ exports.listDocuments = async (req, res) => {
   if (q) {
     vals.push(`%${q}%`);
     const i = vals.length;
-    conds.push(`(d.nom_entreprise ILIKE $${i} OR d.num_dossier ILIKE $${i} OR d.num_acte ILIKE $${i} OR d.reference_mfile ILIKE $${i} OR d.description ILIKE $${i} OR d.type_document ILIKE $${i} OR d.auteur ILIKE $${i} OR EXISTS (SELECT 1 FROM unnest(d.tags) t(tag) WHERE t.tag ILIKE $${i}))`);
+    conds.push(`(d.nom_entreprise ILIKE $${i} OR d.num_dossier ILIKE $${i} OR d.num_acte ILIKE $${i} OR d.reference_mfile ILIKE $${i} OR d.description ILIKE $${i} OR d.type_document ILIKE $${i} OR d.auteur ILIKE $${i} OR EXISTS (SELECT 1 FROM unnest(d.tags) t(tag) WHERE t.tag ILIKE $${i})
+      OR EXISTS (SELECT 1 FROM metadata_values mv WHERE mv.document_id = d.id AND (mv.value_json #>> '{}') ILIKE $${i}))`);
+    // La dernière clause cherche aussi dans les PROPRIÉTÉS (n° IFU, quartier,
+    // activité…) : tout ce qu'un classeur importé a apporté se retrouve.
   }
   if (type_document) { vals.push(type_document); conds.push(`d.type_document = $${vals.length}`); }
   if (annee) { vals.push(Number(annee)); conds.push(`d.annee = $${vals.length}`); }
