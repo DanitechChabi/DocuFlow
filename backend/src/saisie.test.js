@@ -252,6 +252,20 @@ const attendreErreur = async (fn) => { try { await fn(); return null; } catch (e
       ],
     }, archi);
     const ent = await fiche(importees.crees[0].id);
+    const dateCreation = (await db.query('SELECT value_json FROM metadata_values WHERE document_id = $1 AND field_id = $2', [ent.id, cc('Date de création')])).rows[0]?.value_json;
+    ok(ent.date_document === null && dateCreation === '2019-04-12' && ent.statut === 'disponible',
+      'fiche de référentiel : la date de création reste une propriété, elle ne devient pas la date du document');
+    const retention = require('./services/retentionService');
+    await retention.createPolicy({ tenantId: t, name: `Conservation standard ${s}`, retentionYears: 5, actionOnExpiry: 'archive' });
+    await db.query("UPDATE documents SET date_document = '2001-01-01' WHERE id = $1", [ent.id]);
+    const ancien = (await db.query(
+      `INSERT INTO documents (tenant_id, reference_mfile, num_dossier, num_acte, nom_entreprise, annee, statut, created_by, date_document)
+       VALUES ($1, $2, 'D', 'A', 'X', 2001, 'disponible', $3, '2001-01-01') RETURNING id`, [t, `ANCIEN-${s}`, archi.id])).rows[0].id;
+    const expires = await retention.checkExpiredDocuments(t);
+    ok(expires.some((x) => x.documentId === ancien) && !expires.some((x) => x.documentId === ent.id),
+      'la politique de conservation générale archive un document ancien, jamais une fiche de référentiel');
+    await db.query('UPDATE documents SET date_document = NULL WHERE id = $1', [ent.id]);
+    await db.query('DELETE FROM documents WHERE id = $1', [ancien]);
     ok(importees.crees.length === 2 && ent.description === 'ENTREPRISE FICTIVE DU LAC' && ent.nom_entreprise === 'ENTREPRISE FICTIVE DU LAC' && ent.num_dossier === '3201900000001'
       && ent.type_document === 'Registre des entreprises' && (await fiche(importees.crees[1].id)).description === 'COOPÉRATIVE FICTIVE DES PALMIERS',
       'lignes importées dans la nouvelle classe : le titre vient de la colonne choisie, l\'entreprise et le n° de dossier sont repris');

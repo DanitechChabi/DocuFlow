@@ -139,7 +139,7 @@ async function referentiel(tenantId, user) {
     db.query('SELECT name FROM tenants WHERE id = $1', [tenantId]),
     db.query(
       `SELECT s.id, s.name, s.code, s.description, s.modele_nom, s.dossier_defaut_id, s.sous_dossier_annee, COALESCE(s.is_default, false) AS commune,
-              s.dua_annees, s.dua_point_depart, s.sort_final, s.dua_reference, s.communicabilite,
+              s.dua_annees, s.dua_point_depart, s.sort_final, s.dua_reference, s.communicabilite, s.referentiel,
               (SELECT count(*)::int FROM documents d WHERE d.classe_id = s.id AND d.tenant_id = s.tenant_id AND d.deleted_at IS NULL AND d.elimine_at IS NULL) AS nb_documents
          FROM metadata_schemas s WHERE s.tenant_id = $1 ORDER BY s.code NULLS LAST, s.name`, [tenantId]),
     db.query(
@@ -182,6 +182,7 @@ async function referentiel(tenantId, user) {
     const comm = COMMUNICABILITE[s.communicabilite] || null;
     return {
       id: s.id, code: s.code || null, nom: s.name, description: s.description || null, modele_nom: s.modele_nom || null,
+      referentiel: Boolean(s.referentiel),
       exemple: exemple.get(s.id) || null, proprietes: proprietes(s.id),
       rangement: s.dossier_defaut_id && lisible(s.dossier_defaut_id) ? { dossier: cheminDe(s.dossier_defaut_id), par_annee: Boolean(s.sous_dossier_annee) } : null,
       conservation: s.dua_annees === null || s.dua_annees === undefined ? null : {
@@ -225,7 +226,8 @@ async function referentiel(tenantId, user) {
   r.manques = [
     !r.responsable.nom && { cle: 'responsable', texte: "Aucun responsable des archives n'est désigné." },
     !r.plan.rubriques.length && { cle: 'plan', texte: 'Le plan de classement est vide.' },
-    classes.some((c) => !c.conservation) && { cle: 'conservation', texte: `${pluriel(classes.filter((c) => !c.conservation).length, 'classe n\'a', 'classes n\'ont')} pas de durée de conservation.` },
+    // Un référentiel importé est un outil de travail : il n'attend pas de durée de conservation.
+    classes.some((c) => !c.conservation && !c.referentiel) && { cle: 'conservation', texte: `${pluriel(classes.filter((c) => !c.conservation && !c.referentiel).length, 'classe n\'a', 'classes n\'ont')} pas de durée de conservation.` },
     classes.some((c) => !c.modele_nom) && { cle: 'nommage', texte: `${pluriel(classes.filter((c) => !c.modele_nom).length, 'classe n\'a', 'classes n\'ont')} pas de charte de nommage.` },
     periodicite === 'aucune' && { cle: 'campagne', texte: "Aucune campagne d'archivage périodique n'est planifiée." },
   ].filter(Boolean);

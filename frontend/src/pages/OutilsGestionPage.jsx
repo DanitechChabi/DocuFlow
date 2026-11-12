@@ -99,7 +99,7 @@ const TableauGestion = ({ r }) => (
           <tr key={c.id}>
             <td className="mono" style={{ fontWeight: 700 }}>{c.code || ''}</td>
             <td style={{ fontWeight: 700 }}>{c.nom}</td>
-            <td>{duree(c.conservation) || <strong style={{ color: '#b45309' }}>À définir</strong>}</td>
+            <td>{duree(c.conservation) || (c.referentiel ? <span className="discret">Référentiel de travail : pas de durée</span> : <strong style={{ color: '#b45309' }}>À définir</strong>)}</td>
             <td>{c.conservation?.sort_final_libelle || ''}</td>
             <td>{c.communicabilite ? <>{c.communicabilite.libelle} <span className="discret">({c.communicabilite.reference})</span></> : ''}</td>
             <td>{c.conservation?.reference || ''}</td>

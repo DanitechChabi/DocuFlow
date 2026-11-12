@@ -88,7 +88,7 @@ async function rapport(tenantId, annee) {
           FROM document_files f JOIN documents d ON d.id = f.document_id
          WHERE d.tenant_id = $1 AND d.elimine_at IS NULL AND d.deleted_at IS NULL`, p),
     un(`SELECT count(*) FILTER (WHERE statut = 'obtenu')::int AS obtenus FROM horodatages WHERE tenant_id = $1 AND created_at >= $2 AND created_at < $3`, p),
-    un(`SELECT count(*)::int AS n, count(*) FILTER (WHERE dua_annees IS NULL)::int AS sans_duree
+    un(`SELECT count(*)::int AS n, count(*) FILTER (WHERE dua_annees IS NULL AND referentiel IS NOT TRUE)::int AS sans_duree
           FROM metadata_schemas WHERE tenant_id = $1 AND is_default IS NOT TRUE`, [tenantId]),
   ]);
 

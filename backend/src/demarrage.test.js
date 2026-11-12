@@ -12,14 +12,15 @@ const ok = (cond, nom) => { verifs += 1; console.log(`${cond ? '  ok  ' : '  ÉC
 (async () => {
   console.log('\n1. Sans base');
   const vide = demarrage.construire({ classes: 0, sansDua: 0, utilisateurs: 1, emplacements: 0, documents: 0, sauvegardeDisponible: false });
-  ok(vide.map((e) => e.cle).join('>') === 'identite>autorite>responsable>plan>conservation>equipe>magasins>horodatage>document', 'ordre : identité, autorité, responsable, plan, durées, équipe, magasins, horodatage, document');
+  ok(vide.map((e) => e.cle).join('>') === 'identite>autorite>responsable>plan>conservation>equipe>magasins>horodatage>referentiel>document', 'ordre : identité, autorité, responsable, plan, durées, équipe, magasins, horodatage, listes existantes, document');
   ok(demarrage.construire({ responsable: true }).find((e) => e.cle === 'responsable').fait && !vide.find((e) => e.cle === 'responsable').facultatif, 'responsable des archives : étape obligatoire, constatée dès qu\'il est désigné');
   ok(vide.every((e) => !e.fait), 'organisation neuve : rien n\'est fait');
   ok(!vide.find((e) => e.cle === 'conservation').fait, 'pas de classe : les durées ne sont pas « faites »');
   const avecSauvegarde = demarrage.construire({ classes: 3, sansDua: 1, utilisateurs: 2, sauvegardeDisponible: true, sauvegardeActive: false });
   ok(avecSauvegarde.some((e) => e.cle === 'sauvegarde'), 'poste avec pg_dump : étape sauvegarde proposée');
   ok(!avecSauvegarde.find((e) => e.cle === 'conservation').fait && avecSauvegarde.find((e) => e.cle === 'conservation').detail === '1 classe(s) sans durée', 'une classe sans durée : étape ouverte, détail donné');
-  ok(vide.filter((e) => e.facultatif).map((e) => e.cle).join() === 'magasins,horodatage', 'magasins et horodatage facultatifs');
+  ok(vide.filter((e) => e.facultatif).map((e) => e.cle).join() === 'magasins,horodatage,referentiel' && demarrage.construire({ referentiels: 3 }).find((e) => e.cle === 'referentiel').fait,
+    'magasins, horodatage et import des listes existantes : facultatifs ; l\'import est constaté dès qu\'un classeur sert de référentiel');
 
   if (!(process.env.DB_HOST || process.env.DATABASE_URL)) {
     console.log('\n2. Sur PostgreSQL — SAUTÉ (ni DB_HOST ni DATABASE_URL)');

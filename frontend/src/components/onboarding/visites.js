@@ -134,6 +134,13 @@ function visiteDocuments({ can }) {
       content: 'Les documents versés en masse ou issus d\'une demande, qui attendent leurs métadonnées.',
     });
   }
+  if (can('documents.index') && can('documents.upload')) {
+    etapes.push({
+      id: 'saisie', selector: '[data-tour="saisie"]', position: 'right',
+      title: 'Vos listes Excel, et vos dossiers papier',
+      content: 'Importez un classeur tel quel — registre d\'entreprises, liste de dossiers : DocuFlow reconnaît ses colonnes, et s\'en sert ensuite pour chercher et pour pré-remplir l\'indexation. Les dossiers papier se saisissent ici aussi, ligne par ligne, boîte par boîte.',
+    });
+  }
   if (can('compliance.view')) {
     etapes.push({
       id: 'conformite', selector: '[data-tour="conformite"]', position: 'right',
@@ -170,6 +177,11 @@ function visiteDocuments({ can }) {
       content: 'Chaque fichier porte son empreinte SHA-256 et il est relu régulièrement. Le journal est chaîné et scellé, et un gel juridique interdit toute destruction le temps d\'un contentieux. Un certificat d\'archivage s\'émet depuis la fiche ; les durées de conservation mènent aux bordereaux d\'élimination, validés par une autre personne.',
     });
   }
+  etapes.push({
+    id: 'outils', selector: '[data-tour="outils"]', position: 'right',
+    title: 'Les règles du jeu',
+    content: 'La politique de gestion des documents, le plan de classement, le tableau de gestion et la charte de nommage : tirés de la configuration, ils disent ce que DocuFlow applique vraiment, et s\'impriment.',
+  });
   etapes.push({
     id: 'corbeille', selector: '[data-tour="corbeille"]', position: 'right',
     title: 'Rien ne disparaît d\'un clic',
