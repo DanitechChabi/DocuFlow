@@ -55,6 +55,13 @@ async function cadresAdmis(tenantId) {
   return normalizeOptions(settings.request_motifs, fallback('request_motifs'));
 }
 
+/** Priorité donnée aux demandes déposées sans en choisir : celle réglée par l'organisation. */
+async function prioriteParDefaut(tenantId) {
+  const settings = await settingsService.getAll(tenantId);
+  const priorites = allowedValues(normalizeOptions(settings.request_priorities, fallback('request_priorities'), { withTone: true }));
+  return (priorites.includes(settings.request_default_priority) ? settings.request_default_priority : priorites[0]) || null;
+}
+
 async function peutTraiter(tenantId, user) {
   return roleService.possede(tenantId, user.role, 'requests.process');
 }
@@ -159,9 +166,7 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
     emprunteur = u.rows[0].id;
   }
 
-  const settings = await settingsService.getAll(tenantId);
-  const priorites = allowedValues(normalizeOptions(settings.request_priorities, fallback('request_priorities'), { withTone: true }));
-  const priorite = (priorites.includes(settings.request_default_priority) ? settings.request_default_priority : priorites[0]) || null;
+  const priorite = await prioriteParDefaut(tenantId);
 
   const liste = await loanService.enTransaction(async (client) => {
     const l = (await client.query(
@@ -360,5 +365,5 @@ async function dossiersConnus(tenantId, user, q) {
 
 module.exports = {
   LIMITE_LIGNES, lireLignes, etatDossier,
-  cadresAdmis, creer, lister, detail, transmettre, retourner, dossiersConnus,
+  cadresAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
 };

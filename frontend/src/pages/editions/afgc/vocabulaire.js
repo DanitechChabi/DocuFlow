@@ -65,3 +65,27 @@ export function ressembleAReference(texte) {
   const s = String(texte || '').trim();
   return /\d/.test(s) && !/\s/.test(s) && s.length <= 50;
 }
+
+/**
+ * Plusieurs dossiers collés d'un coup (une colonne copiée dans Excel ou dans
+ * un e-mail) : une ligne par dossier. Dans une ligne copiée d'un tableur, les
+ * cellules sont séparées par des tabulations : le premier texte est
+ * l'entreprise, les références (chiffres, sans espace) le n° de dossier puis
+ * le n° d'acte, un nombre de quatre chiffres l'année. Une ligne de titres en
+ * tête est ignorée.
+ */
+export function analyserCollage(texte) {
+  const lignes = String(texte || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lignes.length > 1 && !/\d/.test(lignes[0]) && /raison|entreprise|soci[eé]t[eé]|client|dossier|n°|acte/i.test(lignes[0])) lignes.shift();
+  return lignes.map((ligne) => {
+    const d = { nom_entreprise: '', num_dossier: '', num_acte: '', annee: '' };
+    for (const c of ligne.split('\t').map((x) => x.trim()).filter(Boolean)) {
+      if (!d.annee && /^(19|20)\d{2}$/.test(c)) d.annee = c;
+      else if (ressembleAReference(c)) {
+        if (!d.num_dossier) d.num_dossier = c;
+        else if (!d.num_acte) d.num_acte = c;
+      } else if (!d.nom_entreprise) d.nom_entreprise = c;
+    }
+    return d;
+  }).filter((d) => d.nom_entreprise || d.num_dossier || d.num_acte);
+}

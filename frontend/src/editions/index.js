@@ -57,6 +57,8 @@ const EDITIONS = {
     // Espaces sans visite guidée automatique : l'édition en remplace les écrans,
     // dont les phrases d'aide suffisent.
     visitesMasquees: ['accueil', 'demandes'],
+    // « Demander un dossier » derrière Ctrl+K et la barre du haut.
+    demandeRapide: () => import('../pages/editions/afgc/DemandeRapideAfgc'),
     // Page d'accueil propre à l'édition, chargée à la demande.
     accueil: () => import('../pages/editions/AccueilAfgc'),
     // Écrans propres à l'édition, à la place de ceux de DocuFlow aux mêmes

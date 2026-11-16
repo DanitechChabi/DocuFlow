@@ -14,3 +14,7 @@ export const listeService = {
   /** Registre des sorties, filtrable par état, cadre, liste et recherche. */
   sorties: async (params = {}) => (await api.get('/requests/loans', { params })).data,
 };
+
+// Demandes reçues par l'archive (téléphone) : agents, et enregistrement au nom d'un agent.
+listeService.demandeurs = async () => (await api.get('/requests/demandeurs')).data;
+listeService.pourAgent = async (corps) => (await api.post('/requests/pour-agent', corps)).data;

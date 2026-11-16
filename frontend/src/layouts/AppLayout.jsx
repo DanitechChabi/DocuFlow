@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, MessageCircle, Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -11,6 +11,11 @@ import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { estBureau } from '../utils/plateforme';
 import DossierSurveilleAgent from '../components/desktop/DossierSurveilleAgent';
+import { edition } from '../editions';
+
+// Site d'une édition dédiée (ex. AFGC) : « Demander un dossier » derrière
+// Ctrl+K et la barre du haut, pour qui peut demander sans accéder à la GED.
+const DemandeRapide = edition?.demandeRapide ? lazy(edition.demandeRapide) : null;
 
 /**
  * Layout partagé de la plateforme à deux modules :
@@ -32,6 +37,9 @@ const AppLayout = () => {
   const location = useLocation();
   const settings = useSettings();
   const { charge, can } = usePermissions();
+  // Chercher un document qu'on ne peut pas ouvrir n'a pas de sens : sur le
+  // site d'une édition, l'agent sans accès à la GED demande un dossier.
+  const modeDemande = Boolean(DemandeRapide) && charge && can('requests.create') && !can('documents.view');
   const [search, setSearch] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOuvert, setDrawerOuvert] = useState(false);
@@ -89,6 +97,12 @@ const AppLayout = () => {
               Ctrl+K n'y existe pas (pas de clavier) — la loupe ouvre la
               recherche globale, tactile elle. */}
           <div className="w-full max-w-md flex items-center justify-center">
+            {modeDemande ? (
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('afgc:demander'))}
+                className="hidden md:flex w-full items-center gap-2 pl-3 pr-3 py-1.5 rounded-lg border border-white/10 bg-white/10 text-sm text-white/70 hover:bg-white/15 transition-colors">
+                <Search size={15} className="text-white/50" /> Demander un dossier… <span className="ml-auto text-xs text-white/40">Ctrl+K</span>
+              </button>
+            ) : (
             <form onSubmit={handleSearch} data-tour="topbar-search" className="hidden md:flex w-full items-center relative">
               <Search size={15} className="absolute left-3 pointer-events-none text-white/50" />
               <input
@@ -98,8 +112,9 @@ const AppLayout = () => {
                 className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-white/10 bg-white/10 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
               />
             </form>
+            )}
             <button
-              onClick={() => window.dispatchEvent(new CustomEvent('docuflow:open-search'))}
+              onClick={() => window.dispatchEvent(new CustomEvent(modeDemande ? 'afgc:demander' : 'docuflow:open-search'))}
               className="md:hidden p-2 rounded-lg transition-colors hover:bg-white/10 text-white"
               aria-label="Rechercher"
             >
@@ -135,10 +150,11 @@ const AppLayout = () => {
         </main>
       </div>
 
-      <DocumentChatbot />
-      <GlobalSearch />
+      {/* L'assistant parle des documents de la GED : rien pour qui n'y a pas accès. */}
+      {!modeDemande && <DocumentChatbot />}
+      {modeDemande ? <Suspense fallback={null}><DemandeRapide /></Suspense> : <GlobalSearch />}
       <VisiteGuidee onOccupe={setVisiteOccupe} />
-      <ContextualTooltips enabled={!visiteOccupe} />
+      <ContextualTooltips enabled={!visiteOccupe && !modeDemande} />
       {/* Bureau : verse les scans du dossier surveillé au nom de l'utilisateur. */}
       {estBureau() && charge && can('documents.upload') && <DossierSurveilleAgent />}
     </div>
