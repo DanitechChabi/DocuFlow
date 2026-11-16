@@ -17,5 +17,7 @@ router.get('/semaines', entreeController.semaines);
 router.get('/semaines/:debut', entreeController.semaine);
 router.get('/recherche', entreeController.rechercher);
 router.get('/filtres', entreeController.filtres);
+router.get('/fichiers', entreeController.fichiers);
+router.delete('/fichiers', entreeController.supprimerFichier);
 
 module.exports = router;

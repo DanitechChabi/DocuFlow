@@ -19,3 +19,5 @@ exports.rechercher = geste((req) => entreeService.rechercher(req.user.tenant_id,
 exports.filtres = geste((req) => entreeService.filtres(req.user.tenant_id), 'la lecture des filtres');
 exports.presence = geste((req) => entreeService.presence(req.user.tenant_id, req.query), 'la recherche de présence');
 exports.presences = geste((req) => entreeService.presences(req.user.tenant_id, req.body?.dossiers), 'la recherche de présence');
+exports.fichiers = geste((req) => entreeService.fichiers(req.user.tenant_id), 'la lecture des classeurs');
+exports.supprimerFichier = geste((req) => entreeService.supprimerFichier(req.user.tenant_id, req.user, req.body || {}), 'la suppression du classeur');

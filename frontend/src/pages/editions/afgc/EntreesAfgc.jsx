@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight } from 'lucide-react';
+import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { lireClasseur } from '../../../utils/classeur';
 import { entreeService } from '../../../services/entreeService';
@@ -171,6 +171,114 @@ const BordereauImprime = ({ detail, groupes }) => (
   </div>
 );
 
+/**
+ * Les classeurs importés : nom, lignes, période couverte, import. Un classeur
+ * périmé ou importé par erreur se supprime (toutes ses lignes) ; le classeur
+ * corrigé peut ensuite être réimporté.
+ */
+const ClasseursImportes = ({ onChange, onImporter }) => {
+  const [liste, setListe] = useState(null);
+  const [aSupprimer, setASupprimer] = useState(null); // { fichier, lignes } ou { tous: true, lignes }
+  const [saisie, setSaisie] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const charger = useCallback(() => entreeService.fichiers().then(setListe).catch(() => setListe([])), []);
+  useEffect(() => { charger(); }, [charger]);
+  const total = (liste || []).reduce((n, f) => n + f.lignes, 0);
+  const fermer = () => { if (!envoi) { setASupprimer(null); setSaisie(''); } };
+  const supprimer = async () => {
+    setEnvoi(true);
+    try {
+      const r = await entreeService.supprimerFichier(aSupprimer.tous ? { tous: true } : { fichier: aSupprimer.fichier });
+      toast.success(`${r.supprimees.toLocaleString('fr-FR')} ligne${r.supprimees > 1 ? 's' : ''} supprimée${r.supprimees > 1 ? 's' : ''}.`);
+      setASupprimer(null); setSaisie('');
+      charger(); onChange?.();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'La suppression a échoué.');
+    } finally {
+      setEnvoi(false);
+    }
+  };
+  if (liste === null) return <Chargement />;
+  return (
+    <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-black text-slate-900">Classeurs importés</h2>
+          <p className="text-sm font-semibold text-slate-600">
+            {liste.length ? `${liste.length} classeur${liste.length > 1 ? 's' : ''} · ${total.toLocaleString('fr-FR')} dossiers entrés` : 'Aucun classeur importé.'}
+          </p>
+        </div>
+        {liste.length > 1 && (
+          <button type="button" onClick={() => setASupprimer({ tous: true, lignes: total })}
+            className="px-4 py-2.5 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
+            <Trash2 size={15} /> Tout supprimer
+          </button>
+        )}
+      </div>
+      {liste.length ? (
+        <ul className="space-y-2">
+          {liste.map((f) => (
+            <li key={f.fichier ?? '—'} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="w-10 h-10 rounded-xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><FileSpreadsheet size={20} /></span>
+              <div className="min-w-0 flex-1 basis-60">
+                <div className="text-base font-black text-slate-900 break-all">{f.fichier || 'Sans nom de classeur'}</div>
+                <div className="text-sm font-semibold text-slate-700">
+                  {f.lignes.toLocaleString('fr-FR')} dossier{f.lignes > 1 ? 's' : ''} · du {dateCourte(f.du)} au {dateCourte(f.au)}
+                </div>
+                <div className="text-sm text-slate-600">Importé le {dateCourte(f.importe_le)}{f.importe_par ? ` par ${f.importe_par}` : ''}</div>
+              </div>
+              <button type="button" onClick={() => setASupprimer(f)}
+                className="px-3.5 py-2 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
+                <Trash2 size={15} /> Supprimer
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <button type="button" onClick={onImporter} className="px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-2">
+          <Upload size={16} /> Importer des points (Excel)
+        </button>
+      )}
+
+      <Modal open={Boolean(aSupprimer)} onClose={fermer} panelClassName="w-full max-w-md mx-4">
+        {aSupprimer && (
+          <div className="bg-white rounded-3xl shadow-2xl p-6">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0"><Trash2 size={20} /></span>
+              <div className="min-w-0">
+                <h3 className="text-lg font-black text-slate-900">
+                  {aSupprimer.tous ? 'Supprimer tous les classeurs ?' : 'Supprimer ce classeur ?'}
+                </h3>
+                {!aSupprimer.tous && <p className="text-sm font-bold text-slate-800 break-all">{aSupprimer.fichier || 'Sans nom de classeur'}</p>}
+                <p className="text-sm text-slate-700 mt-1">
+                  {aSupprimer.lignes > 1
+                    ? `${aSupprimer.lignes.toLocaleString('fr-FR')} dossiers entrés seront retirés des semaines et de la recherche.`
+                    : '1 dossier entré sera retiré des semaines et de la recherche.'}
+                  Le classeur pourra être réimporté.
+                </p>
+              </div>
+            </div>
+            {aSupprimer.tous && (
+              <label className="block mt-4 text-sm font-bold text-slate-700">
+                Tapez SUPPRIMER pour confirmer
+                <input value={saisie} onChange={(e) => setSaisie(e.target.value)} autoFocus
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-red-400" />
+              </label>
+            )}
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={fermer} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Garder</button>
+              <button type="button" onClick={supprimer} disabled={envoi || (aSupprimer.tous && saisie.trim().toUpperCase() !== 'SUPPRIMER')}
+                className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-50">
+                {envoi ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Supprimer
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </section>
+  );
+};
+
 const EntreesAfgc = () => {
   useTitrePage('Entrée des dossiers');
   const [onglet, setOnglet] = useState('semaines');
@@ -250,7 +358,7 @@ const EntreesAfgc = () => {
       </EnTete>
 
       <div className="inline-flex p-1 rounded-2xl bg-slate-100 mb-5">
-        {[['semaines', 'Par semaine', CalendarDays], ['recherche', 'Rechercher', Search]].map(([cle, label, Icone]) => (
+        {[['semaines', 'Par semaine', CalendarDays], ['recherche', 'Rechercher', Search], ['classeurs', 'Classeurs importés', FileSpreadsheet]].map(([cle, label, Icone]) => (
           <button key={cle} type="button" onClick={() => setOnglet(cle)}
             className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 ${onglet === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             <Icone size={15} /> {label}
@@ -344,6 +452,8 @@ const EntreesAfgc = () => {
             )}
           </section>
         </div>
+      ) : onglet === 'classeurs' ? (
+        <ClasseursImportes onImporter={() => setImportOuvert(true)} onChange={() => { chargerFiltres(); chargerSemaines(); setResultats(null); setChoisie(null); }} />
       ) : (
         <section className="glass-card-premium rounded-3xl p-5 md:p-6">
           <form onSubmit={rechercher} className="flex flex-wrap items-end gap-3 mb-5">
