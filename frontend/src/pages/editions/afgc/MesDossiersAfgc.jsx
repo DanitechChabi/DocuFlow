@@ -25,7 +25,7 @@ const LigneDossier = ({ d, etat, presence, children }) => (
       <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ') || 'Sans référence'}</div>
       {/* Entré aux archives ? dans quelle semaine, à quelle date ? */}
-      <Presence resultat={presence} className="mt-1" />
+      <Presence resultat={presence} className="mt-2" />
     </div>
     {children}
     <Pastille ton={etat.ton}>{etat.texte}</Pastille>
