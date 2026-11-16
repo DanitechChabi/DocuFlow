@@ -50,6 +50,8 @@ router.post('/pour-agent', requirePermission('requests.process'), listeControlle
 router.get('/listes', requirePermission('requests.view'), listeController.lister);
 router.post('/listes', requirePermission('requests.create'), listeController.creer);
 router.get('/listes/:listeId', requirePermission('requests.view'), listeController.detail);
+// Son auteur ou l'archive (contrôlé dans le service), si aucun dossier n'est dehors.
+router.delete('/listes/:listeId', requirePermission('requests.view'), listeController.supprimer);
 router.post('/listes/:listeId/transmission', requirePermission('requests.process'), listeController.transmettre);
 router.post('/listes/:listeId/retour', requirePermission('requests.process'), listeController.retourner);
 

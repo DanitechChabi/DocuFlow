@@ -422,7 +422,41 @@ async function fixerTypologie(tenantId, user, requestId, type) {
   });
 }
 
+/**
+ * Supprime une liste et ses demandes (un classeur ancien, envoyé deux fois
+ * ou par erreur). Son auteur ou l'archive. Refusé tant qu'un de ses dossiers
+ * est sorti et pas encore retourné : il faut d'abord noter son retour, sinon
+ * le dossier disparaîtrait du registre alors qu'il est dehors. Journalisé.
+ */
+async function supprimer(tenantId, listeId, user) {
+  const liste = await lireListe(tenantId, listeId, user);
+  const archive = await peutTraiter(tenantId, user);
+  if (!archive && liste.demandeur_id !== user.id && liste.cree_par !== user.id) throw erreur(404, 'Liste introuvable.');
+  return loanService.enTransaction(async (client) => {
+    const dehors = await client.query(
+      `SELECT count(*)::int AS n FROM requests r JOIN request_loans p ON p.request_id = r.id
+        WHERE r.lot_id = $1 AND r.tenant_id = $2 AND p.retourne_at IS NULL`,
+      [liste.id, tenantId]
+    );
+    if (dehors.rows[0].n) {
+      const n = dehors.rows[0].n;
+      throw erreur(409, `${n} dossier${n > 1 ? 's' : ''} de cette liste ${n > 1 ? 'sont' : 'est'} encore sorti${n > 1 ? 's' : ''} : notez d'abord ${n > 1 ? 'leur' : 'son'} retour.`, 'DOSSIERS_SORTIS');
+    }
+    const ids = (await client.query('SELECT id FROM requests WHERE lot_id = $1 AND tenant_id = $2', [liste.id, tenantId])).rows.map((x) => x.id);
+    if (ids.length) {
+      // L'historique d'état n'a pas de suppression en cascade (003).
+      await client.query('DELETE FROM request_history WHERE request_id = ANY($1::int[])', [ids]);
+      await client.query('DELETE FROM requests WHERE id = ANY($1::int[]) AND tenant_id = $2', [ids, tenantId]);
+    }
+    await client.query('DELETE FROM request_lots WHERE id = $1 AND tenant_id = $2', [liste.id, tenantId]);
+    await client.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
+      [user.id, `A supprimé la liste « ${liste.libelle} »${liste.fichier ? ` (${liste.fichier})` : ''} — ${ids.length} dossier${ids.length > 1 ? 's' : ''}`.slice(0, 500), tenantId]);
+    return { supprimes: ids.length };
+  });
+}
+
 module.exports = {
+  supprimer,
   LIMITE_LIGNES, lireLignes, etatDossier,
   cadresAdmis, typesAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
   fixerTypologie, processeurs,

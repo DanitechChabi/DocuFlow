@@ -226,6 +226,20 @@ const appel = (handler, req) => new Promise((resolve) => {
     const resume = (await listes.lister(t, archiviste, { q: 'Liste 1' }))[0];
     ok(resume.total === 3 && resume.transmis === 1 && resume.retournes === 2 && resume.a_transmettre === 0, 'avancement de la liste : 1 transmis, 2 retournés');
 
+    // --- Suppression d'une liste (classeur ancien ou envoyé par erreur) ---
+    const lx = await listes.creer(t, finances, { libelle: 'Liste à supprimer', cadre: 'Soldes créditeurs', fichier: 'ancien.xlsx', lignes: [{ nom_entreprise: 'Supp Fictif A' }, { nom_entreprise: 'Supp Fictif B' }] });
+    const [dx1] = lx.dossiers.map((d) => d.id);
+    await listes.transmettre(t, lx.id, archiviste, { ids: [dx1] });
+    await rejette(listes.supprimer(t, lx.id, juridique), 404, 'suppression par un autre agent : 404');
+    await rejette(listes.supprimer(t, lx.id, finances), 409, 'un dossier encore sorti : suppression refusée (409)');
+    await listes.retourner(t, lx.id, archiviste, { ids: [dx1] });
+    const sx = await listes.supprimer(t, lx.id, finances);
+    ok(sx.supprimes === 2, 'dossiers revenus : la liste et ses 2 demandes supprimées par son auteur');
+    ok((await db.query('SELECT count(*)::int AS n FROM requests WHERE lot_id = $1 OR id = $2', [lx.id, dx1])).rows[0].n === 0
+      && (await listes.lister(t, finances, { q: 'Liste à supprimer' })).length === 0, 'plus rien de la liste, ni dans « Mes listes »');
+    ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action LIKE 'A supprimé la liste%'", [t])).rows[0].n === 1, 'suppression journalisée');
+    await rejette(listes.supprimer(t, lx.id, archiviste), 404, 'liste déjà supprimée : 404');
+
     // --- Demande en un clic : dossiers connus ---
     const connus = await listes.dossiersConnus(t, finances, 'transit');
     ok(connus.length === 1 && connus[0].num_dossier === 'CL-0275' && connus[0].sorti_jusqu_au, 'dossier connu, signalé comme sorti avec sa date de retour');

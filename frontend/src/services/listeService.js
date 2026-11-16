@@ -9,6 +9,8 @@ export const listeService = {
   creer: async (corps) => (await api.post('/requests/listes', corps)).data,
   lister: async (params = {}) => (await api.get('/requests/listes', { params })).data,
   detail: async (id) => (await api.get(`/requests/listes/${id}`)).data,
+  // Liste et ses demandes ; refusé tant qu'un dossier est sorti.
+  supprimer: async (id) => (await api.delete(`/requests/listes/${id}`)).data,
   transmettre: async (id, corps = {}) => (await api.post(`/requests/listes/${id}/transmission`, corps)).data,
   retourner: async (id, corps = {}) => (await api.post(`/requests/listes/${id}/retour`, corps)).data,
   /** Registre des sorties, filtrable par état, cadre, liste et recherche. */

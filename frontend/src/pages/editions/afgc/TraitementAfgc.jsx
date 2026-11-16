@@ -10,6 +10,7 @@ import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 import { parDepartement } from './departements';
 import { Presence, usePresences } from './presence';
+import SupprimerListe from './SupprimerListe';
 import { ModaleComplement, EchangeComplement, BoutonComplement } from './complements';
 
 // ============================================================================
@@ -340,8 +341,9 @@ const TraitementAfgc = () => {
                             {coches.size ? `Retourné (${cochesEtat('transmis')})` : `Tout retourné (${compte('transmis')})`}
                           </button>
                           {coches.size > 0 && <button type="button" onClick={() => setCoches(new Set())} className="px-3 py-2 text-sm font-bold text-slate-400 hover:text-slate-600">Décocher</button>}
+                          <span className="ml-auto"><SupprimerListe liste={ouverte} onFait={() => { setOuverte(null); charger(); }} /></span>
                           <button type="button" onClick={() => exporterListe(ouverte).catch(() => toast.error('L\'export Excel a échoué.'))}
-                            className="ml-auto px-3.5 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1.5">
+                            className="px-3.5 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1.5">
                             <FileSpreadsheet size={14} /> Exporter (Excel)
                           </button>
                         </div>

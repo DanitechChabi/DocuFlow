@@ -48,3 +48,4 @@ exports.cadres = geste(async (req) => (await listeService.cadresAdmis(req.user.t
 const demandeRapideService = require('../services/demandeRapideService');
 exports.demandeurs = geste((req) => demandeRapideService.demandeurs(req.user.tenant_id), 'la lecture des agents');
 exports.pourAgent = geste((req) => demandeRapideService.pourAgent(req.user.tenant_id, req.user, req.body || {}), 'l\'enregistrement de la demande', 201);
+exports.supprimer = geste((req) => listeService.supprimer(req.user.tenant_id, req.params.listeId, req.user), 'la suppression de la liste');
