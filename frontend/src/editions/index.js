@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode,
+  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3,
 } from 'lucide-react';
 
 /**
@@ -51,6 +51,7 @@ const EDITIONS = {
       { to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
       { to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
       { to: '/archives/douchette', label: 'Douchette', icone: ScanBarcode, permission: 'requests.process' },
+      { to: '/archives/tableau-de-bord', label: 'Tableau de bord', icone: BarChart3, permission: 'requests.process' },
       { to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
       { to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
       { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
@@ -90,6 +91,7 @@ const EDITIONS = {
     routes: {
       '/archives/entrees': () => import('../pages/editions/afgc/EntreesAfgc'),
       '/archives/douchette': () => import('../pages/editions/afgc/DouchetteAfgc'),
+      '/archives/tableau-de-bord': () => import('../pages/editions/afgc/TableauBordAfgc'),
     },
     pages: {
       // Connexion (identifiant ou adresse Outlook) et inscription en deux

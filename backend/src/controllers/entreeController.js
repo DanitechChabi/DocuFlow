@@ -47,3 +47,7 @@ const gesteMetier = (fn, contexte) => async (req, res) => {
 exports.lireScan = gesteMetier((req) => douchetteService.lire(req.user.tenant_id, req.query.code), 'la lecture du code');
 exports.sortieScan = gesteMetier((req) => douchetteService.sortir(req.user.tenant_id, req.user, req.body || {}), 'la sortie du dossier');
 exports.retourScan = gesteMetier((req) => douchetteService.rentrer(req.user.tenant_id, req.user, req.body || {}), 'le retour du dossier');
+
+// Tableau de bord des archives (direction).
+const tableauBordService = require('../services/tableauBordService');
+exports.tableauBord = geste((req) => tableauBordService.tableau(req.user.tenant_id, req.query), 'la lecture du tableau de bord');

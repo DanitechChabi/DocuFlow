@@ -20,6 +20,8 @@ router.get('/filtres', entreeController.filtres);
 router.get('/fichiers', entreeController.fichiers);
 router.delete('/fichiers', entreeController.supprimerFichier);
 // Douchette (053) : lire un code, sortir, rentrer.
+// Tableau de bord des archives (direction).
+router.get('/tableau-de-bord', entreeController.tableauBord);
 router.get('/douchette', entreeController.lireScan);
 router.post('/douchette/sortie', entreeController.sortieScan);
 router.post('/douchette/retour', entreeController.retourScan);
