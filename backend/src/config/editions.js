@@ -28,8 +28,8 @@ const EDITIONS = {
     // Réglages de l'espace, posés s'ils ne le sont pas déjà (un choix de
     // l'administrateur n'est jamais écrasé) : un agent dont le département
     // manque peut le créer en s'inscrivant ; seules les adresses
-    // professionnelles de l'AFGC (Outlook, @afgc.sa) sont admises.
-    reglages: { registration_new_department: true, registration_email_domains: 'afgc.sa' },
+    // professionnelles de l'AFGC (Outlook, @afgcsa.com) sont admises.
+    reglages: { registration_new_department: true, registration_email_domains: 'afgcsa.com' },
     // Départements : « SIGLE — intitulé ». Le sigle sert à proposer d'abord
     // les motifs habituels de chacun (édition AFGC du frontend).
     departements: [
