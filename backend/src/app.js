@@ -199,13 +199,18 @@ app.use('/api/absence', require('./routes/absenceRoutes'));
 // des licences est montée sous /api/superadmin, derrière ses trois middlewares.
 app.use('/api/licenses', licenseRoutes);
 
-// --- Mode bureau (Electron) : sert le frontend compilé, même-origine ---
-// Opt-in via SERVE_FRONTEND=true (défini par desktop/main.js).
-// Sans impact sur Render/Vercel (variable absente) : routes /api, /uploads
+// --- Interface servie par le serveur lui-même (même origine) ---
+// - Bureau (Electron) : SERVE_FRONTEND=true (défini par desktop/main.js).
+// - Serveur de l'organisation (Windows Server, réseau interne) : FRONTEND_DIST
+//   = dossier de l'interface compilée (deploiement/windows-server). Une seule
+//   adresse pour tout : https://archives…/ (interface) et …/api (API).
+// Sans impact sur Render/Vercel (variables absentes) : routes /api, /uploads
 // et health check conservent leur comportement actuel.
 const fs = require('fs');
-const frontendDist = path.join(__dirname, '../../frontend/dist');
-if (process.env.SERVE_FRONTEND === 'true' && fs.existsSync(frontendDist)) {
+const frontendDist = process.env.FRONTEND_DIST
+  ? path.resolve(process.env.FRONTEND_DIST)
+  : path.join(__dirname, '../../frontend/dist');
+if ((process.env.SERVE_FRONTEND === 'true' || process.env.FRONTEND_DIST) && fs.existsSync(frontendDist)) {
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
       return express.static(frontendDist)(req, res, () => {
@@ -292,10 +297,33 @@ const PORT = process.env.PORT || 3000;
 // (port libre attribué par l'OS — lu via server.address().port).
 const HOST = process.env.HOST || '0.0.0.0';
 
-const server = app.listen(PORT, HOST, () => {
+// HTTPS direct (serveur de l'organisation) : certificat PFX délivré par
+// l'autorité interne (AD CS) ou acheté. HTTPS_PFX_PATH absent : HTTP simple,
+// comme sur Render (qui chiffre en amont) et en bureau (boucle locale).
+// HTTP_REDIRECT_PORT : un second port (80) qui renvoie vers l'adresse HTTPS.
+function ecouter(application, demarre) {
+  if (!process.env.HTTPS_PFX_PATH) return application.listen(PORT, HOST, demarre);
+  const https = require('https');
+  const srv = https.createServer({
+    pfx: fs.readFileSync(path.resolve(process.env.HTTPS_PFX_PATH)),
+    passphrase: process.env.HTTPS_PFX_PASSPHRASE || undefined,
+  }, application).listen(PORT, HOST, demarre);
+  const portRedirection = Number(process.env.HTTP_REDIRECT_PORT);
+  if (portRedirection) {
+    require('http').createServer((req, res) => {
+      const hote = String(req.headers.host || '').replace(/:\d+$/, '');
+      const suffixe = Number(PORT) === 443 ? '' : `:${PORT}`;
+      res.writeHead(301, { Location: `https://${hote}${suffixe}${req.url}` });
+      res.end();
+    }).listen(portRedirection, HOST);
+  }
+  return srv;
+}
+
+const server = ecouter(app, () => {
   console.log(`-------------------------------------------------`);
   console.log(`🚀 Server is running!`);
-  console.log(`📍 Local: http://127.0.0.1:${PORT}`);
+  console.log(`📍 Local: ${process.env.HTTPS_PFX_PATH ? 'https' : 'http'}://127.0.0.1:${PORT}`);
   console.log(`-------------------------------------------------`);
 
   // Synchronise le catalogue de configuration (config/settingsCatalog.js) vers
