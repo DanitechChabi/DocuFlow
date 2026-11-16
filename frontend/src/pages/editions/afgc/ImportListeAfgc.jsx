@@ -36,7 +36,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
     if (!f) return;
     setErreur(''); setLecture(true); setResultats(null);
     try {
-      // Les types de dossier de l'organisation, pour reconnaître la colonne « Type ».
+      // Les typologies de l'organisation, pour reconnaître la colonne « Typologie ».
       const typesConnus = types.length ? types : ((await requestService.getOptions().catch(() => null))?.documentTypes || []);
       if (!types.length) setTypes(typesConnus);
       const classeur = await lireClasseur(f);
@@ -119,7 +119,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
             <>
               <p className="text-sm text-slate-600">
                 Chaque feuille du classeur devient une liste (« Liste 1 », « Liste 2 »…). Les colonnes sont reconnues d'après leur titre :
-                entreprise, n° de dossier, n° d'acte, année.
+                entreprise, typologie, n° de dossier, n° d'acte, année.
               </p>
               <button
                 type="button"
@@ -171,8 +171,10 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
                     {f.lignes.slice(0, 3).map((l) => (
                       <li key={l.rang} className="py-1.5 flex gap-2">
                         <span className="text-slate-300 w-14 flex-shrink-0">ligne {l.rang}</span>
-                        <span className="font-semibold text-slate-700 truncate">{intitule(l)}</span>
-                        <span className="truncate">{references(l)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold text-slate-700 line-clamp-2">{intitule(l)}</span>
+                          {references(l) && <span className="block truncate">{references(l)}</span>}
+                        </span>
                       </li>
                     ))}
                     {f.lignes.length > 3 && <li className="py-1.5 text-slate-400">… et {f.lignes.length - 3} autre{f.lignes.length - 3 > 1 ? 's' : ''}</li>}

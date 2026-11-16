@@ -38,6 +38,7 @@ const geste = (fn, contexte, statut = 200) => async (req, res) => {
 exports.creer = geste((req) => listeService.creer(req.user.tenant_id, req.user, req.body || {}), 'l\'enregistrement de la liste', 201);
 exports.lister = geste((req) => listeService.lister(req.user.tenant_id, req.user, { cadre: req.query.cadre, q: req.query.q }), 'la lecture des listes');
 exports.detail = geste((req) => listeService.detail(req.user.tenant_id, req.params.listeId, req.user), 'la lecture de la liste');
+exports.typologie = geste((req) => listeService.fixerTypologie(req.user.tenant_id, req.user, req.params.id, req.body?.type_document), 'la mise à jour de la typologie');
 exports.transmettre = geste((req) => listeService.transmettre(req.user.tenant_id, req.params.listeId, req.user, req.body || {}), 'la transmission de la liste');
 exports.retourner = geste((req) => listeService.retourner(req.user.tenant_id, req.params.listeId, req.user, req.body || {}), 'l\'enregistrement du retour');
 exports.dossiersConnus = geste((req) => listeService.dossiersConnus(req.user.tenant_id, req.user, req.query.q), 'la recherche des dossiers');

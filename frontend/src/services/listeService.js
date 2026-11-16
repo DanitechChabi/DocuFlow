@@ -18,3 +18,5 @@ export const listeService = {
 // Demandes reçues par l'archive (téléphone) : agents, et enregistrement au nom d'un agent.
 listeService.demandeurs = async () => (await api.get('/requests/demandeurs')).data;
 listeService.pourAgent = async (corps) => (await api.post('/requests/pour-agent', corps)).data;
+// L'archive précise la typologie d'une demande arrivée sans elle.
+listeService.typologie = async (id, typeDocument) => (await api.patch(`/requests/${id}/typologie`, { type_document: typeDocument })).data;

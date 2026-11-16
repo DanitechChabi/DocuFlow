@@ -39,15 +39,21 @@ export function etatDossierListe(d) {
   return { cle: 'demande', texte: 'Demandé', ton: 'ambre' };
 }
 
-/** Comment désigner un dossier : l'entreprise d'abord, sinon la description. */
+/**
+ * Intitulé d'un dossier : l'entreprise (sinon la description ou le numéro),
+ * puis sa typologie — une même entreprise a souvent plusieurs dossiers, un
+ * par typologie : « Agro Fictive du Zou — Bonne exécution (CBE) ».
+ */
 export function intitule(d) {
-  return d.nom_entreprise || d.description || (d.num_dossier ? `Dossier ${d.num_dossier}` : 'Dossier sans intitulé');
+  const nom = d.nom_entreprise || d.description
+    || (d.num_dossier ? `Dossier ${d.num_dossier}` : d.num_acte ? `Acte ${d.num_acte}` : '');
+  if (nom && d.type_document) return `${nom} — ${d.type_document}`;
+  return nom || d.type_document || 'Dossier sans intitulé';
 }
 
-/** Références lisibles : type, n° de dossier, n° d'acte, année. */
+/** Références lisibles : n° de dossier, n° d'acte, année (la typologie est dans l'intitulé). */
 export function references(d) {
   return [
-    d.type_document,
     d.num_dossier && `Dossier ${d.num_dossier}`,
     d.num_acte && `Acte ${d.num_acte}`,
     d.annee && String(d.annee),

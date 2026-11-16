@@ -103,12 +103,17 @@ function lireSaisie(body = {}, { now = new Date() } = {}) {
  * remplacés par la première référence disponible.
  */
 function libelleDemande(r = {}) {
+  // La typologie (attestation, bonne exécution…) fait partie de l'intitulé :
+  // une même entreprise a souvent plusieurs dossiers, un par typologie.
+  const type = texte(r.type_document);
+  const avecType = (s) => (type ? `${s} — ${type}` : s);
   const nom = texte(r.nom_entreprise);
-  if (nom) return nom;
+  if (nom) return avecType(nom);
   const desc = texte(r.description);
-  if (desc) return desc.length > 60 ? `${desc.slice(0, 57)}…` : desc;
+  if (desc) return avecType(desc.length > 60 ? `${desc.slice(0, 57)}…` : desc);
   const dossier = texte(r.num_dossier);
-  if (dossier) return `dossier ${dossier}`;
+  if (dossier) return avecType(`dossier ${dossier}`);
+  if (type) return r.id ? `${type} n° ${r.id}` : type;
   return r.id ? `n° ${r.id}` : 'sans titre';
 }
 

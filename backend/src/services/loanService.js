@@ -279,7 +279,7 @@ async function retourner(tenantId, requestId, user, { observation } = {},
 /** Lit le prêt en vérifiant que l'appelant en est l'emprunteur. */
 async function pretDeLEmprunteur(client, tenantId, requestId, user) {
   const r = await client.query(
-    `SELECT l.*, q.nom_entreprise, q.description, q.num_dossier, q.id AS rid
+    `SELECT l.*, q.nom_entreprise, q.description, q.num_dossier, q.type_document, q.id AS rid
        FROM request_loans l JOIN requests q ON q.id = l.request_id
       WHERE l.request_id = $1 AND l.tenant_id = $2 FOR UPDATE OF l`,
     [requestId, tenantId]

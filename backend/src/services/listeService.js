@@ -27,7 +27,7 @@ const roleService = require('./roleService');
 const loanService = require('./loanService');
 const catalog = require('../config/settingsCatalog');
 const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
-const { lireSaisie, aujourdhui } = require('../helpers/requestInput');
+const { lireSaisie, aujourdhui, libelleDemande } = require('../helpers/requestInput');
 
 const LIMITE_LIGNES = 2000;
 
@@ -90,9 +90,9 @@ function lireLignes(lignes, { types = null } = {}) {
       annee: l.annee,
       description: l.description,
     });
-    // Type de dossier : facultatif ; s'il est donné, il doit être proposé.
+    // Typologie : facultative ; si elle est donnée, elle doit être proposée.
     const type = texte(l.type_document, 100);
-    if (type && types && !types.includes(type)) errors.push(`Type de dossier inconnu : « ${type} ».`);
+    if (type && types && !types.includes(type)) errors.push(`Typologie inconnue : « ${type} ».`);
     if (errors.length) erreurs.push({ ligne: i + 1, message: errors.join(' ') });
     else valeurs.push({ ...values, type_document: type });
   });
@@ -372,7 +372,43 @@ async function dossiersConnus(tenantId, user, q) {
   return r.rows;
 }
 
+/**
+ * L'archive précise (ou corrige) la typologie d'une demande arrivée sans
+ * elle : c'est en sortant le dossier qu'on la voit. La typologie fait partie
+ * de l'intitulé du dossier. Vide : la typologie est retirée.
+ * @returns {Promise<{ id: number, type_document: string|null }>}
+ */
+async function fixerTypologie(tenantId, user, requestId, type) {
+  const id = Number(requestId);
+  if (!Number.isInteger(id) || id <= 0) throw erreur(400, 'Demande invalide.');
+  const valeur = texte(type, 100);
+  if (valeur && !allowedValues(await typesAdmis(tenantId)).includes(valeur)) {
+    throw erreur(400, `Typologie inconnue : « ${valeur} ».`);
+  }
+  return loanService.enTransaction(async (client) => {
+    const r = (await client.query(
+      'SELECT id, statut, type_document, nom_entreprise, description, num_dossier FROM requests WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
+      [id, tenantId]
+    )).rows[0];
+    if (!r) throw erreur(404, 'Demande introuvable.');
+    if ((r.type_document || null) === valeur) return { id, type_document: valeur };
+    await client.query('UPDATE requests SET type_document = $1 WHERE id = $2 AND tenant_id = $3', [valeur, id, tenantId]);
+    const action = valeur ? `Typologie : ${valeur}` : 'Typologie retirée';
+    await client.query(
+      `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, comment, user_name, tenant_id)
+       VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
+      [id, user.id, action.slice(0, 100), r.statut, r.type_document ? `Auparavant : ${r.type_document}` : null, user.full_name || null, tenantId]
+    );
+    await client.query(
+      'INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, $3, $4)',
+      [user.id, `A précisé la typologie du dossier « ${libelleDemande({ ...r, type_document: null })} » : ${valeur || 'aucune'}`.slice(0, 500), id, tenantId]
+    );
+    return { id, type_document: valeur };
+  });
+}
+
 module.exports = {
   LIMITE_LIGNES, lireLignes, etatDossier,
   cadresAdmis, typesAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
+  fixerTypologie,
 };

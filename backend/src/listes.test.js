@@ -87,6 +87,8 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok((await appel(garde('post', '/pour-agent'), u('demandeur'))).code === 403, 'demande au nom d\'un agent : demandeur refusé (403)');
     ok((await appel(garde('get', '/demandeurs'), u('demandeur'))).code === 403, 'liste des agents : demandeur refusé (403)');
     ok((await appel(garde('post', '/pour-agent'), u('archiviste'))).code === 'next', 'demande au nom d\'un agent : archiviste admis');
+    ok((await appel(garde('patch', '/:id/typologie'), u('demandeur'))).code === 403, 'préciser la typologie : demandeur refusé (403)');
+    ok((await appel(garde('patch', '/:id/typologie'), u('archiviste'))).code === 'next', 'préciser la typologie : archiviste admis');
   }
 
   if (!avecBase) {
@@ -125,7 +127,7 @@ const appel = (handler, req) => new Promise((resolve) => {
     await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Radiation', lignes }), 400, 'motif non proposé : 400');
     const eType = await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [{ nom_entreprise: 'X', type_document: 'Statuts' }] }), 422,
       'type de dossier non proposé : 422');
-    ok(eType && /Type de dossier inconnu/.test(eType.details[0].message), '422 : le type inconnu est nommé');
+    ok(eType && /Typologie inconnue/.test(eType.details[0].message), '422 : la typologie inconnue est nommée');
     await rejette(listes.creer(t, finances, { libelle: '  ', cadre: 'Soldes créditeurs', lignes }), 400, 'liste sans nom : 400');
     await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [] }), 400, 'liste vide : 400');
     const e422 = await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [lignes[0], { annee: 2024 }] }), 422, 'ligne sans référence : 422');
@@ -237,6 +239,26 @@ const appel = (handler, req) => new Promise((resolve) => {
       'transmission avec date de retour passée : 400');
     ok((await db.query("SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND nom_entreprise = 'Y'", [t])).rows[0].n === 0,
       'refus de la transmission : la demande n\'est pas créée non plus (tout ou rien)');
+
+    // --- Typologie précisée par l'archive ---
+    await rejette(listes.fixerTypologie(t, archiviste, 'abc', 'Attestation'), 400, 'typologie : demande invalide → 400');
+    await rejette(listes.fixerTypologie(t, archiviste, tel2.request.id, 'Statuts'), 400, 'typologie non proposée → 400');
+    await rejette(listes.fixerTypologie(autreOrg, archiviste, tel2.request.id, ''), 404, 'typologie : demande d\'une autre organisation → 404');
+    const fixe = await listes.fixerTypologie(t, archiviste, tel2.request.id, 'Caution douanière (CD)');
+    ok(fixe.type_document === 'Caution douanière (CD)'
+      && (await db.query('SELECT type_document FROM requests WHERE id = $1', [tel2.request.id])).rows[0].type_document === 'Caution douanière (CD)',
+      'l\'archive précise la typologie d\'une demande arrivée sans elle');
+    ok((await db.query("SELECT count(*)::int AS n FROM request_history WHERE request_id = $1 AND action = 'Typologie : Caution douanière (CD)'", [tel2.request.id])).rows[0].n === 1,
+      'typologie : une étape d\'historique');
+    ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE request_id = $1 AND action LIKE 'A précisé la typologie du dossier « Garage Fictif du Centre » : Caution douanière (CD)'", [tel2.request.id])).rows[0].n === 1,
+      'typologie : inscrite au journal d\'audit');
+    await listes.fixerTypologie(t, archiviste, tel2.request.id, 'Caution douanière (CD)');
+    ok((await db.query("SELECT count(*)::int AS n FROM request_history WHERE request_id = $1 AND action LIKE 'Typologie%'", [tel2.request.id])).rows[0].n === 1,
+      'même typologie : rien de plus à l\'historique');
+    ok((await listes.fixerTypologie(t, archiviste, tel2.request.id, '')).type_document === null, 'typologie retirée (vide)');
+    const { libelleDemande } = require('./helpers/requestInput');
+    ok(libelleDemande({ nom_entreprise: 'Agro Fictive du Zou', type_document: 'Bonne exécution (CBE)' }) === 'Agro Fictive du Zou — Bonne exécution (CBE)',
+      'intitulé d\'un dossier : l\'entreprise puis la typologie');
   }
 
   console.log('\n4. Préréglages de l\'édition AFGC');

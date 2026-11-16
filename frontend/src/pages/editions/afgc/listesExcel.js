@@ -13,7 +13,7 @@ export const CHAMPS = [
   { cle: 'nom_entreprise', label: 'Entreprise', motifs: [/raison sociale/, /entreprise/, /societe/, /client/, /denomination/, /beneficiaire/, /\bnom\b/] },
   { cle: 'num_dossier', label: 'N° de dossier', motifs: [/dossier/, /\bcompte\b/, /\bref/] },
   // Le type avant le n° d'acte : « Type de garantie » est un type, pas un numéro.
-  { cle: 'type_document', label: 'Type', motifs: [/\btype\b/, /nature/, /produit/, /typologie/] },
+  { cle: 'type_document', label: 'Typologie', motifs: [/\btype\b/, /nature/, /produit/, /typologie/] },
   { cle: 'num_acte', label: 'N° d\'acte', motifs: [/\bacte\b/, /garantie/, /caution/, /engagement/] },
   { cle: 'annee', label: 'Année', motifs: [/annee/, /exercice/] },
   { cle: 'description', label: 'Précisions', motifs: [/observation/, /objet/, /solde/, /montant/, /libelle/, /commentaire/] },
