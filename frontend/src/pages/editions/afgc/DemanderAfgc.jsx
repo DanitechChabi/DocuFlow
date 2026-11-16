@@ -12,6 +12,7 @@ import { motifsHabituels } from './departements';
 import { authService } from '../../../services/authService';
 import BoiteDemande from './BoiteDemande';
 import ImportListeAfgc from './ImportListeAfgc';
+import { AlerteACompleter } from './complements';
 
 // ============================================================================
 // Demander un dossier : la boîte de demande (on tape, Entrée), les derniers
@@ -28,11 +29,13 @@ const DemanderAfgc = () => {
   const [recents, setRecents] = useState([]);
   const [importOuvert, setImportOuvert] = useState(params.get('liste') === '1');
   const [envoi, setEnvoi] = useState(null);
+  const [aCompleter, setACompleter] = useState(0);
 
   const chargerRecents = useCallback(() => {
     requestService.getMyRequests().then((l) => {
       const vus = new Set();
       const rec = [];
+      setACompleter((Array.isArray(l) ? l : []).filter((d) => d.statut === 'a completer').length);
       for (const d of Array.isArray(l) ? l : []) {
         if (d.lot_id || (!d.nom_entreprise && !d.num_dossier && !d.num_acte)) continue;
         const k = cleDossier(d);
@@ -92,6 +95,8 @@ const DemanderAfgc = () => {
           <FileSpreadsheet size={16} /> Demander une liste (Excel)
         </button>
       </EnTete>
+
+      <AlerteACompleter nombre={aCompleter} className="mb-5" />
 
       <div className="glass-card-premium rounded-3xl p-5 md:p-6 animate-fade-in-up">
         <BoiteDemande grande autoFocus onEnvoye={chargerRecents} />

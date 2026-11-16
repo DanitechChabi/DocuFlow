@@ -4,6 +4,7 @@ const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
 const loanController = require('../controllers/loanController');
 const gedMatchController = require('../controllers/gedMatchController');
+const complementController = require('../controllers/complementController');
 const listeController = require('../controllers/listeController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
@@ -89,6 +90,9 @@ router.get('/all', requireAnyPermission(PERMISSIONS_VUE_GLOBALE), requestControl
 router.get('/:id/matching-document', requirePermission('requests.process'), requestController.findMatchingDocument);
 // requests.create admis pour l'annulation par l'auteur — le contrôleur borne
 // alors la transition (sa demande, vers « annulé » seulement).
+// Compléments (051) : l'archive renvoie la demande à son auteur, qui la complète.
+router.post('/:id/complement', requirePermission('requests.process'), complementController.demander);
+router.post('/:id/completer', requireAnyPermission(['requests.create', 'requests.process']), complementController.completer);
 router.patch('/:id/status', requireAnyPermission(['requests.process', 'requests.create']), requestController.updateRequestStatus);
 router.patch('/:id/assign', requirePermission('requests.assign'), requestController.assignRequest);
 // Lier/délier un document GED : une action documentaire autant que de demande —

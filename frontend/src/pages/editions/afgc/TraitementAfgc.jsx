@@ -10,6 +10,7 @@ import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 import { parDepartement } from './departements';
 import { Presence, usePresences } from './presence';
+import { ModaleComplement, EchangeComplement, BoutonComplement } from './complements';
 
 // ============================================================================
 // À traiter (archive) : chaque dossier se TRANSMET d'un clic, et son RETOUR se
@@ -50,6 +51,7 @@ const Ligne = ({ d, presence, children }) => (
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif, d.requester_name && `pour ${d.requester_name}`].filter(Boolean).join(' · ')}</div>
       {/* Où le chercher : semaine de production, date du point, lettre. */}
       <Presence resultat={presence} archiviste className="mt-2" />
+      <EchangeComplement d={d} />
     </div>
     {/* Les gestes restent groupés, à droite, même quand ils passent à la ligne. */}
     <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">{children}</div>
@@ -75,6 +77,8 @@ const TraitementAfgc = () => {
   const [refCourrier, setRefCourrier] = useState('');
   const [transmettreTel, setTransmettreTel] = useState(true);
   const [typologies, setTypologies] = useState([]);
+  // Demande renvoyée au demandeur faute d'informations (051).
+  const [aRenvoyer, setARenvoyer] = useState(null);
 
   const charger = useCallback(() => {
     requestService.getAllRequests().then((l) => setDemandes(Array.isArray(l) ? l : [])).catch(() => setDemandes([]));
@@ -92,6 +96,7 @@ const TraitementAfgc = () => {
   const aTransmettre = seules.filter((d) => etatDemande(d).cle === 'demande').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   // Pour chaque dossier à sortir : semaine et date du point où il est entré.
   const presences = usePresences(aTransmettre);
+  const enAttenteComplements = seules.filter((d) => etatDemande(d).cle === 'a_completer');
   const sortis = seules.filter((d) => etatDemande(d).cle === 'transmis').sort((a, b) => String(a.loan_retour_prevu).localeCompare(String(b.loan_retour_prevu)));
   const listesVues = (listes || []).filter((l) => (!cadre || l.cadre === cadre) && correspond(l, q));
   const listesOuvertes = listesVues.filter((l) => l.a_transmettre + l.transmis > 0);
@@ -256,6 +261,7 @@ const TraitementAfgc = () => {
                     <Ligne key={d.id} d={d} presence={presences[d.id]}>
                       <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                       <span className="text-xs text-slate-400">demandé le {dateCourte(d.created_at)}</span>
+                      <BoutonComplement onClick={() => setARenvoyer(d)} desactive={Boolean(geste)} />
                       <button type="button" onClick={() => transmettre(d)} disabled={Boolean(geste)}
                         className="px-3.5 py-2 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60">
                         {geste === `t-${d.id}` ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Transmettre
@@ -286,6 +292,15 @@ const TraitementAfgc = () => {
               ) : <p className="text-sm text-slate-400 py-2">Aucun dossier sorti.</p>}
             </section>
           </div>
+          {enAttenteComplements.length > 0 && (
+            <section className="glass-card-premium rounded-3xl p-5 md:p-6 mt-6 border-2 border-amber-200">
+              <h2 className="font-bold text-slate-900 mb-1">Attendent des compléments <span className="text-amber-600 font-semibold">({enAttenteComplements.length})</span></h2>
+              <p className="text-sm text-slate-600 mb-2">Renvoyées à leur auteur ; elles reviennent dans « À transmettre » dès qu'il les a complétées.</p>
+              <ul className="divide-y divide-slate-100">
+                {enAttenteComplements.map((d) => <Ligne key={d.id} d={d}><Pastille ton="rouge">À compléter</Pastille></Ligne>)}
+              </ul>
+            </section>
+          )}
         </>)
       ) : (
         listes === null ? <Chargement /> : listesVues.length ? (
@@ -300,6 +315,7 @@ const TraitementAfgc = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {l.a_transmettre > 0 && <Pastille ton="ambre">{l.a_transmettre} à transmettre</Pastille>}
+                    {l.a_completer > 0 && <Pastille ton="rouge">{l.a_completer} à compléter</Pastille>}
                     {l.transmis > 0 && <Pastille ton="vert">{l.transmis} transmis</Pastille>}
                     {l.retournes > 0 && <Pastille ton="gris">{l.retournes} retourné{l.retournes > 1 ? 's' : ''}</Pastille>}
                     {l.en_retard > 0 && <Pastille ton="rouge">{l.en_retard} en retard</Pastille>}
@@ -341,7 +357,9 @@ const TraitementAfgc = () => {
                                   <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                                   <div className="text-xs text-slate-400 truncate">{references(d) || d.description || 'Sans référence'}</div>
                                   {d.etat === 'demande' && <Presence resultat={presencesListe[d.id]} archiviste className="mt-2" />}
+                                  <EchangeComplement d={d} />
                                 </div>
+                                {d.etat === 'demande' && <BoutonComplement onClick={() => setARenvoyer({ ...d, requester_name: ouverte.demandeur_name })} desactive={Boolean(geste)} />}
                                 {(d.etat === 'demande' || d.etat === 'transmis') && (
                                   <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                                 )}
@@ -359,6 +377,10 @@ const TraitementAfgc = () => {
             ))}
           </div>
         ) : <div className="glass-card-premium rounded-3xl p-8 text-center text-sm text-slate-500">Aucune liste.</div>
+      )}
+      {aRenvoyer && (
+        <ModaleComplement dossier={aRenvoyer} onClose={() => setARenvoyer(null)}
+          onFait={async () => { charger(); if (ouverte?.id) setOuverte(await listeService.detail(ouverte.id)); }} />
       )}
     </div>
   );
