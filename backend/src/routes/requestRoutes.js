@@ -42,6 +42,10 @@ router.patch('/fields/:id/visibility', requirePermission('settings.manage'), req
 // demandeur, à qui l'a déposée et à l'archive.
 router.get('/dossiers-connus', requirePermission('requests.create'), listeController.dossiersConnus);
 router.get('/cadres', requirePermission('requests.view'), listeController.cadres);
+// Demande reçue par l'archive (téléphone) : enregistrée au nom de l'agent,
+// transmise dans le même geste si l'archiviste le veut.
+router.get('/demandeurs', requirePermission('requests.process'), listeController.demandeurs);
+router.post('/pour-agent', requirePermission('requests.process'), listeController.pourAgent);
 router.get('/listes', requirePermission('requests.view'), listeController.lister);
 router.post('/listes', requirePermission('requests.create'), listeController.creer);
 router.get('/listes/:listeId', requirePermission('requests.view'), listeController.detail);

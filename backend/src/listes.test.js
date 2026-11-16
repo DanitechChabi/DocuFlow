@@ -82,8 +82,11 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok((await appel(garde('get', '/dossiers-connus'), u('demandeur'))).code === 'next', 'dossiers connus : qui peut demander');
     const couches = router.stack.filter((l) => l.route).map((l) => l.route.path);
     const premierId = couches.findIndex((p) => p.startsWith('/:id'));
-    ok(['/listes', '/listes/:listeId', '/dossiers-connus', '/cadres'].every((p) => couches.indexOf(p) >= 0 && couches.indexOf(p) < premierId),
+    ok(['/listes', '/listes/:listeId', '/dossiers-connus', '/cadres', '/demandeurs', '/pour-agent'].every((p) => couches.indexOf(p) >= 0 && couches.indexOf(p) < premierId),
       'routes des listes déclarées avant /:id/…');
+    ok((await appel(garde('post', '/pour-agent'), u('demandeur'))).code === 403, 'demande au nom d\'un agent : demandeur refusé (403)');
+    ok((await appel(garde('get', '/demandeurs'), u('demandeur'))).code === 403, 'liste des agents : demandeur refusé (403)');
+    ok((await appel(garde('post', '/pour-agent'), u('archiviste'))).code === 'next', 'demande au nom d\'un agent : archiviste admis');
   }
 
   if (!avecBase) {
@@ -187,6 +190,29 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok((await listes.dossiersConnus(t, archiviste, 'CL-0')).length === 4, 'l\'archive voit les dossiers de toute l\'organisation (4)');
     ok((await listes.dossiersConnus(t, finances, 'x')).length === 0, 'saisie d\'un caractère : rien');
     ok((await listes.dossiersConnus(t, finances, '%')).length === 0, 'caractère « % » cherché tel quel');
+
+    // --- Demande reçue par l'archive (téléphone) ---
+    const rapide = require('./services/demandeRapideService');
+    const agents = await rapide.demandeurs(t);
+    ok(agents.length === 3 && agents.every((a) => a.full_name && !('email' in a) && !('role' in a)), 'liste des agents : nom et service seulement');
+    await rejette(rapide.pourAgent(t, archiviste, { nom_entreprise: 'X' }), 400, 'sans agent : 400');
+    const autreOrg = (await db.query("INSERT INTO tenants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id", [`Autre ${suffixe}`, `autre-${suffixe}`])).rows[0].id;
+    const etranger = (await db.query(`INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', 'Étranger', $3, 'demandeur') RETURNING id`, [autreOrg, `etr-${suffixe}`, `etr-${suffixe}@exemple.test`])).rows[0];
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: etranger.id, nom_entreprise: 'X' }), 404, 'agent d\'une autre organisation : 404');
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id }), 400, 'sans référence ni description : 400');
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'X', motif: 'Radiation' }), 400, 'cadre non proposé : 400');
+    const tel = await rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'Garage Fictif du Centre', num_dossier: 'CL-0900' });
+    ok(tel.request.id_user === juridique.id && tel.request.motif === 'Consultation' && tel.pret === null, 'demande enregistrée au nom de l\'agent, cadre par défaut');
+    ok((await db.query("SELECT 1 FROM notifications WHERE request_id = $1 AND id_user = $2 AND title = 'Demande enregistrée'", [tel.request.id, juridique.id])).rows.length === 1,
+      'l\'agent est prévenu que l\'archive a enregistré sa demande');
+    ok((await db.query("SELECT 1 FROM audit_logs WHERE request_id = $1 AND action LIKE 'A enregistré la demande de Jules Juridique%'", [tel.request.id])).rows.length === 1,
+      'journal d\'audit : qui a enregistré la demande, pour qui');
+    const tel2 = await rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'Garage Fictif du Centre', motif: 'Commissaire aux comptes', transmettre: true });
+    ok(tel2.pret && tel2.pret.emprunteur_id === juridique.id && tel2.request.statut === 'livré', 'enregistrée et transmise d\'un geste : prêt à l\'agent');
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'Y', transmettre: true, date_retour_prevue: '2020-01-01' }), 400,
+      'transmission avec date de retour passée : 400');
+    ok((await db.query("SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND nom_entreprise = 'Y'", [t])).rows[0].n === 0,
+      'refus de la transmission : la demande n\'est pas créée non plus (tout ou rien)');
   }
 
   console.log(`\n${verifs - echecs}/${verifs} vérifications réussies`);

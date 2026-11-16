@@ -42,3 +42,8 @@ exports.transmettre = geste((req) => listeService.transmettre(req.user.tenant_id
 exports.retourner = geste((req) => listeService.retourner(req.user.tenant_id, req.params.listeId, req.user, req.body || {}), 'l\'enregistrement du retour');
 exports.dossiersConnus = geste((req) => listeService.dossiersConnus(req.user.tenant_id, req.user, req.query.q), 'la recherche des dossiers');
 exports.cadres = geste(async (req) => (await listeService.cadresAdmis(req.user.tenant_id)), 'la lecture des cadres');
+
+// --- Demandes reçues par l'archive (téléphone) ---
+const demandeRapideService = require('../services/demandeRapideService');
+exports.demandeurs = geste((req) => demandeRapideService.demandeurs(req.user.tenant_id), 'la lecture des agents');
+exports.pourAgent = geste((req) => demandeRapideService.pourAgent(req.user.tenant_id, req.user, req.body || {}), 'l\'enregistrement de la demande', 201);

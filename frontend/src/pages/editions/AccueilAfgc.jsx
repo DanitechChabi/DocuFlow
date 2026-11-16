@@ -12,6 +12,7 @@ import { useTitrePage } from '../../hooks/useTitrePage';
 import { edition } from '../../editions';
 import { Pastille, Chargement } from './afgc/elements';
 import { etatDemande, intitule, references } from './afgc/vocabulaire';
+import BoiteDemande from './afgc/BoiteDemande';
 
 // ============================================================================
 // Accueil de l'édition AFGC : l'essentiel en trois boutons.
@@ -88,7 +89,12 @@ const AccueilAfgc = () => {
     }
   }, [traite]);
 
-  useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    charger();
+    const recharger = () => charger();
+    window.addEventListener('afgc:demande-envoyee', recharger);
+    return () => window.removeEventListener('afgc:demande-envoyee', recharger);
+  }, [charger]);
 
   const prenom = (user?.full_name || '').split(' ')[0] || 'bienvenue';
 
@@ -107,7 +113,7 @@ const AccueilAfgc = () => {
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Bonjour, {prenom}</h1>
           <p className="text-sm md:text-base text-slate-500">
-            {traite ? 'Archives de l\'AFGC : les demandes à traiter et les dossiers sortis.' : 'Archives de l\'AFGC : demandez un dossier, suivez-le, retournez-le.'}
+            {traite ? 'Archives de l\'AFGC : les demandes à traiter et les dossiers sortis.' : 'Archives de l\'AFGC'}
           </p>
         </div>
         {traite && can('requests.create') && (
@@ -181,27 +187,46 @@ const AccueilAfgc = () => {
         </>
       ) : (
         <>
-          <div className="grid gap-5 md:grid-cols-3">
-            <CarteAction to="/demandes/nouvelle" icone={PlusCircle} titre="Demander un dossier" principale
-              texte="Tapez l'entreprise ou un numéro, un clic sur « Demander » : l'archive est prévenue. Une liste Excel se demande d'un coup." />
-            <CarteAction to="/demandes/mes-demandes" icone={FileSearch} titre="Mes dossiers"
-              texte="Où en est chaque demande : Demandé, Transmis, Retourné.">
-              {mesDemandes !== null && <Pastille ton={enCours.length ? 'ambre' : 'gris'}>{enCours.length} en cours</Pastille>}
-            </CarteAction>
-            <CarteAction to="/demandes/mes-demandes" icone={Undo2} titre="Retourner un dossier"
-              texte="Rapportez-le à l'archive : l'archiviste note le retour d'un clic et vous en êtes déchargé.">
-              {mesDemandes !== null && <Pastille ton={transmis.length ? 'vert' : 'gris'}>{transmis.length} transmis</Pastille>}
-              {enRetardAgent > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {enRetardAgent} en retard</Pastille>}
-            </CarteAction>
+          {/* La demande, là où l'on arrive : on tape, Entrée. */}
+          <section className="glass-card-premium rounded-3xl p-5 md:p-7 animate-fade-in-up">
+            <h2 className="text-lg md:text-xl font-black text-slate-900 mb-4">Quel dossier vous faut-il ?</h2>
+            <BoiteDemande grande autoFocus onEnvoye={charger} />
+          </section>
+
+          <div className="grid gap-4 sm:grid-cols-2 mt-5">
+            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-2xl p-5 flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all group animate-fade-in-up">
+              <div className="w-12 h-12 rounded-2xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><FileSearch size={22} /></div>
+              <div className="min-w-0">
+                <div className="font-black text-slate-900">Mes dossiers</div>
+                <div className="text-sm text-slate-500">{mesDemandes === null ? '…' : `${enCours.length} en cours`}</div>
+              </div>
+              <ArrowRight size={18} className="ml-auto text-slate-300 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-2xl p-5 flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all group animate-fade-in-up">
+              <div className="w-12 h-12 rounded-2xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Undo2 size={22} /></div>
+              <div className="min-w-0">
+                <div className="font-black text-slate-900">À retourner</div>
+                <div className="text-sm text-slate-500">
+                  {mesDemandes === null ? '…' : `${transmis.length} dossier${transmis.length > 1 ? 's' : ''} chez vous`}
+                  {enRetardAgent > 0 && <span className="ml-2 font-bold text-red-600">· {enRetardAgent} en retard</span>}
+                </div>
+              </div>
+              <ArrowRight size={18} className="ml-auto text-slate-300 group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
 
-          <section className="glass-card-premium rounded-3xl p-6 mt-8 animate-fade-in-up">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
-              <FileSearch size={16} className="text-docuflow-secondary" /> Mes demandes en cours
-            </h3>
+          <section className="glass-card-premium rounded-3xl p-6 mt-5 animate-fade-in-up">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2 flex-1">
+                <FileSearch size={16} className="text-docuflow-secondary" /> Mes demandes en cours
+              </h3>
+              <Link to="/demandes/nouvelle?liste=1" className="text-sm font-bold text-slate-500 hover:text-docuflow-secondary inline-flex items-center gap-1.5">
+                <ListChecks size={15} /> Demander une liste (Excel)
+              </Link>
+            </div>
             {mesDemandes === null ? <Chargement /> : enCours.length ? (
               <ul className="divide-y divide-slate-100">
-                {enCours.slice(0, 6).map((d) => {
+                {enCours.slice(0, 8).map((d) => {
                   const e = etatDemande(d);
                   return (
                     <li key={d.id} className="py-3 flex items-center gap-4">
@@ -215,9 +240,7 @@ const AccueilAfgc = () => {
                 })}
               </ul>
             ) : (
-              <p className="text-sm text-slate-400 py-2">
-                Aucune demande en cours. <Link to="/demandes/nouvelle" className="font-semibold text-docuflow-secondary hover:underline">Demander un dossier</Link>
-              </p>
+              <p className="text-sm text-slate-400 py-2">Aucune demande en cours.</p>
             )}
           </section>
         </>

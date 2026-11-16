@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight, FileSpreadsheet, Phone } from 'lucide-react';
+import BoiteDemande from './BoiteDemande';
 import { exporterListe } from './exportListe';
 import { requestService } from '../../../services/requestService';
 import { listeService } from '../../../services/listeService';
@@ -42,6 +43,10 @@ const TraitementAfgc = () => {
   const [geste, setGeste] = useState(null);
   const [ouverte, setOuverte] = useState(null);
   const [coches, setCoches] = useState(new Set());
+  // Demande reçue par téléphone : pour qui, et faut-il transmettre aussitôt.
+  const [demandeurs, setDemandeurs] = useState([]);
+  const [agentTel, setAgentTel] = useState('');
+  const [transmettreTel, setTransmettreTel] = useState(true);
 
   const charger = useCallback(() => {
     requestService.getAllRequests().then((l) => setDemandes(Array.isArray(l) ? l : [])).catch(() => setDemandes([]));
@@ -51,6 +56,7 @@ const TraitementAfgc = () => {
   useEffect(() => {
     charger();
     listeService.cadres().then(setCadres).catch(() => setCadres([]));
+    listeService.demandeurs().then(setDemandeurs).catch(() => setDemandeurs([]));
   }, [charger]);
 
   const seules = useMemo(() => (demandes || []).filter((d) => !d.lot_id && (!cadre || d.motif === cadre) && correspond(d, q)), [demandes, cadre, q]);
@@ -123,7 +129,37 @@ const TraitementAfgc = () => {
       {cadres.length > 1 && <div className="mb-5"><ChoixCadre cadres={cadres} valeur={cadre} onChange={setCadre} tous /></div>}
 
       {onglet === 'demandes' ? (
-        demandes === null ? <Chargement /> : (
+        demandes === null ? <Chargement /> : (<>
+          {/* On appelle encore l'archive : la demande s'inscrit quand même au registre. */}
+          <section className="glass-card-premium rounded-3xl p-5 md:p-6 mb-6">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
+              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Phone size={16} className="text-docuflow-secondary" /> Demande reçue par téléphone</h2>
+              <span className="text-xs text-slate-400">enregistrée au nom de l'agent, qui la retrouve dans « Mes dossiers »</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              <select value={agentTel} onChange={(e) => setAgentTel(e.target.value)} aria-label="Agent qui demande"
+                className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-slate-700 min-w-[240px]">
+                <option value="">Qui demande ?</option>
+                {demandeurs.map((a) => <option key={a.id} value={a.id}>{a.full_name}{a.section ? ` — ${a.section}` : ''}</option>)}
+              </select>
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={transmettreTel} onChange={(e) => setTransmettreTel(e.target.checked)} className="w-4 h-4 accent-[var(--color-docuflow-secondary)]" />
+                Transmettre tout de suite
+              </label>
+            </div>
+            <BoiteDemande
+              plusieurs={false}
+              annulable={false}
+              desactive={!agentTel}
+              libelleBouton={transmettreTel ? 'Enregistrer et transmettre' : 'Enregistrer'}
+              envoyerUn={(corps) => listeService.pourAgent({ ...corps, pour_user_id: Number(agentTel), transmettre: transmettreTel })}
+              messageEnvoye={(texte) => {
+                const nom = demandeurs.find((a) => String(a.id) === String(agentTel))?.full_name || 'l\'agent';
+                return transmettreTel ? `Transmis à ${nom} : ${texte}.` : `Enregistré pour ${nom} : ${texte}.`;
+              }}
+              onEnvoye={charger}
+            />
+          </section>
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="glass-card-premium rounded-3xl p-5 md:p-6">
               <h2 className="font-bold text-slate-900 mb-2">À transmettre <span className="text-slate-400 font-semibold">({aTransmettre.length})</span></h2>
@@ -161,7 +197,7 @@ const TraitementAfgc = () => {
               ) : <p className="text-sm text-slate-400 py-2">Aucun dossier sorti.</p>}
             </section>
           </div>
-        )
+        </>)
       ) : (
         listes === null ? <Chargement /> : listesVues.length ? (
           <div className="space-y-3">
