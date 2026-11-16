@@ -19,10 +19,10 @@ const POINTS = [
   { icone: BookOpenCheck, texte: 'Retrouvez ce qui est sorti, pour qui et pourquoi.' },
 ];
 
-const CadreConnexion = ({ children }) => (
+const CadreConnexion = ({ children, enHaut = false }) => (
   <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
     {/* Panneau de marque */}
-    <aside className="relative overflow-hidden lg:w-[44%] lg:min-h-screen text-white px-6 py-7 sm:px-10 lg:px-14 lg:py-12 flex flex-col"
+    <aside className="relative overflow-hidden lg:w-[44%] lg:min-h-screen text-white px-6 py-6 sm:px-10 sm:py-7 lg:px-14 lg:py-12 flex flex-col"
       style={{ background: `radial-gradient(120% 90% at 0% 0%, #13263d 0%, ${NUIT} 55%, #050b14 100%)` }}>
       {/* Halo vert et jaune, discrets */}
       <div aria-hidden="true" className="absolute -right-24 -bottom-24 w-80 h-80 rounded-full opacity-25 blur-3xl" style={{ background: VERT }} />
@@ -35,9 +35,9 @@ const CadreConnexion = ({ children }) => (
         </div>
       </div>
 
-      <div className="relative mt-8 lg:mt-auto lg:mb-auto">
+      <div className="relative mt-5 sm:mt-8 lg:mt-auto lg:mb-auto">
         <div className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: JAUNE }}>Archives</div>
-        <h2 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-[1.05] tracking-tight text-white">
+        <h2 className="mt-2 text-[1.75rem] sm:text-4xl lg:text-5xl font-black uppercase leading-[1.05] tracking-tight text-white">
           Vos dossiers,<br /><span style={{ color: JAUNE }}>en un clic.</span>
         </h2>
         <ul className="hidden sm:block mt-8 space-y-4 max-w-sm">
@@ -58,7 +58,7 @@ const CadreConnexion = ({ children }) => (
     </aside>
 
     {/* Formulaire */}
-    <main className="flex-1 flex items-start lg:items-center justify-center px-4 py-8 sm:px-8 lg:py-12">
+    <main className={`flex-1 flex items-start justify-center px-4 py-6 sm:px-8 sm:py-8 lg:py-12 ${enHaut ? 'lg:pt-[12vh]' : 'lg:items-center'}`}>
       <div className="w-full max-w-lg animate-fade-in-up">{children}</div>
     </main>
   </div>
