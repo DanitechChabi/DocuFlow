@@ -51,13 +51,47 @@ export function intitule(d) {
   return nom || d.type_document || 'Dossier sans intitulé';
 }
 
-/** Références lisibles : n° de dossier, n° d'acte, année (la typologie est dans l'intitulé). */
+/** Montant lisible : « 2 347 200 F ». */
+export function montantLisible(m) {
+  const n = Number(m);
+  return m === null || m === undefined || m === '' || !Number.isFinite(n) ? '' : `${n.toLocaleString('fr-FR')} F`;
+}
+
+/** Références lisibles : n° de dossier, n° d'acte, banque, année, montant (la typologie est dans l'intitulé). */
 export function references(d) {
   return [
     d.num_dossier && `Dossier ${d.num_dossier}`,
     d.num_acte && `Acte ${d.num_acte}`,
+    d.banque,
     d.annee && String(d.annee),
+    montantLisible(d.montant),
   ].filter(Boolean).join(' · ');
+}
+
+/**
+ * Formats de l'AFGC : n° d'acte « 2026/1234 » (année/numéro), n° de dossier
+ * « 004523.0008 » (n° du client.n° du dossier).
+ */
+export const FORMAT_ACTE = /^(19|20)\d{2}\/\d+$/;
+export const FORMAT_DOSSIER = /^\d{2,}\.\d{2,}$/;
+
+/**
+ * Une saisie libre décomposée : « Agro Fictive 2026/1234 » donne l'entreprise
+ * et le n° d'acte ; « 004523.0008 » le n° de dossier ; une année seule (« 2024 »)
+ * l'année. Ce qui reste est le nom de l'entreprise.
+ */
+export function decomposerSaisie(texte) {
+  let reste = ` ${String(texte || '').trim()} `;
+  const prendre = (re) => {
+    const m = reste.match(re);
+    if (!m) return '';
+    reste = reste.replace(m[0], ' ');
+    return m[1];
+  };
+  const num_acte = prendre(/\s((?:19|20)\d{2}\/\d+)(?=\s)/);
+  const num_dossier = prendre(/\s(\d{2,}\.\d{2,})(?=\s)/);
+  const annee = prendre(/\s((?:19|20)\d{2})(?=\s)/);
+  return { nom_entreprise: reste.replace(/\s+/g, ' ').trim(), num_acte, num_dossier, annee };
 }
 
 /** AAAA-MM-JJ (ou date ISO) → JJ/MM/AAAA. */
@@ -90,6 +124,8 @@ export function analyserCollage(texte, types = []) {
       const typeSeul = typeDeCellule(c, types);
       if (typeSeul && !d.type_document) { d.type_document = typeSeul; continue; }
       if (!d.annee && /^(19|20)\d{2}$/.test(c)) { d.annee = c; continue; }
+      if (!d.num_acte && FORMAT_ACTE.test(c)) { d.num_acte = c; continue; }
+      if (!d.num_dossier && FORMAT_DOSSIER.test(c)) { d.num_dossier = c; continue; }
       const det = detecterType(c, types);
       if (det.acte) {
         if (!d.num_acte) d.num_acte = c;

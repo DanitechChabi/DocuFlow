@@ -67,6 +67,28 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok(listes.etatDossier({ statut: 'livré', remis_at: new Date(), retourne_at: new Date() }) === 'retourne', 'prêt clos : retourné');
     ok(listes.etatDossier({ statut: 'annulé' }) === 'annule', 'annulé');
     ok(listes.etatDossier({ statut: 'livré' }) === 'servi', 'servi autrement (copie numérique) : rien ne sort');
+
+    // Exigences par typologie (édition AFGC) et nouveaux champs (048).
+    const { EDITIONS } = require('./config/editions');
+    const exi = EDITIONS.afgc.exigences;
+    const { manque } = require('./helpers/exigencesTypologie');
+    const { lireSaisie } = require('./helpers/requestInput');
+    const lu = (corps) => lireSaisie(corps).values;
+    ok(/n° d'acte/.test(manque(lu({ nom_entreprise: 'Agro Fictive' }), 'Bonne exécution (CBE)', exi) || ''), 'caution sans n° d\'acte : refusée, le n° d\'acte est réclamé');
+    ok(manque(lu({ nom_entreprise: 'Agro Fictive', num_acte: '2026/1234' }), 'bonne execution (cbe)', exi) === null, 'caution avec nom et n° d\'acte : acceptée (casse et accents indifférents)');
+    ok(/l'année/.test(manque(lu({ nom_entreprise: 'Agro Fictive' }), 'Prêt', exi) || ''), 'prêt sans année : refusé');
+    ok(manque(lu({ nom_entreprise: 'Agro Fictive', annee: '2024' }), 'Prêt', exi) === null, 'prêt avec nom et année : accepté, montant facultatif');
+    const mg = manque(lu({ nom_entreprise: 'Agro Fictive' }), 'Garantie bancaire', exi) || '';
+    ok(/banque/.test(mg) && /l'année/.test(mg), 'garantie bancaire : la banque et l\'année réclamées ensemble');
+    ok(manque(lu({ nom_entreprise: 'X' }), 'Attestation', exi) === null && manque(lu({ nom_entreprise: 'X' }), 'Prêt', null) === null,
+      'autres typologies, ou organisation sans exigences : rien de plus');
+    ok(lu({ nom_entreprise: 'X', montant: '2 347 200 F' }).montant === 2347200 && lu({ nom_entreprise: 'X', montant: '1.500.000,50' }).montant === 1500000.5,
+      'montant lu malgré espaces, points et « F »');
+    ok(lireSaisie({ nom_entreprise: 'X', montant: 'beaucoup' }).errors.length === 1, 'montant illisible : refusé');
+    ok(lu({ nom_entreprise: 'X', banque: '  Banque Fictive  ' }).banque === 'Banque Fictive', 'banque enregistrée');
+    const { erreurs: errListe } = listes.lireLignes([{ nom_entreprise: 'Y', type_document: 'Caution douanière (CD)' }],
+      { types: ['Caution douanière (CD)'], exigences: exi });
+    ok(errListe.length === 1 && errListe[0].ligne === 1 && /n° d'acte/.test(errListe[0].message), 'liste : la ligne sans n° d\'acte est signalée');
   }
 
   console.log('\n2. Gardes des routes');

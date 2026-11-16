@@ -71,7 +71,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
           cadre,
           fichier: fichier?.name,
           // `rang` (ligne du tableur) reste ici : il sert à situer une erreur.
-          lignes: f.lignes.map(({ nom_entreprise, num_dossier, num_acte, annee, description, type_document }) => ({ nom_entreprise, num_dossier, num_acte, annee, description, type_document })),
+          lignes: f.lignes.map(({ nom_entreprise, num_dossier, num_acte, annee, description, type_document, banque, montant }) => ({ nom_entreprise, num_dossier, num_acte, annee, description, type_document, banque, montant })),
         });
         res.push({ libelle: liste.libelle, ok: true, n: liste.dossiers.length });
       } catch (e) {
@@ -119,7 +119,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
             <>
               <p className="text-sm text-slate-600">
                 Chaque feuille du classeur devient une liste (« Liste 1 », « Liste 2 »…). Les colonnes sont reconnues d'après leur titre :
-                entreprise, typologie, n° de dossier, n° d'acte, année.
+                entreprise, typologie, n° de dossier (004523.0008), n° d'acte (2026/1234), banque, année, montant.
               </p>
               <button
                 type="button"

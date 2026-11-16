@@ -5,7 +5,8 @@ import { listeService } from '../../../services/listeService';
 import { authService } from '../../../services/authService';
 import { toast } from '../../../components/Toast';
 import { Pastille } from './elements';
-import { intitule, references, dateCourte, ressembleAReference, analyserCollage, detecterType } from './vocabulaire';
+import { intitule, references, dateCourte, ressembleAReference, analyserCollage, detecterType, decomposerSaisie, FORMAT_ACTE } from './vocabulaire';
+import { edition } from '../../../editions';
 import { lireCadre, ecrireCadre, cadreActif } from './cadreRetenu';
 import { departementDe, motifsHabituels } from './departements';
 
@@ -38,9 +39,23 @@ const ligneDe = (d, type) => ({
   num_dossier: d.num_dossier || '',
   num_acte: d.num_acte || '',
   annee: d.annee ? String(d.annee) : '',
+  banque: d.banque || '',
+  montant: d.montant ? String(d.montant) : '',
   // Un dossier connu garde sa typologie ; sinon, celle choisie ou devinée.
   type_document: d.type_document || type || '',
 });
+
+// Ce que la typologie exige (édition AFGC) : n° d'acte des cautions, année des
+// prêts, banque et année des garanties bancaires.
+const LIBELLES_CHAMPS = { nom_entreprise: 'l\'entreprise', num_acte: 'le n° d\'acte', num_dossier: 'le n° de dossier', annee: 'l\'année', banque: 'la banque' };
+const sansAccent = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const exigees = (type) => {
+  const regles = edition?.exigences || {};
+  const cle = Object.keys(regles).find((k) => sansAccent(k) === sansAccent(type));
+  return cle ? regles[cle] : [];
+};
+const manquants = (d, type) => exigees(type).filter((c) => !String(d[c] ?? '').trim());
+const estPret = (type) => sansAccent(type).startsWith('pret');
 
 const cleDossier = (d) => [d.nom_entreprise, d.num_dossier, d.num_acte, d.annee].map((x) => String(x ?? '').toLowerCase()).join('|');
 const maintenant = () => {
@@ -80,7 +95,8 @@ const BoiteDemande = ({
   const [recherche, setRecherche] = useState(false);
   const [envoi, setEnvoi] = useState(null);
   const [precisions, setPrecisions] = useState(false);
-  const [detail, setDetail] = useState({ nom_entreprise: '', num_dossier: '', num_acte: '', annee: '' });
+  const [detail, setDetail] = useState({ nom_entreprise: '', num_dossier: '', num_acte: '', annee: '', banque: '', montant: '' });
+  const [aCompleter, setACompleter] = useState([]);
   const [colles, setColles] = useState(null);
   const [envoyee, setEnvoyee] = useState(null);
   const champ = useRef(null);
@@ -125,11 +141,29 @@ const BoiteDemande = ({
   }, [qNet]);
 
   useEffect(() => {
-    const vide = { nom_entreprise: '', num_dossier: '', num_acte: '', annee: '' };
-    if (detection.acte) setDetail({ ...vide, num_acte: qNet });
-    else if (ressembleAReference(qNet)) setDetail({ ...vide, num_dossier: qNet });
-    else setDetail({ ...vide, nom_entreprise: qNet });
+    const vide = { nom_entreprise: '', num_dossier: '', num_acte: '', annee: '', banque: '', montant: '' };
+    setACompleter([]);
+    if (detection.acte) { setDetail({ ...vide, num_acte: qNet }); return; }
+    // « Agro Fictive 2026/1234 », « 004523.0008 », « Agro Fictive 2024 »…
+    const dec = decomposerSaisie(qNet);
+    if (!dec.num_acte && !dec.num_dossier && !dec.annee && ressembleAReference(qNet)) setDetail({ ...vide, num_dossier: qNet });
+    else setDetail({ ...vide, ...dec });
   }, [qNet, detection.acte]);
+
+  /**
+   * La demande comporte-t-elle ce que sa typologie exige ? Sinon on ouvre
+   * « Préciser » sur les champs à remplir, et rien ne part.
+   */
+  const complete = (d, type) => {
+    const m = manquants(d, type);
+    if (!m.length) return true;
+    setDetail((x) => ({ ...x, ...Object.fromEntries(['nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'banque', 'montant'].map((k) => [k, String(d[k] ?? x[k] ?? '')])) }));
+    setACompleter(m);
+    setPrecisions(true);
+    const liste = m.map((c) => LIBELLES_CHAMPS[c] || c);
+    toast.error(`Pour un dossier « ${type} », indiquez ${liste.length > 1 ? `${liste.slice(0, -1).join(', ')} et ${liste[liste.length - 1]}` : liste[0]}.`);
+    return false;
+  };
 
   const choisirCadre = (v) => { setCadre(v); if (retenir) ecrireCadre(v); };
 
@@ -146,6 +180,7 @@ const BoiteDemande = ({
 
   // Mode `cumuler` : le dossier rejoint la liste en préparation.
   const ajouter = (d) => {
+    if (!complete(d, d.type_document || typeEffectif)) return;
     setColles((c) => [...(c || []), ligneDe(d, typeEffectif)]);
     setSaisie(''); setSuggestions([]); setPrecisions(false); setTypeManuel(undefined);
     setTimeout(() => champ.current?.focus(), 0);
@@ -157,6 +192,7 @@ const BoiteDemande = ({
 
   const demander = async (d, cle) => {
     if (!cadre) { toast.error('Choisissez le motif de la demande.'); return; }
+    if (!complete(d, d.type_document || typeEffectif)) return;
     setEnvoi(cle);
     try {
       const corps = {
@@ -166,6 +202,8 @@ const BoiteDemande = ({
         num_dossier: d.num_dossier || '',
         num_acte: d.num_acte || '',
         annee: d.annee ? String(d.annee) : '',
+        banque: d.banque || '',
+        montant: d.montant ? String(d.montant) : '',
         type_document: d.type_document || typeEffectif || '',
         ...(d.source_request_id ? { source_request_id: d.source_request_id } : {}),
       };
@@ -388,6 +426,9 @@ const BoiteDemande = ({
                     {suggestions.length ? 'Un autre dossier : ' : cumuler ? 'Entrée pour l\'ajouter : ' : 'Entrée pour l\'envoyer : '}
                     {detail.num_acte ? 'n° d\'acte' : detail.num_dossier && !detail.nom_entreprise ? 'n° de dossier' : 'nom de l\'entreprise'}
                     {typeEffectif ? '' : ' · typologie à préciser'}
+                    {typeEffectif && manquants(detail, typeEffectif).length > 0 && (
+                      <span className="text-amber-700 font-semibold"> · à préciser : {manquants(detail, typeEffectif).map((c) => LIBELLES_CHAMPS[c]).join(', ')}</span>
+                    )}
                   </div>
                 </div>
                 <button type="button" onClick={() => setPrecisions((v) => !v)}
@@ -401,14 +442,29 @@ const BoiteDemande = ({
               </div>
               {precisions && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                  {[['nom_entreprise', 'Entreprise'], ['num_dossier', 'N° de dossier'], ['num_acte', 'N° d\'acte'], ['annee', 'Année']].map(([k, label]) => (
-                    <label key={k} className="text-[11px] font-bold text-slate-400">
-                      {label}
-                      <input value={detail[k]} onChange={(e) => setDetail((d) => ({ ...d, [k]: e.target.value }))}
-                        inputMode={k === 'annee' ? 'numeric' : undefined} maxLength={k === 'annee' ? 4 : 255}
-                        className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-docuflow-secondary" />
-                    </label>
-                  ))}
+                  {[
+                    ['nom_entreprise', 'Entreprise', 'ex. Agro Fictive'],
+                    ['num_dossier', 'N° de dossier', '004523.0008'],
+                    ['num_acte', 'N° d\'acte', '2026/1234'],
+                    ['annee', 'Année', '2024'],
+                    ...(exigees(typeEffectif).includes('banque') ? [['banque', 'Banque', 'ex. Banque Fictive']] : []),
+                    ...(estPret(typeEffectif) ? [['montant', 'Montant (facultatif)', 'ex. 2 500 000']] : []),
+                  ].map(([k, label, exemple]) => {
+                    const requis = exigees(typeEffectif).includes(k);
+                    const vide = !String(detail[k] ?? '').trim();
+                    const aRemplir = vide && (aCompleter.includes(k) || (requis && aCompleter.length > 0));
+                    const formatDouteux = k === 'num_acte' && !vide && !FORMAT_ACTE.test(String(detail[k]).trim());
+                    return (
+                      <label key={k} className={`text-[11px] font-bold ${aRemplir ? 'text-red-600' : 'text-slate-400'}`}>
+                        {label}{requis ? ' *' : ''}
+                        <input value={detail[k] ?? ''} onChange={(e) => setDetail((d) => ({ ...d, [k]: e.target.value }))}
+                          inputMode={k === 'annee' || k === 'montant' ? 'numeric' : undefined} maxLength={k === 'annee' ? 4 : 255}
+                          placeholder={exemple}
+                          className={`mt-1 w-full px-3 py-2 rounded-xl border text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-docuflow-secondary ${aRemplir ? 'border-red-300 bg-red-50/40' : 'border-slate-200'}`} />
+                        {formatDouteux && <span className="block mt-1 font-semibold text-amber-600">format attendu : 2026/1234</span>}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </li>

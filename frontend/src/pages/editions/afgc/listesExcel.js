@@ -14,9 +14,12 @@ export const CHAMPS = [
   { cle: 'num_dossier', label: 'N° de dossier', motifs: [/dossier/, /\bcompte\b/, /\bref/] },
   // Le type avant le n° d'acte : « Type de garantie » est un type, pas un numéro.
   { cle: 'type_document', label: 'Typologie', motifs: [/\btype\b/, /nature/, /produit/, /typologie/] },
+  // Le montant avant le n° d'acte : « Montant engagement » est un montant.
+  { cle: 'montant', label: 'Montant', motifs: [/montant/] },
   { cle: 'num_acte', label: 'N° d\'acte', motifs: [/\bacte\b/, /garantie/, /caution/, /engagement/] },
+  { cle: 'banque', label: 'Banque', motifs: [/banque/, /etablissement/] },
   { cle: 'annee', label: 'Année', motifs: [/annee/, /exercice/] },
-  { cle: 'description', label: 'Précisions', motifs: [/observation/, /objet/, /solde/, /montant/, /libelle/, /commentaire/] },
+  { cle: 'description', label: 'Précisions', motifs: [/observation/, /objet/, /solde/, /libelle/, /commentaire/] },
 ];
 
 /** Associe à chaque champ la première colonne dont le titre lui correspond. */
@@ -62,6 +65,9 @@ export function lignesDeFeuille(feuille, indexTitres, assoc, colonnes = [], type
       type_document: typeDeCellule(enTexte(v('type_document')), types)
         || (detecterType(enTexte(v('num_acte')), types).acte ? detecterType(enTexte(v('num_acte')), types).type : ''),
       annee: annee(v('annee')),
+      banque: enTexte(v('banque')),
+      // Montant : nombre de la cellule, sans séparateurs ni « F ».
+      montant: (() => { const m = v('montant'); if (typeof m === 'number') return m > 0 ? String(m) : ''; return enTexte(m).replace(/[^\d,.]/g, ''); })(),
       description: precision && assoc.description !== undefined && titre(assoc.description) && !/observation|precision|commentaire/.test(cle(titre(assoc.description)))
         ? `${titre(assoc.description)} : ${precision}` : precision,
     };

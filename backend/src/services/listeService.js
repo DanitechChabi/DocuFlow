@@ -28,6 +28,7 @@ const loanService = require('./loanService');
 const catalog = require('../config/settingsCatalog');
 const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
 const { lireSaisie, aujourdhui, libelleDemande } = require('../helpers/requestInput');
+const exigencesTypologie = require('../helpers/exigencesTypologie');
 
 const LIMITE_LIGNES = 2000;
 
@@ -78,7 +79,7 @@ async function peutTraiter(tenantId, user) {
  * ou au moins une référence.
  * @returns {{ valeurs: object[], erreurs: {ligne: number, message: string}[] }}
  */
-function lireLignes(lignes, { types = null } = {}) {
+function lireLignes(lignes, { types = null, exigences = null } = {}) {
   const valeurs = [];
   const erreurs = [];
   (Array.isArray(lignes) ? lignes : []).forEach((brute, i) => {
@@ -87,12 +88,18 @@ function lireLignes(lignes, { types = null } = {}) {
       nom_entreprise: l.nom_entreprise,
       num_dossier: l.num_dossier,
       num_acte: l.num_acte,
+      banque: l.banque,
+      montant: l.montant,
       annee: l.annee,
       description: l.description,
     });
     // Typologie : facultative ; si elle est donnée, elle doit être proposée.
     const type = texte(l.type_document, 100);
     if (type && types && !types.includes(type)) errors.push(`Typologie inconnue : « ${type} ».`);
+    else if (!errors.length) {
+      const manque = exigencesTypologie.manque(values, type, exigences);
+      if (manque) errors.push(manque);
+    }
     if (errors.length) erreurs.push({ ligne: i + 1, message: errors.join(' ') });
     else valeurs.push({ ...values, type_document: type });
   });
@@ -160,7 +167,10 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
   }
   if (!Array.isArray(lignes) || !lignes.length) throw erreur(400, 'La liste ne contient aucun dossier.');
   if (lignes.length > LIMITE_LIGNES) throw erreur(400, `Une liste compte au plus ${LIMITE_LIGNES} dossiers : scindez le classeur.`);
-  const { valeurs, erreurs } = lireLignes(lignes, { types: allowedValues(await typesAdmis(tenantId)) });
+  const { valeurs, erreurs } = lireLignes(lignes, {
+    types: allowedValues(await typesAdmis(tenantId)),
+    exigences: await exigencesTypologie.exigencesDe(tenantId),
+  });
   if (erreurs.length) {
     throw erreur(422, `${erreurs.length} ligne${erreurs.length > 1 ? 's' : ''} à corriger avant l'envoi.`, 'LIGNES_INVALIDES', erreurs.slice(0, 50));
   }
@@ -185,12 +195,13 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
     )).rows[0];
     const col = (cle) => valeurs.map((v) => v[cle]);
     const ids = (await client.query(
-      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, lot_id, type_document)
-       SELECT $1, $2, x.n, x.d, x.a, x.y, $3, $4, 'en attente', x.descr, $5, x.t
-         FROM unnest($6::text[], $7::text[], $8::text[], $9::int[], $10::text[], $11::text[]) AS x(n, d, a, y, descr, t)
+      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, lot_id, type_document, banque, montant)
+       SELECT $1, $2, x.n, x.d, x.a, x.y, $3, $4, 'en attente', x.descr, $5, x.t, x.b, x.m
+         FROM unnest($6::text[], $7::text[], $8::text[], $9::int[], $10::text[], $11::text[], $12::text[], $13::numeric[]) AS x(n, d, a, y, descr, t, b, m)
        RETURNING id`,
       [tenantId, emprunteur, leCadre, priorite, l.id,
-        col('nom_entreprise'), col('num_dossier'), col('num_acte'), col('annee'), col('description'), col('type_document')]
+        col('nom_entreprise'), col('num_dossier'), col('num_acte'), col('annee'), col('description'), col('type_document'),
+        col('banque'), col('montant')]
     )).rows.map((x) => x.id);
     await client.query(
       `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)
@@ -257,7 +268,7 @@ async function lister(tenantId, user, { cadre, q } = {}) {
 async function detail(tenantId, listeId, user) {
   const liste = await lireListe(tenantId, listeId, user);
   const r = await db.query(
-    `SELECT r.id, r.nom_entreprise, r.num_dossier, r.num_acte, r.annee, r.description, r.type_document, r.statut, r.created_at,
+    `SELECT r.id, r.nom_entreprise, r.num_dossier, r.num_acte, r.annee, r.description, r.type_document, r.banque, r.montant, r.statut, r.created_at,
             p.remis_at, to_char(p.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue, p.retourne_at, p.signale_at
        FROM requests r
        LEFT JOIN request_loans p ON p.request_id = r.id

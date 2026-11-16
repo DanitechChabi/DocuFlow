@@ -17,6 +17,8 @@ const LIMITES = {
   nom_entreprise: 255,
   num_dossier: 50,
   num_acte: 50,
+  // Garanties bancaires (048) : la banque fait partie de l'identification.
+  banque: 150,
   beneficiaire: 255,
   description: 5000,
 };
@@ -77,6 +79,16 @@ function lireSaisie(body = {}, { now = new Date() } = {}) {
     } else {
       values.date_souhaitee = dateBrute;
     }
+  }
+
+  // Montant (048) : facultatif ; « 2 347 200 », « 2 347 200 F » ou « 2347200,50 ».
+  const montantBrut = texte(body.montant);
+  values.montant = null;
+  if (montantBrut !== null) {
+    const nettoye = montantBrut.replace(/\s|\u00a0|\u202f/g, '').replace(/(f\s*cfa|fcfa|xof|f)$/i, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+    const n = Number(nettoye);
+    if (!/^\d+(\.\d{1,2})?$/.test(nettoye) || !Number.isFinite(n)) errors.push(`Montant invalide : « ${montantBrut} ».`);
+    else values.montant = n;
   }
 
   // Reprise d'une demande antérieure (« Redemander »).

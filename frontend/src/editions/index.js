@@ -59,6 +59,17 @@ const EDITIONS = {
     // agents, et à l'archive qui enregistre une demande en leur nom. Le
     // département d'un agent se lit dans sa section (« DE — Engagement »,
     // « Engagements », « DE »…).
+    // Ce qu'une demande doit comporter selon la typologie (mêmes règles que le
+    // serveur, backend/src/config/editions.js) : l'archive retrouve le dossier
+    // sans rappeler le demandeur.
+    exigences: {
+      'Bonne exécution (CBE)': ['nom_entreprise', 'num_acte'],
+      'Avance de démarrage (CAD)': ['nom_entreprise', 'num_acte'],
+      'Caution professionnelle (CP)': ['nom_entreprise', 'num_acte'],
+      'Caution douanière (CD)': ['nom_entreprise', 'num_acte'],
+      'Prêt': ['nom_entreprise', 'annee'],
+      'Garantie bancaire': ['nom_entreprise', 'banque', 'annee'],
+    },
     departements: [
       { sigle: 'DC', nom: 'Commercial', motifs: ['Consultation', 'Prorogation', 'Actualisation', 'Renouvellement'] },
       { sigle: 'DE', nom: 'Engagement', motifs: ['Restitution de provision', 'Solde créditeur', 'Levée d\'engagement'] },
