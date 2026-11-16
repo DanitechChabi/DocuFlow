@@ -42,6 +42,8 @@ const ALLOWED_ORIGINS = isDev
       'https://docuflow-plateforme.vercel.app',
       'https://docuflow.vercel.app',
       'https://docuflow-afgc.vercel.app',
+      // Site dédié de l'AFGC (édition AFGC de la plateforme, espace « afgc »).
+      'https://afgc.vercel.app',
       // Site vitrine : c'est LUI qui porte la page de tarifs et appelle
       // /api/billing. Sans ces entrées, le bouton de paiement échouerait sur un
       // refus CORS — et le navigateur n'en dirait rien d'exploitable au client.
