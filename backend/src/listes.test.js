@@ -164,6 +164,10 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok((await loan.registre(t, { q: 'zou' })).map((p) => p.nom_entreprise).join() === 'Agro Fictive du Zou', 'registre : recherche par entreprise');
     ok((await loan.registre(t, { q: 'Fanny' })).length === 3, 'registre : recherche par emprunteur');
     await rejette(loan.registre(t, { liste: 'abc' }), 400, 'registre : liste invalide → 400');
+    const jour = require('./helpers/requestInput').aujourdhui();
+    ok((await loan.registre(t, { cadre: 'Soldes créditeurs', du: jour, au: jour })).length === 3, 'registre : sorties du jour (bornes comprises)');
+    ok((await loan.registre(t, { du: '2020-01-01', au: '2020-12-31' })).length === 0, 'registre : période sans sortie');
+    await rejette(loan.registre(t, { du: '2026-02-30' }), 400, 'registre : date impossible → 400');
 
     // --- Retour ---
     const rt = await listes.retourner(t, l1.id, archiviste, { ids: [d1, d3] });
