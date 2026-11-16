@@ -9,6 +9,7 @@ import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements';
 import { Presence, usePresences } from './presence';
 import { CarteACompleter } from './complements';
+import SupprimerListe from './SupprimerListe';
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 
 // ============================================================================
@@ -187,7 +188,8 @@ const MesDossiersAfgc = () => {
                 {ouverte?.id === l.id && (
                   <div className="px-5 pb-5">
                     {ouverte.chargement ? <Chargement /> : (<>
-                      <div className="flex justify-end py-2 border-t border-slate-100">
+                      <div className="flex flex-wrap justify-end gap-2 py-2 border-t border-slate-100">
+                        <SupprimerListe liste={ouverte} onFait={() => { setOuverte(null); charger(); }} />
                         <button type="button" onClick={() => exporterListe(ouverte).catch(() => toast.error('L\'export Excel a échoué.'))}
                           className="px-3.5 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1.5">
                           <FileSpreadsheet size={14} /> Exporter (Excel)
