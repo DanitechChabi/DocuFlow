@@ -385,3 +385,26 @@ exports.uploadLogo = async (req, res) => {
     res.status(500).json({ message: "Erreur lors de l'upload de l'image" });
   }
 };
+
+// Préréglages d'une édition dédiée (ex. AFGC) : motifs, types de dossier,
+// départements — en un geste de l'administrateur, modifiables ensuite.
+exports.etatEdition = async (req, res) => {
+  try {
+    res.json(await require('../services/editionService').etat(req.user.tenant_id, req.query.edition));
+  } catch (err) {
+    if (err.statut) return res.status(err.statut).json({ message: err.message });
+    console.error('[settings] état de l\'édition :', err);
+    res.status(500).json({ message: 'Erreur lors de la lecture de la configuration.' });
+  }
+};
+
+exports.appliquerEdition = async (req, res) => {
+  try {
+    const resultat = await require('../services/editionService').appliquer(req.user.tenant_id, req.user, req.body?.edition);
+    res.json(resultat);
+  } catch (err) {
+    if (err.statut) return res.status(err.statut).json({ message: err.message });
+    console.error('[settings] préréglages d\'édition :', err);
+    res.status(500).json({ message: 'Erreur lors de l\'application de la configuration.' });
+  }
+};

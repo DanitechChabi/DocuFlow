@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PlusCircle, FileSearch, Undo2, ClipboardList, BookOpenCheck, BookOpen, Mail, Warehouse, ListChecks,
-  ArrowRight, AlertTriangle,
+  ArrowRight, AlertTriangle, Settings2, Check, Loader2,
 } from 'lucide-react';
 import { requestService } from '../../services/requestService';
 import { listeService } from '../../services/listeService';
 import { authService } from '../../services/authService';
+import { settingsService } from '../../services/settingsService';
+import { toast } from '../../components/Toast';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useTitrePage } from '../../hooks/useTitrePage';
 import { edition } from '../../editions';
@@ -61,6 +63,7 @@ const AccueilAfgc = () => {
   const { can } = usePermissions();
   const user = authService.getCurrentUser();
   const traite = can('requests.process');
+  const configure = can('settings.manage');
 
   const [mesDemandes, setMesDemandes] = useState(null);
   const [aTraiter, setATraiter] = useState(null);
@@ -68,6 +71,28 @@ const AccueilAfgc = () => {
   const [sorties, setSorties] = useState(null);
 
   useTitrePage('Accueil');
+
+  // Administrateur : la configuration de l'AFGC (motifs, types de dossier,
+  // départements) s'installe d'un clic, tant qu'elle ne l'a jamais été.
+  const [config, setConfig] = useState(null);
+  const [installation, setInstallation] = useState(false);
+  useEffect(() => {
+    if (!configure || !edition?.id) return;
+    settingsService.etatEdition(edition.id).then(setConfig).catch(() => setConfig(null));
+  }, [configure]);
+  const aInstaller = Boolean(config && !config.appliquee && Object.values(config.manquants || {}).some((n) => n > 0));
+  const installer = async () => {
+    setInstallation(true);
+    try {
+      const r = await settingsService.appliquerEdition(edition.id);
+      toast.success(`Configuration de l'AFGC installée : ${r.motifs} motifs, ${r.types} types de dossier, ${r.departements_ajoutes} département${r.departements_ajoutes > 1 ? 's' : ''} ajouté${r.departements_ajoutes > 1 ? 's' : ''}.`);
+      setConfig(null);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'La configuration n\'a pas pu être installée.');
+    } finally {
+      setInstallation(false);
+    }
+  };
 
   const charger = useCallback(async () => {
     if (traite) {
@@ -123,6 +148,23 @@ const AccueilAfgc = () => {
         )}
       </div>
 
+      {aInstaller && (
+        <section className="rounded-3xl border-2 border-dashed border-green-200 bg-green-50/70 p-5 md:p-6 mb-6 flex flex-wrap items-center gap-4 animate-fade-in-up">
+          <div className="w-12 h-12 rounded-2xl bg-white text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Settings2 size={22} /></div>
+          <div className="min-w-0 flex-1 basis-72">
+            <h2 className="font-black text-slate-900">Installer la configuration de l'AFGC</h2>
+            <p className="text-sm text-slate-600">
+              Les {config.attendus.motifs} motifs de demande, les {config.attendus.types} types de dossier et les {config.attendus.departements} départements, en un clic.
+              Ce que vous avez déjà ajouté est gardé, et tout reste modifiable dans Réglages.
+            </p>
+          </div>
+          <button type="button" onClick={installer} disabled={installation}
+            className="px-5 py-3 rounded-2xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60">
+            {installation ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Installer
+          </button>
+        </section>
+      )}
+
       {traite ? (
         <>
           <div className="grid gap-5 md:grid-cols-3">
@@ -140,7 +182,7 @@ const AccueilAfgc = () => {
               )}
             </CarteAction>
             <CarteAction to="/demandes/prets" icone={BookOpenCheck} titre="Dossiers sortis"
-              texte="Qui a quel dossier, dans quel cadre, et pour quand il doit revenir.">
+              texte="Qui a quel dossier, pour quel motif, et pour quand il doit revenir.">
               {sorties !== null && <Pastille ton="vert">{sorties.length} transmis</Pastille>}
               {enRetard.length > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {enRetard.length} en retard</Pastille>}
             </CarteAction>

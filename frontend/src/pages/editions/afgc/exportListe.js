@@ -10,10 +10,10 @@ import { etatDossierListe } from './vocabulaire';
 export function exporterListe(liste) {
   return exporterClasseur(nomFichier(liste.libelle, liste.cadre), [{
     nom: liste.libelle,
-    entetes: ['N°', 'Entreprise', 'N° de dossier', 'N° d\'acte', 'Année', 'Précisions', 'État', 'Transmis le', 'Retour prévu', 'Retourné le'],
-    largeurs: [6, 34, 14, 16, 7, 30, 24, 12, 12, 12],
+    entetes: ['N°', 'Entreprise', 'Type', 'N° de dossier', 'N° d\'acte', 'Année', 'Précisions', 'État', 'Transmis le', 'Retour prévu', 'Retourné le'],
+    largeurs: [6, 34, 24, 14, 16, 7, 30, 24, 12, 12, 12],
     lignes: liste.dossiers.map((d, i) => [
-      i + 1, d.nom_entreprise || '', d.num_dossier || '', d.num_acte || '', d.annee || '', d.description || '',
+      i + 1, d.nom_entreprise || '', d.type_document || '', d.num_dossier || '', d.num_acte || '', d.annee || '', d.description || '',
       etatDossierListe(d).texte, dateExcel(d.remis_at), dateExcel(d.date_retour_prevue), dateExcel(d.retourne_at),
     ]),
   }, {
@@ -21,7 +21,7 @@ export function exporterListe(liste) {
     entetes: [liste.libelle, ''],
     largeurs: [22, 60],
     lignes: [
-      ['Cadre', liste.cadre],
+      ['Motif', liste.cadre],
       ['Pour', liste.demandeur_name || ''],
       ['Déposée le', dateExcel(liste.created_at)],
       ['Classeur d\'origine', liste.fichier || ''],

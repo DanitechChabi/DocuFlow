@@ -67,6 +67,7 @@ exports.registre = async (req, res) => {
       q: req.query.q || undefined,
       du: req.query.du || undefined,
       au: req.query.au || undefined,
+      type: req.query.type || undefined,
     });
     res.json(prets);
   } catch (err) { repondreErreur(res, err, 'la lecture du registre des prêts'); }

@@ -55,6 +55,12 @@ async function cadresAdmis(tenantId) {
   return normalizeOptions(settings.request_motifs, fallback('request_motifs'));
 }
 
+/** Types de dossier admis (attestation, bonne exécution…) : réglables par organisation. */
+async function typesAdmis(tenantId) {
+  const settings = await settingsService.getAll(tenantId);
+  return normalizeOptions(settings.request_document_types, fallback('request_document_types'));
+}
+
 /** Priorité donnée aux demandes déposées sans en choisir : celle réglée par l'organisation. */
 async function prioriteParDefaut(tenantId) {
   const settings = await settingsService.getAll(tenantId);
@@ -72,7 +78,7 @@ async function peutTraiter(tenantId, user) {
  * ou au moins une référence.
  * @returns {{ valeurs: object[], erreurs: {ligne: number, message: string}[] }}
  */
-function lireLignes(lignes) {
+function lireLignes(lignes, { types = null } = {}) {
   const valeurs = [];
   const erreurs = [];
   (Array.isArray(lignes) ? lignes : []).forEach((brute, i) => {
@@ -84,8 +90,11 @@ function lireLignes(lignes) {
       annee: l.annee,
       description: l.description,
     });
+    // Type de dossier : facultatif ; s'il est donné, il doit être proposé.
+    const type = texte(l.type_document, 100);
+    if (type && types && !types.includes(type)) errors.push(`Type de dossier inconnu : « ${type} ».`);
     if (errors.length) erreurs.push({ ligne: i + 1, message: errors.join(' ') });
-    else valeurs.push(values);
+    else valeurs.push({ ...values, type_document: type });
   });
   return { valeurs, erreurs };
 }
@@ -147,11 +156,11 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
   const cadres = await cadresAdmis(tenantId);
   const leCadre = texte(cadre, 100);
   if (!leCadre || !allowedValues(cadres).includes(leCadre)) {
-    throw erreur(400, `Cadre non proposé : « ${leCadre || ''} ». Choisissez parmi : ${cadres.map((c) => c.label).join(', ')}.`);
+    throw erreur(400, `Motif non proposé : « ${leCadre || ''} ». Choisissez parmi : ${cadres.map((c) => c.label).join(', ')}.`);
   }
   if (!Array.isArray(lignes) || !lignes.length) throw erreur(400, 'La liste ne contient aucun dossier.');
   if (lignes.length > LIMITE_LIGNES) throw erreur(400, `Une liste compte au plus ${LIMITE_LIGNES} dossiers : scindez le classeur.`);
-  const { valeurs, erreurs } = lireLignes(lignes);
+  const { valeurs, erreurs } = lireLignes(lignes, { types: allowedValues(await typesAdmis(tenantId)) });
   if (erreurs.length) {
     throw erreur(422, `${erreurs.length} ligne${erreurs.length > 1 ? 's' : ''} à corriger avant l'envoi.`, 'LIGNES_INVALIDES', erreurs.slice(0, 50));
   }
@@ -176,12 +185,12 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
     )).rows[0];
     const col = (cle) => valeurs.map((v) => v[cle]);
     const ids = (await client.query(
-      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, lot_id)
-       SELECT $1, $2, x.n, x.d, x.a, x.y, $3, $4, 'en attente', x.descr, $5
-         FROM unnest($6::text[], $7::text[], $8::text[], $9::int[], $10::text[]) AS x(n, d, a, y, descr)
+      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, lot_id, type_document)
+       SELECT $1, $2, x.n, x.d, x.a, x.y, $3, $4, 'en attente', x.descr, $5, x.t
+         FROM unnest($6::text[], $7::text[], $8::text[], $9::int[], $10::text[], $11::text[]) AS x(n, d, a, y, descr, t)
        RETURNING id`,
       [tenantId, emprunteur, leCadre, priorite, l.id,
-        col('nom_entreprise'), col('num_dossier'), col('num_acte'), col('annee'), col('description')]
+        col('nom_entreprise'), col('num_dossier'), col('num_acte'), col('annee'), col('description'), col('type_document')]
     )).rows.map((x) => x.id);
     await client.query(
       `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)
@@ -248,7 +257,7 @@ async function lister(tenantId, user, { cadre, q } = {}) {
 async function detail(tenantId, listeId, user) {
   const liste = await lireListe(tenantId, listeId, user);
   const r = await db.query(
-    `SELECT r.id, r.nom_entreprise, r.num_dossier, r.num_acte, r.annee, r.description, r.statut, r.created_at,
+    `SELECT r.id, r.nom_entreprise, r.num_dossier, r.num_acte, r.annee, r.description, r.type_document, r.statut, r.created_at,
             p.remis_at, to_char(p.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue, p.retourne_at, p.signale_at
        FROM requests r
        LEFT JOIN request_loans p ON p.request_id = r.id
@@ -340,15 +349,15 @@ async function dossiersConnus(tenantId, user, q) {
   }
   const r = await db.query(
     `WITH s AS (
-       SELECT nom_entreprise, num_dossier, num_acte, annee, max(created_at) AS derniere, count(*)::int AS fois
+       SELECT nom_entreprise, num_dossier, num_acte, annee, type_document, max(created_at) AS derniere, count(*)::int AS fois
          FROM requests
         WHERE tenant_id = $1 ${portee}
           AND (nom_entreprise ILIKE $2 OR num_dossier ILIKE $2 OR num_acte ILIKE $2)
-        GROUP BY nom_entreprise, num_dossier, num_acte, annee
+        GROUP BY nom_entreprise, num_dossier, num_acte, annee, type_document
         ORDER BY max(created_at) DESC
         LIMIT 8
      )
-     SELECT s.nom_entreprise, s.num_dossier, s.num_acte, s.annee, s.fois,
+     SELECT s.nom_entreprise, s.num_dossier, s.num_acte, s.annee, s.type_document, s.fois,
             (SELECT to_char(p.date_retour_prevue, 'YYYY-MM-DD')
                FROM requests r2 JOIN request_loans p ON p.request_id = r2.id
               WHERE r2.tenant_id = $1 AND p.retourne_at IS NULL
@@ -365,5 +374,5 @@ async function dossiersConnus(tenantId, user, q) {
 
 module.exports = {
   LIMITE_LIGNES, lireLignes, etatDossier,
-  cadresAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
+  cadresAdmis, typesAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
 };

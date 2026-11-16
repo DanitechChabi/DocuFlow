@@ -50,6 +50,8 @@ router.put('/', authMiddleware, requirePermission('settings.manage'), settingsCo
 router.post('/reset', authMiddleware, requirePermission('settings.manage'), settingsController.resetSettings);
 // POST /provision — recrée les objets par défaut manquants (idempotent)
 router.post('/provision', authMiddleware, requirePermission('settings.manage'), settingsController.provisionDefaults);
+router.get('/edition', authMiddleware, requirePermission('settings.manage'), settingsController.etatEdition);
+router.post('/edition', authMiddleware, requirePermission('settings.manage'), settingsController.appliquerEdition);
 router.post('/logo', authMiddleware, requirePermission('settings.manage'), upload.single('logo'), settingsController.uploadLogo);
 
 module.exports = router;

@@ -54,6 +54,15 @@ const EDITIONS = {
       { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
       { to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
     ],
+    // Départements dont les demandes suivent des motifs habituels : ces motifs
+    // sont proposés en premier — le premier d'entre eux par défaut — à leurs
+    // agents, et à l'archive qui enregistre une demande en leur nom. Le
+    // département d'un agent se lit dans sa section (« DE — Engagement »,
+    // « Engagements », « DE »…).
+    departements: [
+      { sigle: 'DC', nom: 'Commercial', motifs: ['Consultation', 'Prorogation', 'Actualisation', 'Renouvellement'] },
+      { sigle: 'DE', nom: 'Engagement', motifs: ['Restitution de provision', 'Solde créditeur', 'Levée d\'engagement'] },
+    ],
     // Espaces sans visite guidée automatique : l'édition en remplace les écrans,
     // dont les phrases d'aide suffisent.
     visitesMasquees: ['accueil', 'demandes'],

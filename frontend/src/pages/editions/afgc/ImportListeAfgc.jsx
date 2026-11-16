@@ -3,6 +3,7 @@ import { FileSpreadsheet, X, Upload, CheckCircle2, AlertCircle, Loader2 } from '
 import Modal from '../../../components/ui/Modal';
 import { lireClasseur } from '../../../utils/classeur';
 import { listeService } from '../../../services/listeService';
+import { requestService } from '../../../services/requestService';
 import { CHAMPS, preparerFeuille, lignesDeFeuille } from './listesExcel';
 import { intitule, references } from './vocabulaire';
 import { ChoixCadre } from './elements';
@@ -22,6 +23,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState('');
   const [resultats, setResultats] = useState(null);
+  const [types, setTypes] = useState([]);
   const entree = useRef(null);
 
   useEffect(() => {
@@ -34,8 +36,11 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
     if (!f) return;
     setErreur(''); setLecture(true); setResultats(null);
     try {
+      // Les types de dossier de l'organisation, pour reconnaître la colonne « Type ».
+      const typesConnus = types.length ? types : ((await requestService.getOptions().catch(() => null))?.documentTypes || []);
+      if (!types.length) setTypes(typesConnus);
       const classeur = await lireClasseur(f);
-      const prets = classeur.feuilles.map((feuille) => ({ feuille, libelle: feuille.nom, inclus: true, ...preparerFeuille(feuille) }))
+      const prets = classeur.feuilles.map((feuille) => ({ feuille, libelle: feuille.nom, inclus: true, ...preparerFeuille(feuille, typesConnus) }))
         .filter((x) => x.lignes.length);
       if (!prets.length) setErreur('Aucune ligne de dossier n\'a été trouvée dans ce classeur.');
       setFichier(f); setFeuilles(prets);
@@ -49,7 +54,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
   const modifier = (i, changement) => setFeuilles((fs) => fs.map((f, k) => {
     if (k !== i) return f;
     const suivant = { ...f, ...changement };
-    if (changement.assoc) suivant.lignes = lignesDeFeuille(f.feuille, f.indexTitres, changement.assoc, f.colonnes);
+    if (changement.assoc) suivant.lignes = lignesDeFeuille(f.feuille, f.indexTitres, changement.assoc, f.colonnes, types);
     return suivant;
   }));
 
@@ -66,7 +71,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
           cadre,
           fichier: fichier?.name,
           // `rang` (ligne du tableur) reste ici : il sert à situer une erreur.
-          lignes: f.lignes.map(({ nom_entreprise, num_dossier, num_acte, annee, description }) => ({ nom_entreprise, num_dossier, num_acte, annee, description })),
+          lignes: f.lignes.map(({ nom_entreprise, num_dossier, num_acte, annee, description, type_document }) => ({ nom_entreprise, num_dossier, num_acte, annee, description, type_document })),
         });
         res.push({ libelle: liste.libelle, ok: true, n: liste.dossiers.length });
       } catch (e) {
@@ -132,7 +137,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
           ) : (
             <>
               <div>
-                <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Cadre de la sortie</div>
+                <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Motif de la demande</div>
                 <ChoixCadre cadres={cadres} valeur={cadre} onChange={setCadre} />
               </div>
               {feuilles.map((f, i) => (
@@ -143,7 +148,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
                       className="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:border-docuflow-secondary" aria-label="Nom de la liste" />
                     <span className="text-sm font-bold text-slate-500">{f.lignes.length} dossier{f.lignes.length > 1 ? 's' : ''}</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3">
                     {CHAMPS.map((champ) => (
                       <label key={champ.cle} className="text-[11px] font-bold text-slate-400">
                         {champ.label}
