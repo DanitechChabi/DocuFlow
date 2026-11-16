@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight } from 'lucide-react';
+import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { exporterListe } from './exportListe';
 import { requestService } from '../../../services/requestService';
 import { listeService } from '../../../services/listeService';
 import { toast } from '../../../components/Toast';
@@ -198,6 +199,10 @@ const TraitementAfgc = () => {
                             {coches.size ? `Retourné (${cochesEtat('transmis')})` : `Tout retourné (${compte('transmis')})`}
                           </button>
                           {coches.size > 0 && <button type="button" onClick={() => setCoches(new Set())} className="px-3 py-2 text-sm font-bold text-slate-400 hover:text-slate-600">Décocher</button>}
+                          <button type="button" onClick={() => exporterListe(ouverte).catch(() => toast.error('L\'export Excel a échoué.'))}
+                            className="ml-auto px-3.5 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1.5">
+                            <FileSpreadsheet size={14} /> Exporter (Excel)
+                          </button>
                         </div>
                         <ul className="divide-y divide-slate-100">
                           {ouverte.dossiers.map((d) => {

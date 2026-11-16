@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { FileSearch, ListChecks, Search, ChevronRight, X, Loader2, PlusCircle } from 'lucide-react';
+import { FileSearch, ListChecks, Search, ChevronRight, X, Loader2, PlusCircle, FileSpreadsheet } from 'lucide-react';
+import { exporterListe } from './exportListe';
 import { requestService } from '../../../services/requestService';
 import { listeService } from '../../../services/listeService';
 import { toast } from '../../../components/Toast';
@@ -161,15 +162,21 @@ const MesDossiersAfgc = () => {
                 </button>
                 {ouverte?.id === l.id && (
                   <div className="px-5 pb-5">
-                    {ouverte.chargement ? <Chargement /> : (
-                      <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                    {ouverte.chargement ? <Chargement /> : (<>
+                      <div className="flex justify-end py-2 border-t border-slate-100">
+                        <button type="button" onClick={() => exporterListe(ouverte).catch(() => toast.error('L\'export Excel a échoué.'))}
+                          className="px-3.5 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1.5">
+                          <FileSpreadsheet size={14} /> Exporter (Excel)
+                        </button>
+                      </div>
+                      <ul className="divide-y divide-slate-100">
                         {ouverte.dossiers.map((d) => (
                           <LigneDossier key={d.id} d={d} etat={etatDossierListe(d)}>
                             {d.etat === 'transmis' && d.date_retour_prevue && <span className="text-xs text-slate-500">retour prévu le <strong>{dateCourte(d.date_retour_prevue)}</strong></span>}
                           </LigneDossier>
                         ))}
                       </ul>
-                    )}
+                    </>)}
                   </div>
                 )}
               </div>

@@ -329,11 +329,21 @@ async function confirmer(tenantId, requestId, user) {
  *   créditeurs », « Commissaire aux comptes »…)
  * @param {number} [liste] liste de demandes (047)
  * @param {string} [q] entreprise, n° de dossier, n° d'acte, description ou emprunteur
+ * @param {string} [du] [au] période de sortie (AAAA-MM-JJ, bornes comprises)
  */
-async function registre(tenantId, { etat, cadre, liste, q } = {}) {
+async function registre(tenantId, { etat, cadre, liste, q, du, au } = {}) {
   if (etat && !ETATS.includes(etat)) throw erreur(400, `État inconnu : ${etat} (attendu : ${ETATS.join(', ')}).`);
   const conds = ['l.tenant_id = $1'];
   const params = [tenantId];
+  for (const [borne, valeur] of [['du', du], ['au', au]]) {
+    const s = texte(valeur, 10);
+    if (!s) continue;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    const d = m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    if (!d || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) throw erreur(400, `Date « ${borne} » invalide : « ${s} » (attendu : AAAA-MM-JJ).`);
+    params.push(s);
+    conds.push(borne === 'du' ? `l.remis_at >= $${params.length}::date` : `l.remis_at < ($${params.length}::date + 1)`);
+  }
   if (etat === 'retourne') conds.push('l.retourne_at IS NOT NULL');
   if (etat === 'signale') conds.push('l.retourne_at IS NULL AND l.signale_at IS NOT NULL');
   if (etat === 'en_retard') conds.push('l.retourne_at IS NULL AND l.signale_at IS NULL AND l.date_retour_prevue < CURRENT_DATE');
