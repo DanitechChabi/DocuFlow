@@ -46,7 +46,7 @@ const LicenseBlockingOverlay = ({ message }) => {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-4">Options de renouvellement</p>
 
             <a
-              href="https://getdocuflow.vercel.app/tarifs"
+              href="https://getdocuflow-bj.vercel.app/tarifs"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 p-4 bg-docuflow-secondary text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200 group"
