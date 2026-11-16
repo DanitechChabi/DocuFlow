@@ -11,6 +11,7 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const settingsService = require('./settingsService');
+const { ARMOIRE_SQL } = require('./rangementService');
 
 function erreur(statut, message) {
   const e = new Error(message);
@@ -176,9 +177,9 @@ async function semaine(tenantId, debut) {
   const s = semaineDe(debut);
   if (!s) throw erreur(400, 'Semaine invalide.');
   const r = await db.query(
-    `SELECT id, to_char(date_point, 'YYYY-MM-DD') AS date_point, rubrique, num_ordre, num_actes, denomination, lettre,
-            type_garantie, montant, agent
-       FROM dossiers_entres WHERE tenant_id = $1 AND semaine = $2::date
+    `SELECT d.id, to_char(d.date_point, 'YYYY-MM-DD') AS date_point, d.rubrique, d.num_ordre, d.num_actes, d.denomination, d.lettre,
+            d.type_garantie, d.montant, d.agent, ${ARMOIRE_SQL('d')} AS armoire
+       FROM dossiers_entres d WHERE d.tenant_id = $1 AND d.semaine = $2::date
       ORDER BY lettre NULLS LAST, upper(denomination), date_point, num_ordre`,
     [tenantId, s]
   );
@@ -209,9 +210,9 @@ async function rechercher(tenantId, { q, type, agent, du, au } = {}) {
   if (jour(au)) conds.push(`date_point <= ${p(String(au).slice(0, 10))}::date`);
   if (conds.length === 1) throw erreur(400, 'Tapez un nom ou un n° d\'acte, ou choisissez un filtre.');
   const r = await db.query(
-    `SELECT id, to_char(date_point, 'YYYY-MM-DD') AS date_point, to_char(semaine, 'YYYY-MM-DD') AS semaine, rubrique, num_ordre,
-            num_actes, denomination, lettre, type_garantie, montant, agent
-       FROM dossiers_entres WHERE ${conds.join(' AND ')}
+    `SELECT d.id, to_char(d.date_point, 'YYYY-MM-DD') AS date_point, to_char(d.semaine, 'YYYY-MM-DD') AS semaine, d.rubrique, d.num_ordre,
+            d.num_actes, d.denomination, d.lettre, d.type_garantie, d.montant, d.agent, ${ARMOIRE_SQL('d')} AS armoire
+       FROM dossiers_entres d WHERE ${conds.join(' AND ')}
       ORDER BY date_point DESC, num_ordre LIMIT 300`,
     params
   );
@@ -283,6 +284,7 @@ async function chercherEntrees(tenantId, { nom, numeros, annee }) {
     `SELECT *, count(*) OVER ()::int AS total FROM (
        SELECT to_char(date_point, 'YYYY-MM-DD') AS date_point, to_char(semaine, 'YYYY-MM-DD') AS semaine,
               to_char(semaine + 6, 'YYYY-MM-DD') AS au, rubrique, num_actes, denomination, lettre, type_garantie,
+              ${ARMOIRE_SQL('dossiers_entres')} AS armoire,
               (${scoreNom})::float AS score_nom, ${ordreAnnee} AS ordre_annee
          FROM dossiers_entres WHERE ${conds.join(' AND ')}
      ) t

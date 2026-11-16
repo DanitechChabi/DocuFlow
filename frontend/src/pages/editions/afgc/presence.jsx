@@ -76,6 +76,7 @@ const Detail = ({ e, archiviste }) => (
     <Etiquette titre="Semaine" ton="bg-white border-green-300 text-green-900">{semaineLisible(e.semaine, e.au).replace(/^du /, '').replace(' au ', ' → ')}</Etiquette>
     <Etiquette titre="Point du" ton="bg-amber-50 border-amber-300 text-amber-900">{jourLisible(e.date_point)}</Etiquette>
     {archiviste && e.lettre && <Etiquette titre="Lettre" ton="bg-docuflow-secondary border-docuflow-secondary text-white">{e.lettre}</Etiquette>}
+    {archiviste && e.armoire && <Etiquette titre="Armoire" ton="bg-violet-600 border-violet-600 text-white">{e.armoire}</Etiquette>}
   </span>
 );
 

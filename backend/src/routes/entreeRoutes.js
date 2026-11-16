@@ -19,5 +19,12 @@ router.get('/recherche', entreeController.rechercher);
 router.get('/filtres', entreeController.filtres);
 router.get('/fichiers', entreeController.fichiers);
 router.delete('/fichiers', entreeController.supprimerFichier);
+// Plan de rangement (052).
+router.get('/rangements', entreeController.rangements);
+router.post('/rangements', entreeController.creerRangement);
+router.get('/rangements/plan', entreeController.planRangement);
+router.post('/rangements/plan', entreeController.installerPlan);
+router.put('/rangements/:id', entreeController.modifierRangement);
+router.delete('/rangements/:id', entreeController.supprimerRangement);
 
 module.exports = router;

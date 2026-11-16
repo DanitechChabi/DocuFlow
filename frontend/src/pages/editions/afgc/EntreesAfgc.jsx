@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2 } from 'lucide-react';
+import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2, Archive, Pencil, Plus } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { lireClasseur } from '../../../utils/classeur';
 import { entreeService } from '../../../services/entreeService';
@@ -150,6 +150,11 @@ const ImportPoints = ({ open, onClose, onFini }) => {
   );
 };
 
+/** Les armoires d'un groupe de dossiers (une lettre peut être partagée entre deux). */
+const armoiresDe = (liste) => [...new Set(liste.map((d) => d.armoire).filter(Boolean))].join(' / ');
+/** Version courte, sans le lieu : « Armoire 3 ou Armoire 4 ». */
+const armoiresCourtes = (liste) => [...new Set(liste.flatMap((d) => (d.armoire ? d.armoire.split(' ou ').map((a) => a.split(' · ')[0]) : [])))].join(' ou ');
+
 /** Bordereau de classement imprimé : la semaine, lettre par lettre. */
 const BordereauImprime = ({ detail, groupes }) => (
   <div className="certificat">
@@ -157,7 +162,7 @@ const BordereauImprime = ({ detail, groupes }) => (
     <p>{detail.dossiers.length} dossiers · édité le {new Date().toLocaleDateString('fr-FR')}</p>
     {groupes.map(([lettre, liste]) => (
       <div key={lettre} style={{ breakInside: 'avoid', marginTop: 12 }}>
-        <h2>{lettre === 'Sans nom' ? lettre : `Lettre ${lettre}`} — {liste.length} dossier{liste.length > 1 ? 's' : ''}</h2>
+        <h2>{lettre === 'Sans nom' ? lettre : `Lettre ${lettre}`} — {liste.length} dossier{liste.length > 1 ? 's' : ''}{armoiresDe(liste) ? ` — ${armoiresDe(liste)}` : ''}</h2>
         <table>
           <thead><tr><th>Dénomination</th><th>N° actes</th><th>Type</th><th>Point du</th><th>Agent</th><th>Rangé</th></tr></thead>
           <tbody>
@@ -279,6 +284,184 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
   );
 };
 
+const LETTRES = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+const VIDE = { nom: '', lieu: '', debut_semaine: '', debut_lettre: '', fin_semaine: '', fin_lettre: '' };
+
+/** « ven. 7 févr. 2025, lettre C » ; sans lettre : depuis le début / jusqu'à la fin de la semaine. */
+const borne = (semaine, lettre, debut) => {
+  const fin = finSemaine(semaine);
+  const libelle = `semaine du ${jourLong(semaine)} au ${jourLong(fin)} ${fin.slice(0, 4)}`;
+  if (!lettre) return { libelle, lettre: debut ? 'depuis le début' : 'jusqu\'à la fin' };
+  return { libelle, lettre: `lettre ${lettre === '#' ? '# (chiffres)' : lettre}` };
+};
+
+/**
+ * Plan de rangement : les armoires, chacune de (semaine, lettre) à (semaine,
+ * lettre). Les dossiers entrés y sont situés automatiquement — semaines,
+ * recherche, demandes.
+ */
+const PlanRangement = ({ onChange }) => {
+  const [armoires, setArmoires] = useState(null);
+  const [plan, setPlan] = useState({ plan: [], manquants: 0 });
+  const [edite, setEdite] = useState(null); // null, 'nouvelle' ou l'id
+  const [form, setForm] = useState(VIDE);
+  const [envoi, setEnvoi] = useState(false);
+  const [aSupprimer, setASupprimer] = useState(null);
+  const charger = useCallback(() => {
+    entreeService.rangements().then(setArmoires).catch(() => setArmoires([]));
+    entreeService.planRangement().then(setPlan).catch(() => setPlan({ plan: [], manquants: 0 }));
+  }, []);
+  useEffect(() => { charger(); }, [charger]);
+  const ouvrir = (a) => {
+    setEdite(a ? a.id : 'nouvelle');
+    setForm(a ? { ...VIDE, ...a, lieu: a.lieu || '', debut_lettre: a.debut_lettre || '', fin_lettre: a.fin_lettre || '' }
+      : { ...VIDE, lieu: armoires?.[armoires.length - 1]?.lieu || '', nom: `Armoire ${(armoires?.length || 0) + 1}` });
+  };
+  const enregistrer = async (e) => {
+    e.preventDefault();
+    setEnvoi(true);
+    try {
+      if (edite === 'nouvelle') await entreeService.creerRangement(form);
+      else await entreeService.modifierRangement(edite, form);
+      toast.success(`${form.nom} enregistrée.`);
+      setEdite(null); charger(); onChange?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'L\'armoire n\'a pas pu être enregistrée.');
+    } finally { setEnvoi(false); }
+  };
+  const installer = async () => {
+    setEnvoi(true);
+    try {
+      const r = await entreeService.installerPlan();
+      toast.success(`${r.ajoutees} armoire${r.ajoutees > 1 ? 's' : ''} ajoutée${r.ajoutees > 1 ? 's' : ''} au plan.`);
+      charger(); onChange?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Le plan n\'a pas pu être installé.');
+    } finally { setEnvoi(false); }
+  };
+  const supprimer = async () => {
+    setEnvoi(true);
+    try {
+      await entreeService.supprimerRangement(aSupprimer.id);
+      toast.success(`${aSupprimer.nom} retirée du plan.`);
+      setASupprimer(null); charger(); onChange?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Suppression impossible.');
+    } finally { setEnvoi(false); }
+  };
+  const champ = 'mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 bg-white';
+  const choixLettre = (cle, vide) => (
+    <select value={form[cle]} onChange={(e) => setForm((f) => ({ ...f, [cle]: e.target.value }))} className={champ}>
+      <option value="">{vide}</option>
+      {LETTRES.map((l) => <option key={l} value={l}>{l === '#' ? '# (chiffres)' : l}</option>)}
+    </select>
+  );
+  if (armoires === null) return <Chargement />;
+  return (
+    <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+      <div className="flex flex-wrap items-start gap-3 mb-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-black text-slate-900">Plan de rangement</h2>
+          <p className="text-sm font-semibold text-slate-600">
+            Chaque armoire va d'une semaine et d'une lettre à une autre. Les dossiers y sont situés d'eux-mêmes : semaines, recherche et demandes affichent leur armoire.
+          </p>
+        </div>
+        <button type="button" onClick={() => ouvrir(null)} className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 shadow-md shadow-violet-200">
+          <Plus size={16} /> Ajouter une armoire
+        </button>
+      </div>
+
+      {plan.manquants > 0 && (
+        <div className="resultat-lumiere mb-4 rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4 flex flex-wrap items-center gap-3">
+          <span className="lumiere-pastille w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-black text-violet-950">Plan du couloir des toilettes : {plan.manquants} armoire{plan.manquants > 1 ? 's' : ''} à installer</div>
+            <div className="text-sm font-semibold text-violet-900/80">
+              {plan.plan.map((a) => a.nom).join(', ')} — semaines de 2025, telles que relevées à l'archive. Tout reste modifiable.
+            </div>
+          </div>
+          <button type="button" onClick={installer} disabled={envoi} className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
+            {envoi ? <Loader2 size={15} className="animate-spin" /> : <Archive size={15} />} Installer le plan
+          </button>
+        </div>
+      )}
+
+      {edite && (
+        <form onSubmit={enregistrer} className="mb-4 rounded-2xl border-2 border-violet-200 bg-violet-50/50 p-4 grid gap-3 md:grid-cols-2 animate-fade-in-up">
+          <label className="text-sm font-bold text-slate-700">Nom<input value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} maxLength={60} placeholder="Armoire 3" className={champ} /></label>
+          <label className="text-sm font-bold text-slate-700">Lieu<input value={form.lieu} onChange={(e) => setForm((f) => ({ ...f, lieu: e.target.value }))} maxLength={120} placeholder="Couloir des toilettes" className={champ} /></label>
+          <fieldset className="rounded-xl bg-white border border-slate-200 p-3">
+            <legend className="px-1 text-sm font-black text-slate-800">Commence à</legend>
+            <label className="text-sm font-bold text-slate-700">Un jour de la semaine<input type="date" value={form.debut_semaine} onChange={(e) => setForm((f) => ({ ...f, debut_semaine: e.target.value }))} className={champ} /></label>
+            <label className="block mt-2 text-sm font-bold text-slate-700">Lettre{choixLettre('debut_lettre', 'Début de la semaine')}</label>
+          </fieldset>
+          <fieldset className="rounded-xl bg-white border border-slate-200 p-3">
+            <legend className="px-1 text-sm font-black text-slate-800">Finit à</legend>
+            <label className="text-sm font-bold text-slate-700">Un jour de la semaine<input type="date" value={form.fin_semaine} onChange={(e) => setForm((f) => ({ ...f, fin_semaine: e.target.value }))} className={champ} /></label>
+            <label className="block mt-2 text-sm font-bold text-slate-700">Lettre{choixLettre('fin_lettre', 'Fin de la semaine')}</label>
+          </fieldset>
+          <p className="md:col-span-2 text-sm text-slate-600">N'importe quel jour suffit : la semaine de production (vendredi → jeudi) est retrouvée. Une lettre partagée entre deux armoires (« S », puis « S' ») se met dans les deux.</p>
+          <div className="md:col-span-2 flex justify-end gap-2">
+            <button type="button" onClick={() => setEdite(null)} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Annuler</button>
+            <button type="submit" disabled={envoi} className="px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
+              {envoi ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Enregistrer
+            </button>
+          </div>
+        </form>
+      )}
+
+      {armoires.length ? (
+        <ul className="grid gap-3 md:grid-cols-2">
+          {armoires.map((a) => {
+            const de = borne(a.debut_semaine, a.debut_lettre, true);
+            const a2 = borne(a.fin_semaine, a.fin_lettre, false);
+            return (
+              <li key={a.id} className="rounded-2xl border-2 border-violet-200 bg-white p-4">
+                <div className="flex items-start gap-3">
+                  <span className="w-11 h-11 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-lg font-black text-slate-900 leading-tight">{a.nom}</div>
+                    {a.lieu && <div className="text-sm font-semibold text-slate-600">{a.lieu}</div>}
+                  </div>
+                  <button type="button" onClick={() => ouvrir(a)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Modifier ${a.nom}`}><Pencil size={16} /></button>
+                  <button type="button" onClick={() => setASupprimer(a)} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600" aria-label={`Retirer ${a.nom}`}><Trash2 size={16} /></button>
+                </div>
+                <div className="mt-3 grid gap-2 text-sm">
+                  <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-green-700">De</span>
+                    <div className="font-black text-green-950">{de.libelle}</div>
+                    <div className="font-bold text-green-800">{de.lettre}</div>
+                  </div>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700">À</span>
+                    <div className="font-black text-amber-950">{a2.libelle}</div>
+                    <div className="font-bold text-amber-800">{a2.lettre}</div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : !plan.manquants && <p className="text-base text-slate-600">Aucune armoire. Ajoutez-en une : nom, lieu, et la plage de semaines et de lettres qu'elle contient.</p>}
+
+      <Modal open={Boolean(aSupprimer)} onClose={envoi ? undefined : () => setASupprimer(null)} panelClassName="w-full max-w-md mx-4">
+        {aSupprimer && (
+          <div className="bg-white rounded-3xl shadow-2xl p-6">
+            <h3 className="text-lg font-black text-slate-900">Retirer {aSupprimer.nom} du plan ?</h3>
+            <p className="text-sm text-slate-700 mt-1">Les dossiers ne sont pas touchés : ils n'afficheront simplement plus cette armoire.</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setASupprimer(null)} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Garder</button>
+              <button type="button" onClick={supprimer} disabled={envoi} className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-50">
+                {envoi ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Retirer
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </section>
+  );
+};
+
 const EntreesAfgc = () => {
   useTitrePage('Entrée des dossiers');
   const [onglet, setOnglet] = useState('semaines');
@@ -358,7 +541,7 @@ const EntreesAfgc = () => {
       </EnTete>
 
       <div className="inline-flex p-1 rounded-2xl bg-slate-100 mb-5">
-        {[['semaines', 'Par semaine', CalendarDays], ['recherche', 'Rechercher', Search], ['classeurs', 'Classeurs importés', FileSpreadsheet]].map(([cle, label, Icone]) => (
+        {[['semaines', 'Par semaine', CalendarDays], ['recherche', 'Rechercher', Search], ['rangement', 'Rangement', Archive], ['classeurs', 'Classeurs importés', FileSpreadsheet]].map(([cle, label, Icone]) => (
           <button key={cle} type="button" onClick={() => setOnglet(cle)}
             className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 ${onglet === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             <Icone size={15} /> {label}
@@ -428,11 +611,16 @@ const EntreesAfgc = () => {
                   {groupes.map(([l, ds]) => (
                     // La lettre visée (depuis une recherche) s'allume.
                     <div key={lettreVisee === l ? `${l}-vise` : l} id={`lettre-${l}`}
-                      className={`scroll-mt-16 ${lettreVisee === l ? 'resultat-lumiere rounded-2xl p-2 -m-2 bg-green-50/60' : ''}`}>
-                      <h3 className="mb-2 flex items-center gap-2">
+                      className={`scroll-mt-32 ${lettreVisee === l ? 'resultat-lumiere rounded-2xl p-2 -m-2 bg-green-50/60' : ''}`}>
+                      <h3 className="mb-2 flex flex-wrap items-center gap-2">
                         <span className={`min-w-[2.25rem] h-9 px-2 rounded-xl flex items-center justify-center text-lg font-black ${l === 'Sans nom' ? 'bg-slate-200 text-slate-700 text-sm' : 'bg-docuflow-secondary text-white'}`}>{l === 'Sans nom' ? '?' : l}</span>
                         <span className="text-base font-black text-slate-800">{l === 'Sans nom' ? 'Sans nom' : `Lettre ${l}`}</span>
                         <span className="text-sm font-bold text-slate-600">· {ds.length} dossier{ds.length > 1 ? 's' : ''}</span>
+                        {armoiresDe(ds) ? (
+                          <span className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-sm font-black shadow-sm shadow-violet-200">
+                            <Archive size={14} /> {armoiresCourtes(ds)}
+                          </span>
+                        ) : <span className="ml-auto text-xs font-bold text-slate-500">armoire non renseignée</span>}
                       </h3>
                       <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
                         {ds.map((d) => (
@@ -452,6 +640,8 @@ const EntreesAfgc = () => {
             )}
           </section>
         </div>
+      ) : onglet === 'rangement' ? (
+        <PlanRangement onChange={() => { if (choisie) entreeService.semaine(choisie).then(setDetail).catch(() => {}); setResultats(null); }} />
       ) : onglet === 'classeurs' ? (
         <ClasseursImportes onImporter={() => setImportOuvert(true)} onChange={() => { chargerFiltres(); chargerSemaines(); setResultats(null); setChoisie(null); }} />
       ) : (
@@ -517,6 +707,14 @@ const EntreesAfgc = () => {
                             <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Point du</span>
                             <span className="text-base font-black text-amber-900">{jourLong(d.date_point)} {d.date_point.slice(0, 4)}</span>
                           </span>
+                          {d.armoire ? (
+                            <span className="inline-flex items-baseline gap-2 rounded-xl bg-violet-600 border border-violet-600 px-3 py-2 shadow-md shadow-violet-200">
+                              <span className="text-[11px] font-bold uppercase tracking-wide text-violet-100">Armoire</span>
+                              <span className="text-base font-black text-white">{d.armoire}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-xl bg-slate-100 border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">Armoire non renseignée</span>
+                          )}
                         </div>
                       </div>
                       <button type="button" onClick={() => ouvrirSemaine(d)}

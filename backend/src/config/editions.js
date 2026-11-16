@@ -40,6 +40,22 @@ const EDITIONS = {
       'Prêt': ['nom_entreprise', 'annee'],
       'Garantie bancaire': ['nom_entreprise', 'banque', 'annee'],
     },
+    // Plan de rangement des dossiers entrés : les armoires du couloir des
+    // toilettes, chacune de (semaine, lettre) à (semaine, lettre) — semaines de
+    // production du vendredi au jeudi, 2025. Une lettre partagée (« S », puis
+    // « S' » dans l'armoire suivante) figure aux deux bornes. L'armoire 7 tient
+    // en deux rangées continues (18-24 avril I → 9-15 mai Z, puis 16-22 mai
+    // A → M). Installé à la demande (Entrée des dossiers → Rangement).
+    rangements: [
+      { nom: 'Armoire 2', lieu: 'Couloir des toilettes', debut_semaine: '2025-01-17', debut_lettre: null, fin_semaine: '2025-02-07', fin_lettre: 'B' },
+      { nom: 'Armoire 3', lieu: 'Couloir des toilettes', debut_semaine: '2025-02-07', debut_lettre: 'C', fin_semaine: '2025-02-21', fin_lettre: 'S' },
+      { nom: 'Armoire 4', lieu: 'Couloir des toilettes', debut_semaine: '2025-02-21', debut_lettre: 'S', fin_semaine: '2025-04-04', fin_lettre: 'C' },
+      { nom: 'Armoire 5', lieu: 'Couloir des toilettes', debut_semaine: '2025-04-04', debut_lettre: 'D', fin_semaine: '2025-04-11', fin_lettre: 'F' },
+      { nom: 'Armoire 6', lieu: 'Couloir des toilettes', debut_semaine: '2025-04-11', debut_lettre: 'G', fin_semaine: '2025-04-18', fin_lettre: 'H' },
+      { nom: 'Armoire 7', lieu: 'Couloir des toilettes', debut_semaine: '2025-04-18', debut_lettre: 'I', fin_semaine: '2025-05-16', fin_lettre: 'M' },
+      { nom: 'Armoire 8', lieu: 'Couloir des toilettes', debut_semaine: '2025-05-16', debut_lettre: 'M', fin_semaine: '2025-05-23', fin_lettre: 'J' },
+      { nom: 'Armoire 9', lieu: 'Couloir des toilettes', debut_semaine: '2025-05-23', debut_lettre: 'K', fin_semaine: '2025-06-20', fin_lettre: 'C' },
+    ],
     // Départements : « SIGLE — intitulé ». Le sigle sert à proposer d'abord
     // les motifs habituels de chacun (édition AFGC du frontend).
     departements: [
