@@ -72,7 +72,7 @@ const AccueilAfgc = () => {
 
   useTitrePage('Accueil');
 
-  // Administrateur : la configuration de l'AFGC (motifs, types de dossier,
+  // Administrateur : la configuration de l'AFGC (motifs, typologies,
   // départements) s'installe d'un clic, tant qu'elle ne l'a jamais été.
   const [config, setConfig] = useState(null);
   const [installation, setInstallation] = useState(false);
@@ -85,7 +85,7 @@ const AccueilAfgc = () => {
     setInstallation(true);
     try {
       const r = await settingsService.appliquerEdition(edition.id);
-      toast.success(`Configuration de l'AFGC installée : ${r.motifs} motifs, ${r.types} types de dossier, ${r.departements_ajoutes} département${r.departements_ajoutes > 1 ? 's' : ''} ajouté${r.departements_ajoutes > 1 ? 's' : ''}.`);
+      toast.success(`Configuration de l'AFGC installée : ${r.motifs} motifs, ${r.types} typologies, ${r.departements_ajoutes} département${r.departements_ajoutes > 1 ? 's' : ''} ajouté${r.departements_ajoutes > 1 ? 's' : ''}.`);
       setConfig(null);
     } catch (e) {
       toast.error(e.response?.data?.message || 'La configuration n\'a pas pu être installée.');
@@ -154,7 +154,7 @@ const AccueilAfgc = () => {
           <div className="min-w-0 flex-1 basis-72">
             <h2 className="font-black text-slate-900">Installer la configuration de l'AFGC</h2>
             <p className="text-sm text-slate-600">
-              Les {config.attendus.motifs} motifs de demande, les {config.attendus.types} types de dossier et les {config.attendus.departements} départements, en un clic.
+              Les {config.attendus.motifs} motifs de demande, les {config.attendus.types} typologies de dossiers et les {config.attendus.departements} départements, en un clic.
               Ce que vous avez déjà ajouté est gardé, et tout reste modifiable dans Réglages.
             </p>
           </div>
@@ -215,7 +215,7 @@ const AccueilAfgc = () => {
                 {enRetard.slice(0, 6).map((p) => (
                   <li key={p.id} className="py-3 flex items-center gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-slate-800 truncate">{intitule(p)}</div>
+                      <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(p)}</div>
                       <div className="text-xs text-slate-400 truncate">{[references(p), p.cadre, p.emprunteur_name && `chez ${p.emprunteur_name}`].filter(Boolean).join(' · ')}</div>
                     </div>
                     <Pastille ton="rouge">{joursDeRetard(p.date_retour_prevue)} j de retard</Pastille>
@@ -273,7 +273,7 @@ const AccueilAfgc = () => {
                   return (
                     <li key={d.id} className="py-3 flex items-center gap-4">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-slate-800 truncate">{intitule(d)}</div>
+                        <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                         <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ') || 'Sans référence'}</div>
                       </div>
                       <Pastille ton={e.ton}>{e.texte}</Pastille>

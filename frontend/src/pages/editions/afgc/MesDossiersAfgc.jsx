@@ -21,7 +21,7 @@ const correspond = (d, q) => !q || [d.nom_entreprise, d.num_dossier, d.num_acte,
 const LigneDossier = ({ d, etat, children }) => (
   <li className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
     <div className="min-w-0 flex-1 basis-60">
-      <div className="text-sm font-semibold text-slate-800 truncate">{intitule(d)}</div>
+      <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ') || 'Sans référence'}</div>
     </div>
     {children}

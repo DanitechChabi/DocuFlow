@@ -107,7 +107,7 @@ const DemanderAfgc = () => {
               return (
                 <li key={d.id} className="py-3 flex flex-wrap items-center gap-3">
                   <div className="min-w-0 flex-1 basis-56">
-                    <div className="font-semibold text-slate-800 truncate">{intitule(d)}</div>
+                    <div className="font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                     <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ')}</div>
                   </div>
                   <Pastille ton={etat.ton}>{etat.texte}</Pastille>

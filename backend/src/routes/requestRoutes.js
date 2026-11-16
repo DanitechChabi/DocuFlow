@@ -94,5 +94,7 @@ router.patch('/:id/assign', requirePermission('requests.assign'), requestControl
 // Lier/délier un document GED : une action documentaire autant que de demande —
 // l'indexation elle-même exige documents.index ; le lien exige le côté demande.
 router.patch('/:id/document', requirePermission('requests.process'), requestController.linkDocument);
+// Typologie précisée par l'archive (demande arrivée sans elle).
+router.patch('/:id/typologie', requirePermission('requests.process'), listeController.typologie);
 
 module.exports = router;

@@ -185,6 +185,8 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok(libelleDemande({ nom_entreprise: 'SOTRA' }) === 'SOTRA', 'libellé : l\'entreprise d\'abord');
     ok(libelleDemande({ description: 'a'.repeat(80) }).length === 58, 'libellé : description tronquée');
     ok(libelleDemande({ id: 5 }) === 'n° 5', 'libellé : jamais « null »');
+    ok(libelleDemande({ nom_entreprise: 'SOTRA', type_document: 'Statuts' }) === 'SOTRA — Statuts', 'libellé : la typologie suit l\'entreprise');
+    ok(libelleDemande({ type_document: 'Attestation', id: 7 }) === 'Attestation n° 7', 'libellé : la typologie seule, avec le numéro');
   }
 
   console.log('\n6. Création — demande rapide et formulaire complet');

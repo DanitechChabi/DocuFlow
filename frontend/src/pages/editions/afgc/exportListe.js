@@ -10,7 +10,7 @@ import { etatDossierListe } from './vocabulaire';
 export function exporterListe(liste) {
   return exporterClasseur(nomFichier(liste.libelle, liste.cadre), [{
     nom: liste.libelle,
-    entetes: ['N°', 'Entreprise', 'Type', 'N° de dossier', 'N° d\'acte', 'Année', 'Précisions', 'État', 'Transmis le', 'Retour prévu', 'Retourné le'],
+    entetes: ['N°', 'Entreprise', 'Typologie', 'N° de dossier', 'N° d\'acte', 'Année', 'Précisions', 'État', 'Transmis le', 'Retour prévu', 'Retourné le'],
     largeurs: [6, 34, 24, 14, 16, 7, 30, 24, 12, 12, 12],
     lignes: liste.dossiers.map((d, i) => [
       i + 1, d.nom_entreprise || '', d.type_document || '', d.num_dossier || '', d.num_acte || '', d.annee || '', d.description || '',

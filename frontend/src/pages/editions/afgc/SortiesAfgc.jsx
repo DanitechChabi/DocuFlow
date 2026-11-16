@@ -54,7 +54,7 @@ const RegistreImprime = ({ lignes, criteres }) => (
     <table style={{ marginTop: 14 }}>
       <thead>
         <tr>
-          <th>N°</th><th>Sortie le</th><th>Entreprise</th><th>Type</th><th>N° dossier</th><th>N° acte</th><th>Motif / liste</th>
+          <th>N°</th><th>Sortie le</th><th>Intitulé du dossier</th><th>N° dossier</th><th>N° acte</th><th>Motif / liste</th>
           <th>Transmis à</th><th>Retour prévu</th><th>Retourné le</th><th>Observations</th>
         </tr>
       </thead>
@@ -63,8 +63,7 @@ const RegistreImprime = ({ lignes, criteres }) => (
           <tr key={p.id}>
             <td>{i + 1}</td>
             <td>{dateCourte(p.remis_at)}</td>
-            <td>{p.nom_entreprise || p.description || '—'}</td>
-            <td>{p.type_document || ''}</td>
+            <td>{intitule(p)}</td>
             <td>{p.num_dossier || ''}</td>
             <td>{p.num_acte || ''}</td>
             <td>{[p.cadre, p.liste_libelle].filter(Boolean).join(' · ')}</td>
@@ -132,7 +131,7 @@ const SortiesAfgc = () => {
       const user = authService.getCurrentUser();
       await exporterClasseur(nomFichier('sorties', filtres.cadre, filtres.type, filtres.du, filtres.au || new Date().toISOString().slice(0, 10)), [{
         nom: 'Sorties et retours',
-        entetes: ['N°', 'Sortie le', 'Entreprise', 'Type', 'N° de dossier', 'N° d\'acte', 'Année', 'Motif', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
+        entetes: ['N°', 'Sortie le', 'Entreprise', 'Typologie', 'N° de dossier', 'N° d\'acte', 'Année', 'Motif', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
         largeurs: [6, 12, 34, 24, 14, 16, 7, 22, 14, 22, 22, 12, 12, 11, 40],
         lignes: chronologique.map((p, i) => [
           i + 1, dateExcel(p.remis_at), p.nom_entreprise || p.description || '', p.type_document || '', p.num_dossier || '', p.num_acte || '', p.annee || '',
@@ -177,8 +176,8 @@ const SortiesAfgc = () => {
           </div>
           {types.length > 0 && (
             <select value={filtres.type} onChange={(e) => changer('type', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-700" aria-label="Type de dossier">
-              <option value="">Tous les types</option>
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-700" aria-label="Typologie">
+              <option value="">Toutes les typologies</option>
               {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           )}
@@ -227,15 +226,15 @@ const SortiesAfgc = () => {
                     const e = etatSortie(p);
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/60">
-                        <td className="px-5 py-3 max-w-[320px]">
-                          <div className="font-semibold text-slate-800 truncate">{intitule(p)}</div>
+                        <td className="px-5 py-3 min-w-[240px] max-w-[360px]">
+                          <div className="font-semibold text-slate-800 line-clamp-2">{intitule(p)}</div>
                           <div className="text-xs text-slate-400 truncate">{references(p) || 'Sans référence'}</div>
                         </td>
                         <td className="px-3 py-3 text-slate-600">
                           {p.cadre || '—'}
                           {p.liste_libelle && <div className="text-xs text-slate-400">{p.liste_libelle}</div>}
                         </td>
-                        <td className="px-3 py-3 text-slate-600">{p.emprunteur_name || '—'}</td>
+                        <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{p.emprunteur_name || '—'}</td>
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{dateCourte(p.remis_at)}</td>
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{dateCourte(p.date_retour_prevue)}</td>
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{p.retourne_at ? dateCourte(p.retourne_at) : '—'}</td>

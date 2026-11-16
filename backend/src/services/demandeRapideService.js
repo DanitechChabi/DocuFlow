@@ -69,7 +69,7 @@ async function pourAgent(tenantId, user, corps = {}) {
   }
   const type = String(corps.type_document || '').trim() || null;
   if (type && !allowedValues(await listeService.typesAdmis(tenantId)).includes(type)) {
-    throw erreur(400, `Type de dossier inconnu : « ${type} ».`);
+    throw erreur(400, `Typologie inconnue : « ${type} ».`);
   }
   const priorite = await listeService.prioriteParDefaut(tenantId);
 

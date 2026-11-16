@@ -29,14 +29,27 @@ const correspond = (d, q) => !q || [d.nom_entreprise, d.num_dossier, d.num_acte,
 
 const message = (e, defaut) => e.response?.data?.message || defaut;
 
-/** Une demande dans la file : intitulé, références, cadre, demandeur. */
+/**
+ * Typologie d'une demande arrivée sans elle : l'archiviste la précise en
+ * sortant le dossier (elle fait partie de l'intitulé).
+ */
+const PreciserTypologie = ({ d, typologies, onChoix, desactive }) => (d.type_document || !typologies.length ? null : (
+  <select value="" onChange={(e) => e.target.value && onChoix(d, e.target.value)} disabled={desactive} aria-label={`Typologie de ${intitule(d)}`}
+    className="px-2.5 py-1.5 rounded-xl border border-dashed border-amber-300 bg-amber-50 text-xs font-bold text-amber-800 max-w-[170px] cursor-pointer disabled:opacity-60">
+    <option value="">Typologie ?</option>
+    {typologies.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+  </select>
+));
+
+/** Une demande dans la file : intitulé, références, motif, demandeur. */
 const Ligne = ({ d, children }) => (
   <li className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
     <div className="min-w-0 flex-1 basis-64">
-      <div className="text-sm font-semibold text-slate-800 truncate">{intitule(d)}</div>
+      <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif, d.requester_name && `pour ${d.requester_name}`].filter(Boolean).join(' · ')}</div>
     </div>
-    {children}
+    {/* Les gestes restent groupés, à droite, même quand ils passent à la ligne. */}
+    <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">{children}</div>
   </li>
 );
 
@@ -58,6 +71,7 @@ const TraitementAfgc = () => {
   const [agentTel, setAgentTel] = useState('');
   const [refCourrier, setRefCourrier] = useState('');
   const [transmettreTel, setTransmettreTel] = useState(true);
+  const [typologies, setTypologies] = useState([]);
 
   const charger = useCallback(() => {
     requestService.getAllRequests().then((l) => setDemandes(Array.isArray(l) ? l : [])).catch(() => setDemandes([]));
@@ -68,6 +82,7 @@ const TraitementAfgc = () => {
     charger();
     listeService.cadres().then(setCadres).catch(() => setCadres([]));
     listeService.demandeurs().then(setDemandeurs).catch(() => setDemandeurs([]));
+    requestService.getOptions().then((o) => setTypologies(o?.documentTypes || [])).catch(() => setTypologies([]));
   }, [charger]);
 
   const seules = useMemo(() => (demandes || []).filter((d) => !d.lot_id && (!cadre || d.motif === cadre) && correspond(d, q)), [demandes, cadre, q]);
@@ -92,6 +107,16 @@ const TraitementAfgc = () => {
       toast.success(`Retourné : ${intitule(d)}.`);
       charger();
     } catch (e) { toast.error(message(e, 'Retour impossible.')); } finally { setGeste(null); }
+  };
+
+  const preciser = async (d, valeur) => {
+    setGeste(`y-${d.id}`);
+    try {
+      await listeService.typologie(d.id, valeur);
+      toast.success(`Typologie précisée : ${intitule({ ...d, type_document: valeur })}.`);
+      if (ouverte?.dossiers?.some((x) => x.id === d.id)) setOuverte(await listeService.detail(ouverte.id));
+      charger();
+    } catch (e) { toast.error(message(e, 'La typologie n\'a pas pu être enregistrée.')); } finally { setGeste(null); }
   };
 
   const ouvrir = async (id) => {
@@ -223,6 +248,7 @@ const TraitementAfgc = () => {
                 <ul className="divide-y divide-slate-100">
                   {aTransmettre.map((d) => (
                     <Ligne key={d.id} d={d}>
+                      <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                       <span className="text-xs text-slate-400">demandé le {dateCourte(d.created_at)}</span>
                       <button type="button" onClick={() => transmettre(d)} disabled={Boolean(geste)}
                         className="px-3.5 py-2 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60">
@@ -241,6 +267,7 @@ const TraitementAfgc = () => {
                     const etat = etatDemande(d);
                     return (
                       <Ligne key={d.id} d={d}>
+                        <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                         <Pastille ton={etat.ton}>retour {dateCourte(d.loan_retour_prevu)}</Pastille>
                         <button type="button" onClick={() => retourne(d)} disabled={Boolean(geste)}
                           className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary hover:text-docuflow-secondary inline-flex items-center gap-1.5 disabled:opacity-60">
@@ -305,9 +332,12 @@ const TraitementAfgc = () => {
                                 <input type="checkbox" disabled={!cochable} checked={coches.has(d.id)} onChange={() => basculer(d.id)}
                                   className="w-4 h-4 accent-[var(--color-docuflow-secondary)]" aria-label={`Sélectionner ${intitule(d)}`} />
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold text-slate-800 truncate">{intitule(d)}</div>
+                                  <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                                   <div className="text-xs text-slate-400 truncate">{references(d) || d.description || 'Sans référence'}</div>
                                 </div>
+                                {(d.etat === 'demande' || d.etat === 'transmis') && (
+                                  <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
+                                )}
                                 {d.etat === 'transmis' && d.date_retour_prevue && <span className="text-xs text-slate-500 hidden sm:inline">retour {dateCourte(d.date_retour_prevue)}</span>}
                                 <Pastille ton={etat.ton}>{etat.texte}</Pastille>
                               </li>

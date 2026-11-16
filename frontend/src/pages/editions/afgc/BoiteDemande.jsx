@@ -38,7 +38,8 @@ const ligneDe = (d, type) => ({
   num_dossier: d.num_dossier || '',
   num_acte: d.num_acte || '',
   annee: d.annee ? String(d.annee) : '',
-  type_document: type || d.type_document || '',
+  // Un dossier connu garde sa typologie ; sinon, celle choisie ou devinée.
+  type_document: d.type_document || type || '',
 });
 
 const cleDossier = (d) => [d.nom_entreprise, d.num_dossier, d.num_acte, d.annee].map((x) => String(x ?? '').toLowerCase()).join('|');
@@ -165,12 +166,13 @@ const BoiteDemande = ({
         num_dossier: d.num_dossier || '',
         num_acte: d.num_acte || '',
         annee: d.annee ? String(d.annee) : '',
-        type_document: typeEffectif || d.type_document || '',
+        type_document: d.type_document || typeEffectif || '',
         ...(d.source_request_id ? { source_request_id: d.source_request_id } : {}),
       };
       const res = envoyerUn ? await envoyerUn(corps) : await requestService.createRequest(corps);
       const id = res?.request?.id;
-      montrerEnvoyee({ id, texte: intitule(d), message: messageEnvoye(intitule(d)), annulable: annulable && Boolean(id) });
+      const titre = intitule({ ...d, type_document: corps.type_document });
+      montrerEnvoyee({ id, texte: titre, message: messageEnvoye(titre), annulable: annulable && Boolean(id) });
       reinitialiser();
       onEnvoye?.(res);
     } catch (e) {
@@ -218,7 +220,9 @@ const BoiteDemande = ({
   // Entrée reprend le dossier connu qui correspond exactement à la saisie :
   // un numéro, ou un nom d'entreprise s'il ne désigne qu'un seul dossier.
   const egal = (x) => x && x.toLowerCase() === q.toLowerCase();
-  const memeNom = suggestions.filter((s) => egal(s.nom_entreprise));
+  // Avec une typologie choisie ou devinée, seul le dossier de cette typologie correspond.
+  const memeType = (s) => !typeEffectif || !s.type_document || s.type_document === typeEffectif;
+  const memeNom = suggestions.filter((s) => egal(s.nom_entreprise) && memeType(s));
   const exacte = suggestions.find((s) => egal(s.num_dossier) || egal(s.num_acte)) || (memeNom.length === 1 ? memeNom[0] : null);
   const valider = (e) => {
     e.preventDefault();
@@ -296,13 +300,15 @@ const BoiteDemande = ({
         </label>
         {types.length > 0 && (
           <label className="inline-flex items-center gap-1.5">
-            Type :
+            Typologie :
+            {/* Elle fait partie de l'intitulé du dossier : à préciser si elle n'est pas devinée. */}
             <select value={typeEffectif || ''} onChange={(e) => setTypeManuel(e.target.value)}
-              className="bg-transparent font-bold text-slate-700 border-b border-dashed border-slate-300 focus:outline-none focus:border-docuflow-secondary py-0.5 cursor-pointer max-w-[220px]">
-              <option value="">—</option>
+              className={`bg-transparent font-bold border-b border-dashed focus:outline-none focus:border-docuflow-secondary py-0.5 cursor-pointer max-w-[220px] ${
+                !typeEffectif && (q.length >= 2 || colles) && !cumuler ? 'text-amber-700 border-amber-400' : 'text-slate-700 border-slate-300'}`}>
+              <option value="">{q.length >= 2 ? 'à préciser' : '—'}</option>
               {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
-            {typeManuel === undefined && detection.type && <span className="text-green-700 font-semibold">deviné</span>}
+            {typeManuel === undefined && detection.type && <span className="text-green-700 font-semibold">devinée</span>}
           </label>
         )}
         {plusieurs && !cumuler && <span className="inline-flex items-center gap-1 text-slate-400"><ClipboardPaste size={12} /> plusieurs dossiers ? collez-les, un par ligne</span>}
@@ -335,8 +341,10 @@ const BoiteDemande = ({
             {colles.map((d, i) => (
               <li key={`${i}-${cleDossier(d)}`} className="py-1.5 flex items-center gap-3">
                 <span className="text-slate-300 w-6 text-right flex-shrink-0">{i + 1}</span>
-                <span className="font-semibold text-slate-700 truncate">{intitule(d)}</span>
-                <span className="text-xs text-slate-400 truncate flex-1">{references(d)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-slate-700 line-clamp-2">{intitule(d)}</span>
+                  {references(d) && <span className="block text-xs text-slate-400 truncate">{references(d)}</span>}
+                </span>
                 <button type="button" onClick={() => retirer(i)} className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50" aria-label={`Retirer ${intitule(d)}`}>
                   <X size={14} />
                 </button>
@@ -360,7 +368,7 @@ const BoiteDemande = ({
             return (
               <li key={k} className="py-3 flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1 basis-56">
-                  <div className="font-semibold text-slate-800 truncate">{intitule(s)}</div>
+                  <div className="font-semibold text-slate-800 line-clamp-2">{intitule({ ...s, type_document: s.type_document || typeEffectif })}</div>
                   <div className="text-xs text-slate-400 truncate">{references(s) || 'Sans référence'}</div>
                 </div>
                 {s.sorti_jusqu_au && <Pastille ton="ambre">Sorti · retour prévu le {dateCourte(s.sorti_jusqu_au)}</Pastille>}
@@ -375,11 +383,11 @@ const BoiteDemande = ({
             <li className="py-3">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1 basis-56">
-                  <div className="font-semibold text-slate-800 truncate">« {q} »</div>
+                  <div className="font-semibold text-slate-800 truncate">« {q} »{typeEffectif ? ` — ${typeEffectif}` : ''}</div>
                   <div className="text-xs text-slate-400">
                     {suggestions.length ? 'Un autre dossier : ' : cumuler ? 'Entrée pour l\'ajouter : ' : 'Entrée pour l\'envoyer : '}
                     {detail.num_acte ? 'n° d\'acte' : detail.num_dossier && !detail.nom_entreprise ? 'n° de dossier' : 'nom de l\'entreprise'}
-                    {typeEffectif ? ` · ${typeEffectif}` : ''}
+                    {typeEffectif ? '' : ' · typologie à préciser'}
                   </div>
                 </div>
                 <button type="button" onClick={() => setPrecisions((v) => !v)}
