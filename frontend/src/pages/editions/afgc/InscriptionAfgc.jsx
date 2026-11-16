@@ -58,9 +58,18 @@ const InscriptionAfgc = () => {
     if (cle === 'username') setIdentifiantTouche(true);
   };
 
-  const domaineSaisi = form.email.includes('@') ? form.email.trim().split('@')[1]?.toLowerCase() : '';
+  // Un seul domaine admis (l'AFGC : @afgc.sa) : l'agent ne tape que le début
+  // de son adresse, la fin est déjà écrite. Plusieurs domaines : l'adresse
+  // entière, contrôlée.
+  const domaineUnique = domaines.length === 1 ? domaines[0] : null;
+  const changerAdresse = (e) => {
+    const debut = e.target.value.split('@')[0].replace(/\s+/g, '');
+    setForm((f) => ({ ...f, email: debut }));
+  };
+  const adresse = domaineUnique ? (form.email ? `${form.email}@${domaineUnique}` : '') : form.email.trim();
+  const domaineSaisi = !domaineUnique && adresse.includes('@') ? adresse.split('@')[1]?.toLowerCase() : '';
   const domaineRefuse = Boolean(domaines.length && domaineSaisi && !domaines.includes(domaineSaisi));
-  const complet = departement && form.full_name.trim() && form.username.trim() && form.email.trim() && form.password && !domaineRefuse;
+  const complet = departement && form.full_name.trim() && form.username.trim() && adresse && form.password && !domaineRefuse;
 
   const envoyer = async (e) => {
     e.preventDefault();
@@ -72,7 +81,7 @@ const InscriptionAfgc = () => {
       await authService.register({
         full_name: form.full_name.trim().replace(/\s+/g, ' '),
         username: identifiant,
-        email: form.email.trim(),
+        email: adresse,
         password: form.password,
         section: departement.name,
         nouveau_departement: Boolean(departement.nouveau),
@@ -159,9 +168,18 @@ const InscriptionAfgc = () => {
             </Apparait>
             <Apparait rang={2}>
               <label htmlFor="adresse" className={etiquette}>Adresse professionnelle Outlook</label>
-              <input id="adresse" type="email" className={`${champ} ${domaineRefuse ? 'border-amber-400' : ''}`} value={form.email}
-                onChange={changer('email')} required autoComplete="email" autoCapitalize="none" spellCheck={false}
-                placeholder={domaines.length ? `prenom.nom@${domaines[0]}` : 'prenom.nom@…'} />
+              {domaineUnique ? (
+                <div className="flex items-stretch rounded-xl border border-slate-200 bg-white overflow-hidden transition-shadow focus-within:border-[#2C9C0A] focus-within:ring-4 focus-within:ring-green-100">
+                  <input id="adresse" className="flex-1 min-w-0 px-4 py-3 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                    value={form.email} onChange={changerAdresse} required autoComplete="email" autoCapitalize="none" spellCheck={false}
+                    placeholder="prenom.nom" aria-describedby="fin-adresse" />
+                  <span id="fin-adresse" className="px-3.5 flex items-center text-slate-500 font-semibold bg-slate-50 border-l border-slate-200 select-none">@{domaineUnique}</span>
+                </div>
+              ) : (
+                <input id="adresse" type="email" className={`${champ} ${domaineRefuse ? 'border-amber-400' : ''}`} value={form.email}
+                  onChange={changer('email')} required autoComplete="email" autoCapitalize="none" spellCheck={false}
+                  placeholder={domaines.length ? `prenom.nom@${domaines[0]}` : 'prenom.nom@…'} />
+              )}
               {domaineRefuse ? (
                 <p className="text-xs font-semibold text-amber-700 mt-1.5">Utilisez votre adresse {domaines.map((d) => `@${d}`).join(' ou ')}.</p>
               ) : (
