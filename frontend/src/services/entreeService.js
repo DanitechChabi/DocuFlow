@@ -7,6 +7,10 @@ export const entreeService = {
   semaine: async (debut) => (await api.get(`/entrees/semaines/${debut}`)).data,
   rechercher: async (params) => (await api.get('/entrees/recherche', { params })).data,
   filtres: async () => (await api.get('/entrees/filtres')).data,
+  // Douchette (053) : lire un code, sortir, rentrer.
+  douchette: async (code) => (await api.get('/entrees/douchette', { params: { code } })).data,
+  sortieDouchette: async (corps) => (await api.post('/entrees/douchette/sortie', corps)).data,
+  retourDouchette: async (corps) => (await api.post('/entrees/douchette/retour', corps)).data,
   // Plan de rangement (052) : les armoires.
   rangements: async () => (await api.get('/entrees/rangements')).data,
   creerRangement: async (corps) => (await api.post('/entrees/rangements', corps)).data,

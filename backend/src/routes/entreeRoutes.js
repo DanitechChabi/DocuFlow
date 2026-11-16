@@ -19,6 +19,10 @@ router.get('/recherche', entreeController.rechercher);
 router.get('/filtres', entreeController.filtres);
 router.get('/fichiers', entreeController.fichiers);
 router.delete('/fichiers', entreeController.supprimerFichier);
+// Douchette (053) : lire un code, sortir, rentrer.
+router.get('/douchette', entreeController.lireScan);
+router.post('/douchette/sortie', entreeController.sortieScan);
+router.post('/douchette/retour', entreeController.retourScan);
 // Plan de rangement (052).
 router.get('/rangements', entreeController.rangements);
 router.post('/rangements', entreeController.creerRangement);

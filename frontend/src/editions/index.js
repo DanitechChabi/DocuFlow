@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen,
+  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode,
 } from 'lucide-react';
 
 /**
@@ -50,6 +50,7 @@ const EDITIONS = {
       { to: '/demandes/a-traiter', label: 'À traiter', icone: ClipboardList, permission: 'requests.process' },
       { to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
       { to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
+      { to: '/archives/douchette', label: 'Douchette', icone: ScanBarcode, permission: 'requests.process' },
       { to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
       { to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
       { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
@@ -88,6 +89,7 @@ const EDITIONS = {
     // Écrans propres à l'édition, à des adresses nouvelles.
     routes: {
       '/archives/entrees': () => import('../pages/editions/afgc/EntreesAfgc'),
+      '/archives/douchette': () => import('../pages/editions/afgc/DouchetteAfgc'),
     },
     pages: {
       // Connexion (identifiant ou adresse Outlook) et inscription en deux
