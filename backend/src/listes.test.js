@@ -103,6 +103,11 @@ const appel = (handler, req) => new Promise((resolve) => {
        ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value`,
       [t, JSON.stringify([{ value: 'Consultation', label: 'Consultation' }, { value: 'Soldes créditeurs', label: 'Soldes créditeurs' }, { value: 'Commissaire aux comptes', label: 'Commissaire aux comptes' }])]
     );
+    await db.query(
+      `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'request_document_types', $2)
+       ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value`,
+      [t, JSON.stringify(['Attestation', 'Bonne exécution (CBE)', 'Caution douanière (CD)'].map((v) => ({ value: v, label: v })))]
+    );
     const nouvelUtilisateur = async (role, nom, cle) => (await db.query(
       `INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', $3, $4, $5) RETURNING id, full_name, role, tenant_id`,
       [t, `${cle}-${suffixe}`, nom, `${cle}-${suffixe}@exemple.test`, role]
@@ -113,11 +118,14 @@ const appel = (handler, req) => new Promise((resolve) => {
 
     // --- Dépôt ---
     const lignes = [
-      { nom_entreprise: 'Société Fictive du Littoral', num_dossier: 'CL-0412', num_acte: 'CS-2025-0147', annee: 2025 },
+      { nom_entreprise: 'Société Fictive du Littoral', num_dossier: 'CL-0412', num_acte: 'CS-2025-0147', annee: 2025, type_document: 'Bonne exécution (CBE)' },
       { nom_entreprise: 'Transit Imaginaire SA', num_dossier: 'CL-0275' },
       { nom_entreprise: 'Agro Fictive du Zou', num_dossier: 'CL-0503', description: 'Solde 1 250 000 F' },
     ];
-    await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Radiation', lignes }), 400, 'cadre non proposé : 400');
+    await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Radiation', lignes }), 400, 'motif non proposé : 400');
+    const eType = await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [{ nom_entreprise: 'X', type_document: 'Statuts' }] }), 422,
+      'type de dossier non proposé : 422');
+    ok(eType && /Type de dossier inconnu/.test(eType.details[0].message), '422 : le type inconnu est nommé');
     await rejette(listes.creer(t, finances, { libelle: '  ', cadre: 'Soldes créditeurs', lignes }), 400, 'liste sans nom : 400');
     await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [] }), 400, 'liste vide : 400');
     const e422 = await rejette(listes.creer(t, finances, { libelle: 'Liste 1', cadre: 'Soldes créditeurs', lignes: [lignes[0], { annee: 2024 }] }), 422, 'ligne sans référence : 422');
@@ -166,6 +174,19 @@ const appel = (handler, req) => new Promise((resolve) => {
     ok((await loan.registre(t, { liste: l1.id })).every((p) => p.liste_libelle === 'Liste 1' && p.cadre === 'Soldes créditeurs'), 'registre : sorties de la Liste 1, avec cadre et liste');
     ok((await loan.registre(t, { q: 'zou' })).map((p) => p.nom_entreprise).join() === 'Agro Fictive du Zou', 'registre : recherche par entreprise');
     ok((await loan.registre(t, { q: 'Fanny' })).length === 3, 'registre : recherche par emprunteur');
+    ok((await loan.registre(t, { type: 'Bonne exécution (CBE)' })).map((p) => p.num_dossier).join() === 'CL-0412', 'registre : sorties d\'un type de dossier');
+    ok((await listes.detail(t, l1.id, finances)).dossiers.find((d) => d.num_dossier === 'CL-0412').type_document === 'Bonne exécution (CBE)', 'liste : le type de chaque dossier');
+    ok((await loan.registre(t, { q: 'Liste 1' })).length === 3, 'registre : recherche par nom de liste');
+    // Courrier du DE reçu à l'archive : les dossiers sortent au nom de l'agent,
+    // la référence du courrier nomme la liste et suffit à les retrouver.
+    const courrier = await listes.creer(t, archiviste, {
+      libelle: 'Courrier n° 0123/DE', cadre: 'Commissaire aux comptes', demandeur_id: juridique.id,
+      lignes: [{ nom_entreprise: 'Quincaillerie Fictive', num_dossier: 'CO-0777' }, { nom_entreprise: 'Imprimerie Imaginaire', num_dossier: 'CO-0778' }],
+    });
+    ok((await listes.transmettre(t, courrier.id, archiviste, {})).transmis === 2, 'courrier : les 2 dossiers transmis d\'un geste');
+    const parCourrier = await loan.registre(t, { q: '0123/DE' });
+    ok(parCourrier.length === 2 && parCourrier.every((p) => p.emprunteur_id === juridique.id && p.liste_libelle === 'Courrier n° 0123/DE'),
+      'registre : les dossiers d\'un courrier retrouvés par sa référence, au nom de l\'agent');
     await rejette(loan.registre(t, { liste: 'abc' }), 400, 'registre : liste invalide → 400');
     const jour = require('./helpers/requestInput').aujourdhui();
     ok((await loan.registre(t, { cadre: 'Soldes créditeurs', du: jour, au: jour })).length === 3, 'registre : sorties du jour (bornes comprises)');
@@ -185,6 +206,7 @@ const appel = (handler, req) => new Promise((resolve) => {
     const connus = await listes.dossiersConnus(t, finances, 'transit');
     ok(connus.length === 1 && connus[0].num_dossier === 'CL-0275' && connus[0].sorti_jusqu_au, 'dossier connu, signalé comme sorti avec sa date de retour');
     ok((await listes.dossiersConnus(t, finances, 'littoral'))[0].sorti_jusqu_au === null, 'dossier revenu : disponible');
+    ok((await listes.dossiersConnus(t, finances, 'littoral'))[0].type_document === 'Bonne exécution (CBE)', 'dossier connu : avec son type');
     ok((await listes.dossiersConnus(t, juridique, 'transit')).length === 0, 'un agent ne voit pas les dossiers demandés par un autre');
     ok((await listes.dossiersConnus(t, finances, 'CL-0')).length === 3, 'un agent : ses 3 dossiers');
     ok((await listes.dossiersConnus(t, archiviste, 'CL-0')).length === 4, 'l\'archive voit les dossiers de toute l\'organisation (4)');
@@ -200,8 +222,10 @@ const appel = (handler, req) => new Promise((resolve) => {
     const etranger = (await db.query(`INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', 'Étranger', $3, 'demandeur') RETURNING id`, [autreOrg, `etr-${suffixe}`, `etr-${suffixe}@exemple.test`])).rows[0];
     await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: etranger.id, nom_entreprise: 'X' }), 404, 'agent d\'une autre organisation : 404');
     await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id }), 400, 'sans référence ni description : 400');
-    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'X', motif: 'Radiation' }), 400, 'cadre non proposé : 400');
-    const tel = await rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'Garage Fictif du Centre', num_dossier: 'CL-0900' });
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'X', motif: 'Radiation' }), 400, 'motif non proposé : 400');
+    await rejette(rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'X', type_document: 'Statuts' }), 400, 'type de dossier non proposé : 400');
+    const tel = await rapide.pourAgent(t, archiviste, { pour_user_id: juridique.id, nom_entreprise: 'Garage Fictif du Centre', num_dossier: 'CL-0900', type_document: 'Attestation' });
+    ok(tel.request.type_document === 'Attestation', 'demande par téléphone : le type est enregistré');
     ok(tel.request.id_user === juridique.id && tel.request.motif === 'Consultation' && tel.pret === null, 'demande enregistrée au nom de l\'agent, cadre par défaut');
     ok((await db.query("SELECT 1 FROM notifications WHERE request_id = $1 AND id_user = $2 AND title = 'Demande enregistrée'", [tel.request.id, juridique.id])).rows.length === 1,
       'l\'agent est prévenu que l\'archive a enregistré sa demande');
@@ -213,6 +237,74 @@ const appel = (handler, req) => new Promise((resolve) => {
       'transmission avec date de retour passée : 400');
     ok((await db.query("SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND nom_entreprise = 'Y'", [t])).rows[0].n === 0,
       'refus de la transmission : la demande n\'est pas créée non plus (tout ou rien)');
+  }
+
+  console.log('\n4. Préréglages de l\'édition AFGC');
+  {
+    const routes = require('./routes/settingsRoutes');
+    const couche = (m) => routes.stack.find((l) => l.route && l.route.path === '/edition' && l.route.methods[m]);
+    ok(Boolean(couche('post')) && Boolean(couche('get')), 'routes GET et POST /settings/edition déclarées');
+    const u = (role) => ({ user: { id: 1, tenant_id: 1, role } });
+    for (const m of ['get', 'post']) {
+      const garde = couche(m).route.stack[1].handle;
+      ok((await appel(garde, u('demandeur'))).code === 403 && (await appel(garde, u('archiviste'))).code === 403, `préréglages (${m}) : demandeur et archiviste refusés (403)`);
+      ok((await appel(garde, u('admin'))).code === 'next', `préréglages (${m}) : administrateur admis`);
+    }
+    const { EDITIONS } = require('./config/editions');
+    ok(EDITIONS.afgc.motifs.length === 15 && EDITIONS.afgc.types.length === 9 && EDITIONS.afgc.departements.length === 10,
+      'AFGC : 15 motifs, 9 types de dossier, 10 départements');
+    const { fusionner, plat } = require('./services/editionService');
+    ok(plat('Soldes créditeurs') === plat('Solde créditeur') && plat('Commissaire aux comptes') === plat('commissaire au compte'),
+      'formes voisines reconnues (pluriel, accents, casse)');
+    ok(plat('Prorogation') !== plat('Prêt') && plat('Solde débiteur') !== plat('Solde créditeur'), 'motifs distincts non confondus');
+    const fusion = fusionner(['Consultation', 'Solde créditeur'], [
+      { value: 'Soldes créditeurs', label: 'Soldes créditeurs' }, { value: 'Radiation', label: 'Radiation' }, { value: 'Mission DAI', label: 'Mission DAI' },
+    ], ['Radiation']).map((o) => o.value);
+    ok(fusion.join('|') === 'Consultation|Soldes créditeurs|Mission DAI',
+      'fusion : l\'édition d\'abord, la forme déjà en usage gardée, l\'ajout de l\'organisation conservé, le générique retiré');
+    if (avecBase) {
+      const db = require('./config/db');
+      const editionService = require('./services/editionService');
+      const settingsService = require('./services/settingsService');
+      const s2 = Date.now();
+      const t2 = (await db.query("INSERT INTO tenants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id", [`Test édition ${s2}`, `test-edition-${s2}`])).rows[0].id;
+      const admin = (await db.query(`INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', 'Admin', $3, 'admin') RETURNING id, full_name`, [t2, `adm-${s2}`, `adm-${s2}@exemple.test`])).rows[0];
+      // Un espace déjà un peu servi : motifs génériques et propres, sections
+      // génériques dont une utilisée par un compte.
+      await db.query(
+        `INSERT INTO settings (tenant_id, key, value) VALUES ($1, 'request_motifs', $2)`,
+        [t2, JSON.stringify(['Consultation', 'Contentieux', 'Soldes créditeurs', 'Mission DAI'].map((v) => ({ value: v, label: v })))]
+      );
+      await db.query("INSERT INTO sections (tenant_id, name) VALUES ($1, 'DGI'), ($1, 'Commercial')", [t2]);
+      await db.query(`INSERT INTO users (tenant_id, username, password_hash, full_name, email, role, section) VALUES ($1, $2, 'x', 'Agent', $3, 'demandeur', 'Commercial')`, [t2, `ag-${s2}`, `ag-${s2}@exemple.test`]);
+      settingsService.invalidate(t2);
+
+      await rejette(editionService.etat(t2, 'inconnue'), 400, 'état d\'une édition inconnue : 400');
+      const avant = await editionService.etat(t2, 'afgc');
+      ok(!avant.appliquee && avant.manquants.motifs === 13 && avant.manquants.types === 9 && avant.manquants.departements === 10,
+        'avant : configuration à installer (13 motifs, 9 types, 10 départements manquants)');
+      await rejette(editionService.appliquer(t2, admin, 'inconnue'), 400, 'édition inconnue : 400');
+      const r1 = await editionService.appliquer(t2, admin, 'afgc');
+      ok(r1.departements_ajoutes === 10 && r1.sections_retirees === 1, 'première application : 10 départements créés, la section générique inutilisée retirée');
+      const sections = (await db.query('SELECT name FROM sections WHERE tenant_id = $1', [t2])).rows.map((r) => r.name);
+      ok(!sections.includes('DGI') && sections.includes('Commercial'), 'une section rattachée à un compte est gardée');
+      const reglages = await settingsService.getAll(t2);
+      const valeurs = (x) => (typeof x === 'string' ? JSON.parse(x) : x).map((o) => o.value);
+      const motifs = valeurs(reglages.request_motifs);
+      ok(motifs[0] === 'Consultation' && motifs.includes('Restitution de provision') && motifs.includes('Commission bancaire'), 'motifs de demande AFGC en place, dans leur ordre');
+      ok(motifs.includes('Soldes créditeurs') && !motifs.includes('Solde créditeur'), 'la forme déjà en usage (« Soldes créditeurs ») est gardée, sans doublon');
+      ok(motifs.includes('Mission DAI') && !motifs.includes('Contentieux') && motifs.length === 16, 'motif propre gardé, motif générique retiré (16 motifs)');
+      const types = valeurs(reglages.request_document_types);
+      ok(types.length === 9 && types.includes('Bonne exécution (CBE)') && !types.includes('Statuts'), 'types de dossier AFGC à la place des types génériques');
+      const apres = await editionService.etat(t2, 'afgc');
+      ok(apres.appliquee && apres.manquants.motifs === 0 && apres.manquants.types === 0 && apres.manquants.departements === 0, 'après : rien ne manque, configuration marquée appliquée');
+      const r2 = await editionService.appliquer(t2, admin, 'AFGC');
+      ok(r2.departements_ajoutes === 0 && r2.sections_retirees === 0 && r2.motifs === 16, 'deuxième application : rien en double');
+      ok(valeurs((await settingsService.getAll(t2)).request_motifs).join('|') === motifs.join('|'), 'deuxième application : motifs inchangés');
+      ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action LIKE 'A appliqué la configuration%'", [t2])).rows[0].n === 2,
+        'chaque application est inscrite au journal d\'audit');
+      ok((await listes.cadresAdmis(t2)).map((c) => c.value).includes('Levée d\'engagement'), 'les listes acceptent les nouveaux motifs');
+    }
   }
 
   console.log(`\n${verifs - echecs}/${verifs} vérifications réussies`);

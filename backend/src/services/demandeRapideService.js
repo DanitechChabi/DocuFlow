@@ -65,15 +65,19 @@ async function pourAgent(tenantId, user, corps = {}) {
   const cadres = await listeService.cadresAdmis(tenantId);
   const cadre = String(corps.motif || '').trim() || cadres[0]?.value;
   if (!cadre || !allowedValues(cadres).includes(cadre)) {
-    throw erreur(400, `Cadre non proposé : « ${cadre || ''} ». Choisissez parmi : ${cadres.map((c) => c.label).join(', ')}.`);
+    throw erreur(400, `Motif non proposé : « ${cadre || ''} ». Choisissez parmi : ${cadres.map((c) => c.label).join(', ')}.`);
+  }
+  const type = String(corps.type_document || '').trim() || null;
+  if (type && !allowedValues(await listeService.typesAdmis(tenantId)).includes(type)) {
+    throw erreur(400, `Type de dossier inconnu : « ${type} ».`);
   }
   const priorite = await listeService.prioriteParDefaut(tenantId);
 
   return loanService.enTransaction(async (client) => {
     const request = (await client.query(
-      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'en attente', $9) RETURNING *`,
-      [tenantId, agent.id, values.nom_entreprise, values.num_dossier, values.num_acte, values.annee, cadre, priorite, values.description]
+      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, type_document)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'en attente', $9, $10) RETURNING *`,
+      [tenantId, agent.id, values.nom_entreprise, values.num_dossier, values.num_acte, values.annee, cadre, priorite, values.description, type]
     )).rows[0];
     await client.query(
       `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)

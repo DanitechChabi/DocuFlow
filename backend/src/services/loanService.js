@@ -330,8 +330,9 @@ async function confirmer(tenantId, requestId, user) {
  * @param {number} [liste] liste de demandes (047)
  * @param {string} [q] entreprise, n° de dossier, n° d'acte, description ou emprunteur
  * @param {string} [du] [au] période de sortie (AAAA-MM-JJ, bornes comprises)
+ * @param {string} [type] type de dossier (attestation, bonne exécution…)
  */
-async function registre(tenantId, { etat, cadre, liste, q, du, au } = {}) {
+async function registre(tenantId, { etat, cadre, liste, q, du, au, type } = {}) {
   if (etat && !ETATS.includes(etat)) throw erreur(400, `État inconnu : ${etat} (attendu : ${ETATS.join(', ')}).`);
   const conds = ['l.tenant_id = $1'];
   const params = [tenantId];
@@ -353,6 +354,11 @@ async function registre(tenantId, { etat, cadre, liste, q, du, au } = {}) {
     params.push(leCadre);
     conds.push(`q.motif = $${params.length}`);
   }
+  const leType = texte(type, 100);
+  if (leType) {
+    params.push(leType);
+    conds.push(`q.type_document = $${params.length}`);
+  }
   const avecListes = liste !== undefined && liste !== null && String(liste).trim() !== '';
   if (avecListes) {
     const n = Number(liste);
@@ -360,12 +366,17 @@ async function registre(tenantId, { etat, cadre, liste, q, du, au } = {}) {
     params.push(n);
     conds.push(`q.lot_id = $${params.length}`);
   }
+  // La recherche porte aussi sur le nom de la liste (« Liste 3 », « Courrier
+  // n° 0123/DE ») : tous les dossiers sortis avec elle se retrouvent ensemble.
   const recherche = texte(q, 100);
+  let pRecherche = null;
   if (recherche) {
     params.push(`%${recherche.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    const p = `$${params.length}`;
-    conds.push(`(q.nom_entreprise ILIKE ${p} OR q.num_dossier ILIKE ${p} OR q.num_acte ILIKE ${p} OR q.description ILIKE ${p} OR ue.full_name ILIKE ${p})`);
+    pRecherche = `$${params.length}`;
   }
+  const filtre = (listes) => (pRecherche
+    ? [...conds, `(q.nom_entreprise ILIKE ${pRecherche} OR q.num_dossier ILIKE ${pRecherche} OR q.num_acte ILIKE ${pRecherche} OR q.description ILIKE ${pRecherche} OR ue.full_name ILIKE ${pRecherche}${listes ? ` OR rl.libelle ILIKE ${pRecherche}` : ''})`]
+    : conds);
   const requete = (listes) => db.query(
     `SELECT l.*, to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue,
             q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document, q.motif AS cadre,
@@ -377,7 +388,7 @@ async function registre(tenantId, { etat, cadre, liste, q, du, au } = {}) {
        LEFT JOIN users ue ON ue.id = l.emprunteur_id
        LEFT JOIN users ur ON ur.id = l.remis_par
        LEFT JOIN users ut ON ut.id = l.retourne_par
-      WHERE ${conds.join(' AND ')}
+      WHERE ${filtre(listes).join(' AND ')}
       ORDER BY (l.retourne_at IS NULL) DESC, l.date_retour_prevue ASC, l.remis_at DESC
       LIMIT 1000`,
     params

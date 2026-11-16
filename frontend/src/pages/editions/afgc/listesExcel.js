@@ -7,10 +7,13 @@
 // retenues partent au serveur.
 // ============================================================================
 import { cle, trouverTitres, decrireColonnes, afficher } from '../../../utils/classeur';
+import { typeDeCellule, detecterType } from './vocabulaire';
 
 export const CHAMPS = [
   { cle: 'nom_entreprise', label: 'Entreprise', motifs: [/raison sociale/, /entreprise/, /societe/, /client/, /denomination/, /beneficiaire/, /\bnom\b/] },
   { cle: 'num_dossier', label: 'N° de dossier', motifs: [/dossier/, /\bcompte\b/, /\bref/] },
+  // Le type avant le n° d'acte : « Type de garantie » est un type, pas un numéro.
+  { cle: 'type_document', label: 'Type', motifs: [/\btype\b/, /nature/, /produit/, /typologie/] },
   { cle: 'num_acte', label: 'N° d\'acte', motifs: [/\bacte\b/, /garantie/, /caution/, /engagement/] },
   { cle: 'annee', label: 'Année', motifs: [/annee/, /exercice/] },
   { cle: 'description', label: 'Précisions', motifs: [/observation/, /objet/, /solde/, /montant/, /libelle/, /commentaire/] },
@@ -45,7 +48,7 @@ function annee(x) {
  * (numéro de ligne dans le tableur) pour situer une erreur. Les lignes vides
  * et la ligne « Total » éventuelle sont laissées de côté.
  */
-export function lignesDeFeuille(feuille, indexTitres, assoc, colonnes = []) {
+export function lignesDeFeuille(feuille, indexTitres, assoc, colonnes = [], types = []) {
   const titre = (index) => colonnes.find((c) => c.index === index)?.titre;
   return feuille.lignes.slice(indexTitres + 1).map((l) => {
     const v = (champ) => (assoc[champ] === undefined ? '' : l.cellules[assoc[champ]]);
@@ -55,6 +58,9 @@ export function lignesDeFeuille(feuille, indexTitres, assoc, colonnes = []) {
       nom_entreprise: enTexte(v('nom_entreprise')),
       num_dossier: enTexte(v('num_dossier')),
       num_acte: enTexte(v('num_acte')),
+      // Type : la colonne « Type » s'il y en a une, sinon le sigle du n° d'acte (« CBE-2025-0147 »).
+      type_document: typeDeCellule(enTexte(v('type_document')), types)
+        || (detecterType(enTexte(v('num_acte')), types).acte ? detecterType(enTexte(v('num_acte')), types).type : ''),
       annee: annee(v('annee')),
       description: precision && assoc.description !== undefined && titre(assoc.description) && !/observation|precision|commentaire/.test(cle(titre(assoc.description)))
         ? `${titre(assoc.description)} : ${precision}` : precision,
@@ -68,9 +74,9 @@ export function lignesDeFeuille(feuille, indexTitres, assoc, colonnes = []) {
 }
 
 /** Lecture d'une feuille : titres, colonnes, association, lignes. */
-export function preparerFeuille(feuille) {
+export function preparerFeuille(feuille, types = []) {
   const indexTitres = trouverTitres(feuille.lignes);
   const colonnes = decrireColonnes(feuille.lignes, indexTitres);
   const assoc = associerColonnes(colonnes);
-  return { indexTitres, colonnes, assoc, lignes: lignesDeFeuille(feuille, indexTitres, assoc, colonnes) };
+  return { indexTitres, colonnes, assoc, lignes: lignesDeFeuille(feuille, indexTitres, assoc, colonnes, types) };
 }

@@ -31,13 +31,25 @@ export const EnTete = ({ titre, aide, icone: Icone, children }) => (
   </div>
 );
 
-/** Choix d'un cadre (soldes créditeurs, commissaire aux comptes…) en pastilles. */
-export const ChoixCadre = ({ cadres, valeur, onChange, tous = false }) => (
-  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Cadre">
+/**
+ * Choix d'un motif (consultation, solde créditeur…) : en pastilles s'ils sont
+ * peu nombreux, sinon en liste déroulante. `tous` : filtre (« Tous les motifs »).
+ */
+export const ChoixCadre = ({ cadres, valeur, onChange, tous = false }) => (cadres.length > 6 ? (
+  <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500">
+    {tous && 'Motif'}
+    <select value={valeur} onChange={(e) => onChange(e.target.value)} aria-label="Motif"
+      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 focus:outline-none focus:border-docuflow-secondary max-w-full">
+      {tous && <option value="">Tous les motifs</option>}
+      {cadres.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+    </select>
+  </label>
+) : (
+  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Motif">
     {tous && (
       <button type="button" role="radio" aria-checked={!valeur} onClick={() => onChange('')}
         className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${!valeur ? 'bg-docuflow-secondary text-white border-docuflow-secondary' : 'bg-white text-slate-600 border-slate-200 hover:border-docuflow-secondary'}`}>
-        Tous les cadres
+        Tous les motifs
       </button>
     )}
     {cadres.map((c) => (
@@ -47,7 +59,7 @@ export const ChoixCadre = ({ cadres, valeur, onChange, tous = false }) => (
       </button>
     ))}
   </div>
-);
+));
 
 /** Barre d'avancement d'une liste : retournés / transmis / à transmettre. */
 export const Avancement = ({ total, transmis, retournes }) => {

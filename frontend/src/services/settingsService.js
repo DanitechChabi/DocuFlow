@@ -56,3 +56,10 @@ export const settingsService = {
     return response.data;
   }
 };
+
+/**
+ * Configuration d'une édition dédiée (AFGC…) : ce qui manque à l'espace, et
+ * son installation (motifs, types de dossier, départements). Administrateur.
+ */
+settingsService.etatEdition = async (edition) => (await api.get('/settings/edition', { params: { edition } })).data;
+settingsService.appliquerEdition = async (edition) => (await api.post('/settings/edition', { edition })).data;

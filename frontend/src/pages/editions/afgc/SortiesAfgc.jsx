@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { BookOpenCheck, Search, Printer, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { listeService } from '../../../services/listeService';
+import { requestService } from '../../../services/requestService';
 import { authService } from '../../../services/authService';
 import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
@@ -53,7 +54,7 @@ const RegistreImprime = ({ lignes, criteres }) => (
     <table style={{ marginTop: 14 }}>
       <thead>
         <tr>
-          <th>N°</th><th>Sortie le</th><th>Entreprise</th><th>N° dossier</th><th>N° acte</th><th>Cadre / liste</th>
+          <th>N°</th><th>Sortie le</th><th>Entreprise</th><th>Type</th><th>N° dossier</th><th>N° acte</th><th>Motif / liste</th>
           <th>Transmis à</th><th>Retour prévu</th><th>Retourné le</th><th>Observations</th>
         </tr>
       </thead>
@@ -63,6 +64,7 @@ const RegistreImprime = ({ lignes, criteres }) => (
             <td>{i + 1}</td>
             <td>{dateCourte(p.remis_at)}</td>
             <td>{p.nom_entreprise || p.description || '—'}</td>
+            <td>{p.type_document || ''}</td>
             <td>{p.num_dossier || ''}</td>
             <td>{p.num_acte || ''}</td>
             <td>{[p.cadre, p.liste_libelle].filter(Boolean).join(' · ')}</td>
@@ -81,7 +83,8 @@ const SortiesAfgc = () => {
   useTitrePage('Dossiers sortis');
   const [cadres, setCadres] = useState([]);
   const [listes, setListes] = useState([]);
-  const [filtres, setFiltres] = useState({ etat: '', cadre: '', liste: '', q: '', du: '', au: '' });
+  const [types, setTypes] = useState([]);
+  const [filtres, setFiltres] = useState({ etat: '', cadre: '', liste: '', q: '', du: '', au: '', type: '' });
   const [saisie, setSaisie] = useState('');
   const [sorties, setSorties] = useState(null);
   const [export_, setExport] = useState(false);
@@ -89,6 +92,7 @@ const SortiesAfgc = () => {
   useEffect(() => {
     listeService.cadres().then(setCadres).catch(() => setCadres([]));
     listeService.lister().then(setListes).catch(() => setListes([]));
+    requestService.getOptions().then((o) => setTypes(o?.documentTypes || [])).catch(() => setTypes([]));
   }, []);
 
   useEffect(() => {
@@ -115,7 +119,8 @@ const SortiesAfgc = () => {
       : filtres.au ? `Jusqu'au ${dateCourte(filtres.au)}` : 'Toutes périodes';
   const criteres = [
     periode,
-    filtres.cadre || 'tous les cadres',
+    filtres.cadre || 'tous les motifs',
+    filtres.type || null,
     filtres.liste ? (listes.find((l) => String(l.id) === String(filtres.liste))?.libelle || 'liste') : null,
     filtres.etat ? ETATS.find(([k]) => k === filtres.etat)?.[1].toLowerCase() : null,
     filtres.q ? `recherche « ${filtres.q} »` : null,
@@ -125,12 +130,12 @@ const SortiesAfgc = () => {
     setExport(true);
     try {
       const user = authService.getCurrentUser();
-      await exporterClasseur(nomFichier('sorties', filtres.cadre, filtres.du, filtres.au || new Date().toISOString().slice(0, 10)), [{
+      await exporterClasseur(nomFichier('sorties', filtres.cadre, filtres.type, filtres.du, filtres.au || new Date().toISOString().slice(0, 10)), [{
         nom: 'Sorties et retours',
-        entetes: ['N°', 'Sortie le', 'Entreprise', 'N° de dossier', 'N° d\'acte', 'Année', 'Cadre', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
-        largeurs: [6, 12, 34, 14, 16, 7, 22, 14, 22, 22, 12, 12, 11, 40],
+        entetes: ['N°', 'Sortie le', 'Entreprise', 'Type', 'N° de dossier', 'N° d\'acte', 'Année', 'Motif', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
+        largeurs: [6, 12, 34, 24, 14, 16, 7, 22, 14, 22, 22, 12, 12, 11, 40],
         lignes: chronologique.map((p, i) => [
-          i + 1, dateExcel(p.remis_at), p.nom_entreprise || p.description || '', p.num_dossier || '', p.num_acte || '', p.annee || '',
+          i + 1, dateExcel(p.remis_at), p.nom_entreprise || p.description || '', p.type_document || '', p.num_dossier || '', p.num_acte || '', p.annee || '',
           p.cadre || '', p.liste_libelle || '', p.emprunteur_name || '', p.remis_par_name || '',
           dateExcel(p.date_retour_prevue), dateExcel(p.retourne_at), etatSortie(p).texte, observations(p),
         ]),
@@ -149,7 +154,7 @@ const SortiesAfgc = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
-      <EnTete titre="Dossiers sortis" icone={BookOpenCheck} aide="Qui a quel dossier, depuis quand, dans quel cadre et pour quand il doit revenir.">
+      <EnTete titre="Dossiers sortis" icone={BookOpenCheck} aide="Qui a quel dossier, depuis quand, pour quel motif et pour quand il doit revenir.">
         <button type="button" onClick={() => window.print()} disabled={!sorties?.length}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-docuflow-secondary hover:text-docuflow-secondary disabled:opacity-40">
           <Printer size={16} /> Imprimer
@@ -170,6 +175,13 @@ const SortiesAfgc = () => {
               </button>
             ))}
           </div>
+          {types.length > 0 && (
+            <select value={filtres.type} onChange={(e) => changer('type', e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-700" aria-label="Type de dossier">
+              <option value="">Tous les types</option>
+              {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          )}
           <select value={filtres.liste} onChange={(e) => changer('liste', e.target.value)}
             className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white text-slate-700" aria-label="Liste">
             <option value="">Toutes les listes</option>
@@ -202,7 +214,7 @@ const SortiesAfgc = () => {
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400">
                     <th className="px-5 py-2.5 font-black">Dossier</th>
-                    <th className="px-3 py-2.5 font-black">Cadre</th>
+                    <th className="px-3 py-2.5 font-black">Motif</th>
                     <th className="px-3 py-2.5 font-black">Transmis à</th>
                     <th className="px-3 py-2.5 font-black">Le</th>
                     <th className="px-3 py-2.5 font-black">Retour prévu</th>

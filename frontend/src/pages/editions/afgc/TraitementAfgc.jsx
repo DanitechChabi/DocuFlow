@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight, FileSpreadsheet, Phone } from 'lucide-react';
+import { ClipboardList, ListChecks, FileSearch, Search, Send, Undo2, Loader2, ChevronRight, FileSpreadsheet, Phone, Mail } from 'lucide-react';
 import BoiteDemande from './BoiteDemande';
 import { exporterListe } from './exportListe';
 import { requestService } from '../../../services/requestService';
@@ -8,13 +8,21 @@ import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements';
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
+import { parDepartement } from './departements';
 
 // ============================================================================
 // À traiter (archive) : chaque dossier se TRANSMET d'un clic, et son RETOUR se
 // note d'un clic. Les listes (soldes créditeurs…) se traitent en entier ou
 // par sélection. La date de retour proposée est celle réglée pour
 // l'organisation (sept jours par défaut).
+//
+// Les demandes qui arrivent autrement — un appel, un courrier du Suivi (DE)
+// pour des restitutions de provision ou des soldes créditeurs — s'enregistrent
+// ici au nom de l'agent : un courrier devient une liste qui porte sa
+// référence, retrouvable dans le registre des sorties.
 // ============================================================================
+
+const aujourdhuiCourt = () => new Date().toLocaleDateString('fr-FR');
 
 const correspond = (d, q) => !q || [d.nom_entreprise, d.num_dossier, d.num_acte, d.description, d.requester_name, d.libelle, d.demandeur_name]
   .some((x) => x && String(x).toLowerCase().includes(q.toLowerCase()));
@@ -43,9 +51,12 @@ const TraitementAfgc = () => {
   const [geste, setGeste] = useState(null);
   const [ouverte, setOuverte] = useState(null);
   const [coches, setCoches] = useState(new Set());
-  // Demande reçue par téléphone : pour qui, et faut-il transmettre aussitôt.
+  // Demande reçue par téléphone ou par courrier : pour qui, la référence du
+  // courrier, et faut-il transmettre aussitôt.
   const [demandeurs, setDemandeurs] = useState([]);
+  const [canal, setCanal] = useState('telephone');
   const [agentTel, setAgentTel] = useState('');
+  const [refCourrier, setRefCourrier] = useState('');
   const [transmettreTel, setTransmettreTel] = useState(true);
 
   const charger = useCallback(() => {
@@ -103,6 +114,28 @@ const TraitementAfgc = () => {
     } catch (e) { toast.error(message(e, 'Opération impossible.')); } finally { setGeste(null); }
   };
 
+  const agent = demandeurs.find((a) => String(a.id) === String(agentTel));
+  const groupesAgents = useMemo(() => parDepartement(demandeurs), [demandeurs]);
+  const parCourrier = canal === 'courrier';
+
+  // Plusieurs dossiers à la fois (un courrier, ou une liste dictée) : une
+  // liste au nom de l'agent, transmise dans la foulée si on le demande.
+  const enregistrerListe = async (corps) => {
+    const ref = refCourrier.trim();
+    const libelle = parCourrier
+      ? (ref ? `Courrier ${/^n[°o]/i.test(ref) ? ref : `n° ${ref}`}` : `Courrier du ${aujourdhuiCourt()}`)
+      : `Demande par téléphone du ${aujourdhuiCourt()}`;
+    const liste = await listeService.creer({ ...corps, libelle, demandeur_id: Number(agentTel) });
+    if (parCourrier) setRefCourrier('');
+    if (!transmettreTel) return liste;
+    try {
+      return (await listeService.transmettre(liste.id)).liste;
+    } catch (e) {
+      toast.error(message(e, 'Liste enregistrée, mais la transmission a échoué : transmettez-la depuis l\'onglet « Listes ».'));
+      return liste;
+    }
+  };
+
   const basculer = (id) => setCoches((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const cochesEtat = (etat) => (ouverte?.dossiers || []).filter((d) => coches.has(d.id) && d.etat === etat).length;
   const compte = (etat) => (ouverte?.dossiers || []).filter((d) => d.etat === etat).length;
@@ -130,31 +163,54 @@ const TraitementAfgc = () => {
 
       {onglet === 'demandes' ? (
         demandes === null ? <Chargement /> : (<>
-          {/* On appelle encore l'archive : la demande s'inscrit quand même au registre. */}
+          {/* On appelle encore l'archive, on lui écrit : la demande s'inscrit quand même au registre. */}
           <section className="glass-card-premium rounded-3xl p-5 md:p-6 mb-6">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3">
-              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Phone size={16} className="text-docuflow-secondary" /> Demande reçue par téléphone</h2>
-              <span className="text-xs text-slate-400">enregistrée au nom de l'agent, qui la retrouve dans « Mes dossiers »</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
+              <h2 className="font-bold text-slate-900">Demande reçue par</h2>
+              <div className="inline-flex p-1 rounded-xl bg-slate-100" role="radiogroup" aria-label="Demande reçue par">
+                {[['telephone', 'Téléphone', Phone], ['courrier', 'Courrier', Mail]].map(([cle, label, Icone]) => (
+                  <button key={cle} type="button" role="radio" aria-checked={canal === cle} onClick={() => setCanal(cle)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold inline-flex items-center gap-1.5 transition-colors ${canal === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                    <Icone size={14} className={canal === cle ? 'text-docuflow-secondary' : ''} /> {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-slate-400">
+                {parCourrier ? 'les dossiers du courrier, enregistrés au nom de l\'agent ; la référence du courrier permet de les retrouver' : 'enregistrée au nom de l\'agent, qui la retrouve dans « Mes dossiers »'}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-3 mb-3">
               <select value={agentTel} onChange={(e) => setAgentTel(e.target.value)} aria-label="Agent qui demande"
                 className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-slate-700 min-w-[240px]">
                 <option value="">Qui demande ?</option>
-                {demandeurs.map((a) => <option key={a.id} value={a.id}>{a.full_name}{a.section ? ` — ${a.section}` : ''}</option>)}
+                {groupesAgents.map(([departement, agents]) => (
+                  <optgroup key={departement} label={departement}>
+                    {agents.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                  </optgroup>
+                ))}
               </select>
+              {parCourrier && (
+                <input value={refCourrier} onChange={(e) => setRefCourrier(e.target.value)} maxLength={80}
+                  placeholder="Réf. du courrier (facultatif)" aria-label="Référence du courrier"
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 w-56 focus:outline-none focus:border-docuflow-secondary" />
+              )}
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
                 <input type="checkbox" checked={transmettreTel} onChange={(e) => setTransmettreTel(e.target.checked)} className="w-4 h-4 accent-[var(--color-docuflow-secondary)]" />
                 Transmettre tout de suite
               </label>
             </div>
             <BoiteDemande
-              plusieurs={false}
+              key={canal}
+              cumuler={parCourrier}
               annulable={false}
+              retenir={false}
+              departement={agent?.section || ''}
               desactive={!agentTel}
               libelleBouton={transmettreTel ? 'Enregistrer et transmettre' : 'Enregistrer'}
               envoyerUn={(corps) => listeService.pourAgent({ ...corps, pour_user_id: Number(agentTel), transmettre: transmettreTel })}
+              envoyerListe={enregistrerListe}
               messageEnvoye={(texte) => {
-                const nom = demandeurs.find((a) => String(a.id) === String(agentTel))?.full_name || 'l\'agent';
+                const nom = agent?.full_name || 'l\'agent';
                 return transmettreTel ? `Transmis à ${nom} : ${texte}.` : `Enregistré pour ${nom} : ${texte}.`;
               }}
               onEnvoye={charger}

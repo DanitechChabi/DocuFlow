@@ -8,6 +8,8 @@ import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, Pastille } from './elements';
 import { intitule, references, etatDemande } from './vocabulaire';
 import { cadreActif } from './cadreRetenu';
+import { motifsHabituels } from './departements';
+import { authService } from '../../../services/authService';
 import BoiteDemande from './BoiteDemande';
 import ImportListeAfgc from './ImportListeAfgc';
 
@@ -59,13 +61,18 @@ const DemanderAfgc = () => {
   const redemander = async (d) => {
     setEnvoi(d.id);
     try {
+      // Même dossier, même motif que la dernière fois (s'il est encore proposé).
+      const motif = cadres.some((c) => c.value === d.motif)
+        ? d.motif
+        : cadreActif(cadres, motifsHabituels(authService.getCurrentUser()?.section, cadres));
       await requestService.createRequest({
         mode: 'rapide',
-        motif: cadreActif(cadres),
+        motif,
         nom_entreprise: d.nom_entreprise || '',
         num_dossier: d.num_dossier || '',
         num_acte: d.num_acte || '',
         annee: d.annee ? String(d.annee) : '',
+        type_document: d.type_document || '',
         source_request_id: d.id,
       });
       toast.success(`Redemandé : ${intitule(d)}. L'archive est prévenue.`);
