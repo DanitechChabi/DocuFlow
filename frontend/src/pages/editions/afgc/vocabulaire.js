@@ -54,7 +54,7 @@ export function intitule(d) {
 /** Montant lisible : « 2 347 200 F ». */
 export function montantLisible(m) {
   const n = Number(m);
-  return m === null || m === undefined || m === '' || !Number.isFinite(n) ? '' : `${n.toLocaleString('fr-FR')} F`;
+  return m === null || m === undefined || m === '' || !Number.isFinite(n) || n === 0 ? '' : `${n.toLocaleString('fr-FR')} F`;
 }
 
 /** Références lisibles : n° de dossier, n° d'acte, banque, année, montant (la typologie est dans l'intitulé). */
