@@ -77,6 +77,19 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     ok(l4.sorties.length === 1 && l4.sorties[0].id === r2, 'sortie faite sans douchette : retrouvée au scan');
     await d.rentrer(t, archiviste, { request_id: r2 });
     ok((await d.lire(t, d.codeDe(ids['Bravo Fictif']))).sorties.length === 0, 'et rentrée à la douchette');
+
+    console.log('\n3. Tableau de bord');
+    const tb = require('./services/tableauBordService');
+    const aujourdHui = new Date().toISOString().slice(0, 10);
+    const r = await tb.tableau(t, { du: '2025-01-01', au: aujourdHui });
+    ok(r.demandes.recues === 4 && r.demandes.servies === 2 && r.demandes.en_attente === 2, 'demandes : 4 reçues, 2 servies, 2 en attente');
+    ok(r.departements.length === 1 && r.departements[0].n === 4 && r.motifs[0].nom === 'Consultation', 'par département et par motif');
+    ok(r.delai.n === 2 && r.delai.en_24h === 2, 'délai de traitement : 2 sorties, toutes en moins de 24 h');
+    ok(r.entrees_total === 3 && r.entrees_par_semaine.length === 2, 'dossiers entrés par semaine de production');
+    ok(r.demandes_par_semaine.reduce((n, x) => n + x.n, 0) === 4, 'demandes par semaine : le total retombe juste');
+    ok(Array.isArray(r.retards) && r.retards.length === 0, 'aucun retard');
+    let inv = null; try { tb.periode({ du: '2026-02-01', au: '2026-01-01' }); } catch (err) { inv = err.statut; }
+    ok(inv === 400 && tb.periode({}, new Date('2026-11-16T10:00:00Z')).du === '2026-11-01', 'période inversée : 400 ; par défaut : le mois en cours');
   }
   console.log(`\n${verifs - echecs}/${verifs} vérifications réussies`);
   process.exit(echecs ? 1 : 0);
