@@ -25,9 +25,11 @@ const EDITIONS = {
       'Attestation', 'Bonne exécution (CBE)', 'Avance de démarrage (CAD)', 'Caution professionnelle (CP)',
       'Caution douanière (CD)', 'Prêt', 'Garantie bancaire', 'Ouverture de compte', 'Dossier non retiré annulé',
     ],
-    // Réglages de l'espace : un agent dont le département manque peut le
-    // créer en s'inscrivant.
-    reglages: { registration_new_department: true },
+    // Réglages de l'espace, posés s'ils ne le sont pas déjà (un choix de
+    // l'administrateur n'est jamais écrasé) : un agent dont le département
+    // manque peut le créer en s'inscrivant ; seules les adresses
+    // professionnelles de l'AFGC (Outlook, @afgc.sa) sont admises.
+    reglages: { registration_new_department: true, registration_email_domains: 'afgc.sa' },
     // Départements : « SIGLE — intitulé ». Le sigle sert à proposer d'abord
     // les motifs habituels de chacun (édition AFGC du frontend).
     departements: [

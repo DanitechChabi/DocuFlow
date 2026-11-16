@@ -101,14 +101,17 @@ async function appliquer(tenantId, user, cle) {
   const edition = trouver(cle);
   const [motifsActuels, typesActuels] = await Promise.all([listeService.cadresAdmis(tenantId), listeService.typesAdmis(tenantId)]);
 
+  // Motifs et types : fusionnés (voir plus haut). Autres réglages de
+  // l'édition : posés seulement s'ils sont absents — un choix de
+  // l'administrateur (domaine d'adresse, création des départements…) reste.
   const reglages = [
-    ['request_motifs', fusionner(edition.motifs, motifsActuels, valeursParDefaut('request_motifs'))],
-    ['request_document_types', fusionner(edition.types, typesActuels, valeursParDefaut('request_document_types'))],
-    ...Object.entries(edition.reglages || {}),
-  ].map(([cleReglage, valeur]) => {
+    ['request_motifs', fusionner(edition.motifs, motifsActuels, valeursParDefaut('request_motifs')), false],
+    ['request_document_types', fusionner(edition.types, typesActuels, valeursParDefaut('request_document_types')), false],
+    ...Object.entries(edition.reglages || {}).map(([cle, valeur]) => [cle, valeur, true]),
+  ].map(([cleReglage, valeur, siAbsent]) => {
     const definition = catalog.BY_KEY.get(cleReglage);
     if (!definition) throw erreur(500, `Réglage absent du catalogue : ${cleReglage}.`);
-    return [cleReglage, catalog.coerce(definition, valeur), Array.isArray(valeur) ? valeur.length : 1];
+    return [cleReglage, catalog.coerce(definition, valeur), Array.isArray(valeur) ? valeur.length : 1, siAbsent];
   });
 
   const client = await db.pool.connect();
@@ -116,10 +119,10 @@ async function appliquer(tenantId, user, cle) {
   let retirees = 0;
   try {
     await client.query('BEGIN');
-    for (const [cleReglage, valeur] of reglages) {
+    for (const [cleReglage, valeur, , siAbsent] of reglages) {
       await client.query(
         `INSERT INTO settings (tenant_id, key, value) VALUES ($1, $2, $3)
-         ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+         ON CONFLICT (tenant_id, key) DO ${siAbsent ? 'NOTHING' : 'UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP'}`,
         [tenantId, cleReglage, typeof valeur === 'string' ? valeur : JSON.stringify(valeur)]
       );
     }

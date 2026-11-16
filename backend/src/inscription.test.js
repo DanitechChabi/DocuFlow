@@ -134,8 +134,18 @@ const appel = (handler, req) => new Promise((resolve) => {
     // --- Préréglage AFGC : la création du département est permise ---
     const t2 = (await db.query("INSERT INTO tenants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id", [`Test préréglage ${s}`, `test-prereglage-${s}`])).rows[0].id;
     const admin = (await db.query(`INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', 'Admin', $3, 'admin') RETURNING id, full_name`, [t2, `adm-${s}`, `adm-${s}@exemple.test`])).rows[0];
-    await require('./services/editionService').appliquer(t2, admin, 'afgc');
+    const editionService = require('./services/editionService');
+    await editionService.appliquer(t2, admin, 'afgc');
     ok((await settingsService.get(t2, 'registration_new_department', false)) === true, 'configuration AFGC : un agent peut créer son département en s\'inscrivant');
+    ok((await settingsService.get(t2, 'registration_email_domains', '')) === 'afgc.sa', 'configuration AFGC : seules les adresses @afgc.sa sont admises');
+    // Un choix de l'administrateur n'est pas écrasé par une nouvelle application.
+    await db.query("UPDATE settings SET value = 'false' WHERE tenant_id = $1 AND key = 'registration_new_department'", [t2]);
+    await db.query("UPDATE settings SET value = 'afgc.sa, afgc-groupe.test' WHERE tenant_id = $1 AND key = 'registration_email_domains'", [t2]);
+    settingsService.invalidate(t2);
+    await editionService.appliquer(t2, admin, 'afgc');
+    ok((await settingsService.get(t2, 'registration_new_department', true)) === false
+      && (await settingsService.get(t2, 'registration_email_domains', '')) === 'afgc.sa, afgc-groupe.test',
+      'nouvelle application : les réglages choisis par l\'administrateur restent');
   }
 
   console.log(`\n${verifs - echecs}/${verifs} vérifications réussies`);
