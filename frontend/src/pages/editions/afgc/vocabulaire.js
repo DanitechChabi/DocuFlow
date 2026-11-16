@@ -25,7 +25,8 @@ export function etatDemande(d) {
   if (d.statut === 'livré') return { cle: 'servi', texte: 'Copie numérique transmise', ton: 'bleu' };
   if (d.statut === 'annulé') return { cle: 'annule', texte: 'Annulé', ton: 'gris' };
   if (d.statut === 'rejete') return { cle: 'annule', texte: 'Refusé', ton: 'rouge' };
-  return { cle: 'demande', texte: 'Demandé', ton: 'ambre' };
+  if (d.statut === 'a completer') return { cle: 'a_completer', texte: 'À compléter', ton: 'rouge' };
+  return { cle: 'demande', texte: d.complement_fourni_at ? 'Demandé · complété' : 'Demandé', ton: 'ambre' };
 }
 
 /** État d'un dossier de liste (détail d'une liste : etat + en_retard). */
@@ -36,7 +37,8 @@ export function etatDossierListe(d) {
     : { cle: 'transmis', texte: 'Transmis', ton: 'vert' };
   if (d.etat === 'servi') return { cle: 'servi', texte: 'Copie numérique transmise', ton: 'bleu' };
   if (d.etat === 'annule') return { cle: 'annule', texte: 'Annulé', ton: 'gris' };
-  return { cle: 'demande', texte: 'Demandé', ton: 'ambre' };
+  if (d.etat === 'a_completer') return { cle: 'a_completer', texte: 'À compléter', ton: 'rouge' };
+  return { cle: 'demande', texte: d.complement_fourni_at ? 'Demandé · complété' : 'Demandé', ton: 'ambre' };
 }
 
 /**

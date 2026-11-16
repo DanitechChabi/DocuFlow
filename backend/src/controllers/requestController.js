@@ -586,6 +586,11 @@ exports.updateRequestStatus = async (req, res) => {
     // traite pas est donc soumis à la règle du demandeur — sa demande, et
     // l'annulation seulement.
     const estPersonnel = await roleService.possede(tenantId, role, 'requests.process');
+    // Renvoi au demandeur et retour de sa part : avec ce qui manque, par
+    // /:id/complement et /:id/completer (051), pas par un simple changement d'état.
+    if (status === 'a completer' || (request.statut === 'a completer' && status === 'en attente')) {
+      return res.status(400).json({ message: 'Pour demander ou fournir des compléments, utilisez « Demander des compléments » ou « Compléter ».' });
+    }
     const check = requestStateMachine.canTransition({
       from: request.statut,
       to: status,

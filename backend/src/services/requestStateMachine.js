@@ -1,6 +1,7 @@
 /**
  * Machine à états des demandes — source de vérité unique du cycle de vie.
  * Cycle : en attente → à traiter → transmis → livré
+ * Renvoi au demandeur (051) : en attente / à traiter → à compléter → en attente
  * États terminaux : rejete, annulé
  *
  * Chaque transition est horodatée dans la table `request_history` (voir migration 003),
@@ -10,6 +11,7 @@
 const STATUSES = [
   { key: 'en attente', label: 'En attente', step: 1 },
   { key: 'a traiter',  label: 'À traiter',  step: 2 },
+  { key: 'a completer', label: 'À compléter', step: 1 },
   { key: 'transmis',   label: 'Transmis',   step: 3 },
   { key: 'livré',      label: 'Livré',      step: 4 },
   { key: 'rejete',     label: 'Rejeté',     step: 99 },
@@ -18,8 +20,10 @@ const STATUSES = [
 
 // Transitions autorisées : état courant → liste des états suivants possibles
 const TRANSITIONS = {
-  'en attente': ['a traiter', 'rejete', 'annulé'],
-  'a traiter':  ['transmis', 'rejete', 'annulé'],
+  'en attente': ['a traiter', 'a completer', 'rejete', 'annulé'],
+  'a traiter':  ['transmis', 'a completer', 'rejete', 'annulé'],
+  // Le retour à « en attente » passe par complementService.completer (le demandeur).
+  'a completer': ['en attente', 'rejete', 'annulé'],
   'transmis':   ['livré', 'rejete', 'annulé'],
   'livré':      [],
   'rejete':     [],

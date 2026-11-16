@@ -8,6 +8,7 @@ import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements';
 import { Presence, usePresences } from './presence';
+import { CarteACompleter } from './complements';
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 
 // ============================================================================
@@ -42,6 +43,7 @@ const MesDossiersAfgc = () => {
   const [q, setQ] = useState('');
   const [ouverte, setOuverte] = useState(null);
   const [annulation, setAnnulation] = useState(null);
+  const [types, setTypes] = useState([]);
 
   const charger = useCallback(() => {
     requestService.getMyRequests().then((l) => setDemandes(Array.isArray(l) ? l : [])).catch(() => setDemandes([]));
@@ -50,12 +52,15 @@ const MesDossiersAfgc = () => {
 
   useEffect(() => {
     charger();
+    requestService.getOptions().then((o) => setTypes(o?.documentTypes || [])).catch(() => setTypes([]));
     listeService.cadres().then(setCadres).catch(() => setCadres([]));
   }, [charger]);
 
   const seules = useMemo(() => (demandes || []).filter((d) => !d.lot_id && (!cadre || d.motif === cadre) && correspond(d, q)), [demandes, cadre, q]);
   const enCours = seules.filter((d) => ['demande', 'transmis'].includes(etatDemande(d).cle));
-  const terminees = seules.filter((d) => !['demande', 'transmis'].includes(etatDemande(d).cle));
+  const terminees = seules.filter((d) => !['demande', 'transmis', 'a_completer'].includes(etatDemande(d).cle));
+  // Renvoyées par l'archive, faute d'informations : seules ou dans une liste, en tête de page.
+  const aCompleter = (demandes || []).filter((d) => d.statut === 'a completer');
   const listesVues = (listes || []).filter((l) => (!cadre || l.cadre === cadre) && correspond(l, q));
   // Les dossiers encore attendus : sont-ils entrés aux archives, et quand ?
   const presences = usePresences(useMemo(() => enCours.filter((d) => etatDemande(d).cle === 'demande'), [enCours]));
@@ -114,6 +119,18 @@ const MesDossiersAfgc = () => {
       {onglet === 'dossiers' ? (
         demandes === null ? <Chargement /> : (
           <div className="space-y-6">
+            {aCompleter.length > 0 && (
+              <section className="rounded-3xl p-5 md:p-6 bg-amber-50/70 border-2 border-amber-300">
+                <h2 className="text-lg font-black text-amber-900 mb-1">À compléter <span className="text-amber-600">({aCompleter.length})</span></h2>
+                <p className="text-sm font-semibold text-amber-900/80 mb-4">L'archive ne peut pas retrouver ces dossiers : complétez-les puis renvoyez-les.</p>
+                <ul className="space-y-4">
+                  {aCompleter.map((d, i) => (
+                    <CarteACompleter key={`${d.id}-${d.complement_demande_at}`} d={d} types={types} delai={Math.min(i, 5) * 0.1}
+                      onFait={charger} onAnnuler={annuler} annulation={annulation} />
+                  ))}
+                </ul>
+              </section>
+            )}
             <section className="glass-card-premium rounded-3xl p-5 md:p-6">
               <h2 className="font-bold text-slate-900 mb-2">En cours <span className="text-slate-400 font-semibold">({enCours.length})</span></h2>
               {enCours.length ? (
@@ -160,6 +177,7 @@ const MesDossiersAfgc = () => {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {l.a_transmettre > 0 && <Pastille ton="ambre">{l.a_transmettre} demandé{l.a_transmettre > 1 ? 's' : ''}</Pastille>}
+                    {l.a_completer > 0 && <Pastille ton="rouge">{l.a_completer} à compléter</Pastille>}
                     {l.transmis > 0 && <Pastille ton="vert">{l.transmis} transmis</Pastille>}
                     {l.retournes > 0 && <Pastille ton="gris">{l.retournes} retourné{l.retournes > 1 ? 's' : ''}</Pastille>}
                     {l.en_retard > 0 && <Pastille ton="rouge">{l.en_retard} en retard</Pastille>}

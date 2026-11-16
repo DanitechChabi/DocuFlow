@@ -13,6 +13,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useTitrePage } from '../../hooks/useTitrePage';
 import { edition } from '../../editions';
 import { Pastille, Chargement } from './afgc/elements';
+import { AlerteACompleter } from './afgc/complements';
 import { etatDemande, intitule, references } from './afgc/vocabulaire';
 import BoiteDemande from './afgc/BoiteDemande';
 import { prenomDe } from './afgc/identite';
@@ -148,6 +149,8 @@ const AccueilAfgc = () => {
           </Link>
         )}
       </div>
+
+      {!traite && <AlerteACompleter nombre={(mesDemandes || []).filter((d) => d.statut === 'a completer').length} className="mb-6" />}
 
       {aInstaller && (
         <section className="rounded-3xl border-2 border-dashed border-green-200 bg-green-50/70 p-5 md:p-6 mb-6 flex flex-wrap items-center gap-4 animate-fade-in-up">

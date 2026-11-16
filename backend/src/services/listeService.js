@@ -111,6 +111,8 @@ function etatDossier(r) {
   if (r.retourne_at) return 'retourne';
   if (r.remis_at) return 'transmis';
   if (r.statut === 'annulé' || r.statut === 'rejete') return 'annule';
+  // Renvoyé au demandeur, faute d'informations suffisantes (051).
+  if (r.statut === 'a completer') return 'a_completer';
   // Servi autrement (copie numérique tirée de la GED) : rien ne sort du magasin.
   if (r.statut === 'livré') return 'servi';
   return 'demande';
@@ -247,7 +249,8 @@ async function lister(tenantId, user, { cadre, q } = {}) {
   const r = await db.query(
     `SELECT l.id, l.libelle, l.cadre, l.fichier, l.created_at, l.demandeur_id, u.full_name AS demandeur_name,
             count(r.id)::int AS total,
-            count(r.id) FILTER (WHERE p.id IS NULL AND r.statut NOT IN ('rejete', 'annulé', 'livré'))::int AS a_transmettre,
+            count(r.id) FILTER (WHERE p.id IS NULL AND r.statut NOT IN ('rejete', 'annulé', 'livré', 'a completer'))::int AS a_transmettre,
+            count(r.id) FILTER (WHERE r.statut = 'a completer')::int AS a_completer,
             count(r.id) FILTER (WHERE p.id IS NOT NULL AND p.retourne_at IS NULL)::int AS transmis,
             count(r.id) FILTER (WHERE p.retourne_at IS NOT NULL)::int AS retournes,
             count(r.id) FILTER (WHERE p.id IS NOT NULL AND p.retourne_at IS NULL AND p.date_retour_prevue < CURRENT_DATE)::int AS en_retard
@@ -269,6 +272,7 @@ async function detail(tenantId, listeId, user) {
   const liste = await lireListe(tenantId, listeId, user);
   const r = await db.query(
     `SELECT r.id, r.nom_entreprise, r.num_dossier, r.num_acte, r.annee, r.description, r.type_document, r.banque, r.montant, r.statut, r.created_at,
+            r.complement_message, r.complement_champs, r.complement_demande_at, r.complement_fourni_at, r.complement_reponse,
             p.remis_at, to_char(p.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue, p.retourne_at, p.signale_at
        FROM requests r
        LEFT JOIN request_loans p ON p.request_id = r.id
@@ -421,5 +425,5 @@ async function fixerTypologie(tenantId, user, requestId, type) {
 module.exports = {
   LIMITE_LIGNES, lireLignes, etatDossier,
   cadresAdmis, typesAdmis, prioriteParDefaut, creer, lister, detail, transmettre, retourner, dossiersConnus,
-  fixerTypologie,
+  fixerTypologie, processeurs,
 };

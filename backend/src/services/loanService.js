@@ -157,6 +157,9 @@ async function remettre(tenantId, requestId, user, { date_retour_prevue, observa
     if (requestStateMachine.isTerminal(request.statut)) {
       throw erreur(409, `La demande est déjà « ${requestStateMachine.label(request.statut)} » : le dossier ne peut plus être remis.`, 'DEMANDE_TERMINEE');
     }
+    if (request.statut === 'a completer') {
+      throw erreur(409, 'La demande attend les compléments du demandeur : elle ne peut pas encore être servie.', 'A_COMPLETER');
+    }
     const existant = await client.query('SELECT id FROM request_loans WHERE request_id = $1', [requestId]);
     if (existant.rows[0]) throw erreur(409, 'Ce dossier a déjà été remis pour cette demande.', 'DEJA_REMIS');
     // Document et boîte prêtés, s'ils sont connus (registre, récolement).

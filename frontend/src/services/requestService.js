@@ -125,6 +125,9 @@ export const requestService = {
     const response = await api.patch(`/requests/${requestId}/status`, statusData);
     return response.data;
   },
+  // Compléments (051) : l'archive renvoie la demande, le demandeur la complète.
+  demanderComplement: async (requestId, corps) => (await api.post(`/requests/${requestId}/complement`, corps)).data,
+  completer: async (requestId, corps) => (await api.post(`/requests/${requestId}/completer`, corps)).data,
   getStats: async () => {
     const response = await api.get('/requests/stats');
     return response.data;
