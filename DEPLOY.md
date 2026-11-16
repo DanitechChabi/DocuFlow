@@ -76,7 +76,7 @@ Vérification : ouvrir `https://docuflow-backend.onrender.com/` → « DocuFlow-
    ```
    VITE_API_URL=https://docuflow-backend.onrender.com/api
    ```
-5. **Deploy**. L'URL ressemble à `https://docuflow-afgc.vercel.app`.
+5. **Deploy**. L'URL ressemble à `https://docuflow-plateforme.vercel.app`.
 
 ---
 

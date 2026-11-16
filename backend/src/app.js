@@ -37,6 +37,9 @@ const ALLOWED_ORIGINS = isDev
   : [
       process.env.CORS_ORIGIN,
       process.env.APP_URL,
+      // Adresse actuelle de la plateforme ; les deux suivantes restent
+      // acceptées tant que l'ancienne version y est en ligne.
+      'https://docuflow-plateforme.vercel.app',
       'https://docuflow.vercel.app',
       'https://docuflow-afgc.vercel.app',
       // Site vitrine : c'est LUI qui porte la page de tarifs et appelle
@@ -46,6 +49,7 @@ const ALLOWED_ORIGINS = isDev
       // toucher au code ; le domaine ci-dessous est celui des balises canonical
       // du site vitrine (cf. useSEO.js), donc l'adresse réelle des acheteurs.
       process.env.LANDING_URL,
+      'https://getdocuflow-bj.vercel.app',
       'https://getdocuflow.vercel.app',
       'https://docuflow-afgc.com',
       'https://www.docuflow-afgc.com',
