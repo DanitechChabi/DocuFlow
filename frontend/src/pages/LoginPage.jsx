@@ -8,6 +8,7 @@ import { toast } from '../components/Toast';
 import { useTitrePage } from '../hooks/useTitrePage';
 import AuthBackdrop from '../components/auth/AuthBackdrop';
 import AuthBrandMark from '../components/auth/AuthBrandMark';
+import { edition } from '../editions';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -17,7 +18,10 @@ const LoginPage = () => {
   const [showPwd, setShowPwd] = useState(false);
   const navigate = useNavigate();
   const settings = useSettings();
-  const { slug } = useParams();
+  // Sur le site d'une édition dédiée (ex. AFGC), /login ouvre directement
+  // l'espace de cette organisation, comme /:slug/login.
+  const { slug: slugUrl } = useParams();
+  const slug = slugUrl || edition?.organisation;
   const googleBtnRef = useRef(null);
 
   // Entreprise dédiée (page /:slug/login)
@@ -85,8 +89,10 @@ const LoginPage = () => {
   const defaultLogoSrc = '/brand/docuflow-mark-light.png';
   // Branding : priorité à l'entreprise de l'URL, sinon aux réglages globaux
   const displayName = company?.settings?.site_name || company?.name || settings.site_name || 'DocuFlow';
-  const displayDesc = company?.settings?.site_description || settings.site_description || 'Plateforme de gestion documentaire';
-  const displayLogo = company?.settings?.site_logo_url || settings.site_logo_url || defaultLogoSrc;
+  // Sur le site d'une édition, son nom complet (« L'Africaine des Garanties et du
+  // Cautionnement ») plutôt que la description générique de l'espace.
+  const displayDesc = edition?.nomLong || company?.settings?.site_description || settings.site_description || 'Plateforme de gestion documentaire';
+  const displayLogo = company?.settings?.site_logo_url || edition?.logoConnexion || settings.site_logo_url || defaultLogoSrc;
   const suspended = company?.status === 'suspended';
 
   // Titre d'onglet. Sur /:slug/login il nomme l'entreprise : un prestataire qui
@@ -274,16 +280,18 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-3">
-            {!slug && (
+          {/* Sur la page d'un espace (/:slug/login, site d'une édition), rien à
+              proposer ici : pas de séparateur suivi d'un vide. */}
+          {!slug && (
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-3">
               <p className="text-sm text-slate-500">
                 Votre entreprise n'est pas inscrite ?{' '}
                 <Link to="/register-company" className="font-bold transition-colors underline-offset-4 hover:underline" style={{ color: settings.secondary_color || '#3b82f6' }}>
                   Créer mon espace entreprise
                 </Link>
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="text-center mt-6 space-y-2">

@@ -15,6 +15,7 @@ import { circuitService } from '../services/circuitService';
 import { RESTART_TOUR_EVENT } from './OnboardingTour';
 import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
 import Modal from './ui/Modal';
+import { edition } from '../editions';
 
 // ============================================================================
 // Sidebar — navigation principale de la plateforme à deux modules.
@@ -185,7 +186,33 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     ...(!moduleDocuments ? vuesDocuments.filter((v) => v.visible).slice(0, 1) : []),
   ].map((v) => ({ ...v, label: LIBELLES_MODULES[v.to], tourId: undefined }));
 
-  const sections = dansUnModule
+  const sectionOutils = {
+    titre: null,
+    cle: 'outils',
+    items: [
+      {
+        to: '#notifications',
+        label: 'Notifications',
+        icon: <Bell size={18} />,
+        visible: true,
+        bouton: true,
+        onClick: () => window.dispatchEvent(new CustomEvent('docuflow:open-notifications')),
+      },
+    ],
+  };
+
+  const sections = edition
+    ? [
+        // Site d'une édition dédiée (ex. AFGC) : un menu à plat, sans
+        // changement de module. Chaque entrée garde la permission de sa route.
+        {
+          titre: null,
+          cle: 'edition',
+          items: edition.menu.map((m) => entree(m.to, m.label, <m.icone size={18} />, { permission: m.permission, end: m.end })),
+        },
+        sectionOutils,
+      ]
+    : dansUnModule
     ? [
         {
           titre: null,
@@ -223,20 +250,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
           titre: 'Documents',
           items: vuesDocuments,
         },
-        {
-          titre: null,
-          cle: 'outils',
-          items: [
-            {
-              to: '#notifications',
-              label: 'Notifications',
-              icon: <Bell size={18} />,
-              visible: true,
-              bouton: true,
-              onClick: () => window.dispatchEvent(new CustomEvent('docuflow:open-notifications')),
-            },
-          ],
-        },
+        sectionOutils,
       ];
 
   const renduLien = (item, mobile = false) => {

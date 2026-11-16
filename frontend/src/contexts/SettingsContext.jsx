@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { settingsService } from '../services/settingsService';
 import { definirNomSite } from '../utils/titreDocument';
+import { edition } from '../editions';
 
 const SettingsContext = createContext({ site_name: 'DocuFlow', site_description: '' });
 
@@ -17,6 +18,11 @@ const DEFAULT_FAVICONS = {
   '192x192': '/brand/favicon-192.png',
   '180x180': '/brand/apple-touch-icon.png',
 };
+
+// Marque d'une édition dédiée (ex. AFGC) : elle prime sur les réglages du
+// serveur, chargés avant comme après la connexion. Vide sur la plateforme
+// générale.
+const MARQUE_EDITION = edition?.reglages || {};
 
 // Couleurs thème par défaut
 const DEFAULT_THEME = {
@@ -99,6 +105,7 @@ export const SettingsProvider = ({ children }) => {
     site_logo: null,
     site_logo_url: null,
     ...DEFAULT_THEME,
+    ...MARQUE_EDITION,
   });
   const [loaded, setLoaded] = useState(false);
 
@@ -124,7 +131,7 @@ export const SettingsProvider = ({ children }) => {
     const load = async () => {
       try {
         const data = await settingsService.getSettings();
-        setSettings(prev => ({ ...prev, ...data }));
+        setSettings(prev => ({ ...prev, ...data, ...MARQUE_EDITION }));
       } catch {
         // Réglages indisponibles (hors ligne, backend non démarré) : les valeurs
         // par défaut ci-dessus restent en place, l'application reste utilisable.
@@ -138,7 +145,7 @@ export const SettingsProvider = ({ children }) => {
   const refresh = useCallback(async () => {
     try {
       const data = await settingsService.getSettings();
-      setSettings(prev => ({ ...prev, ...data }));
+      setSettings(prev => ({ ...prev, ...data, ...MARQUE_EDITION }));
     } catch {
       // Idem : on conserve les réglages déjà chargés.
     }
