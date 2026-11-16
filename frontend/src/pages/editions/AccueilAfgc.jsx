@@ -1,74 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  PlusCircle, FileSearch, Undo2, ClipboardList, BookOpenCheck, BookOpen, Mail, Warehouse,
+  PlusCircle, FileSearch, Undo2, ClipboardList, BookOpenCheck, BookOpen, Mail, Warehouse, ListChecks,
   ArrowRight, AlertTriangle,
 } from 'lucide-react';
 import { requestService } from '../../services/requestService';
+import { listeService } from '../../services/listeService';
 import { authService } from '../../services/authService';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useTitrePage } from '../../hooks/useTitrePage';
 import { edition } from '../../editions';
+import { Pastille, Chargement } from './afgc/elements';
+import { etatDemande, intitule, references } from './afgc/vocabulaire';
 
 // ============================================================================
 // Accueil de l'édition AFGC : l'essentiel en trois boutons.
 //
-// Un agent n'a que trois gestes : demander un dossier, voir où en sont ses
-// demandes, rendre ce qu'il a emprunté. L'archiviste, lui, traite : la file
-// « à traiter », les dossiers sortis (et les retards), les registres.
-// Chaque carte mène à une page existante de DocuFlow, et ses compteurs viennent
-// des mêmes routes que cette page : l'accueil n'invente aucune donnée.
+// Un agent n'a que trois gestes : demander un dossier (ou une liste), voir où
+// en sont ses demandes — Demandé, Transmis, Retourné — et retourner ce qu'il
+// a reçu. L'archiviste, lui, traite : la file « à traiter » (demandes et
+// listes), les dossiers sortis (et les retards), les registres.
+// Chaque carte mène à une page de la plateforme, et ses compteurs viennent des
+// mêmes routes que cette page : l'accueil n'invente aucune donnée.
 // ============================================================================
 
-const TERMINAUX = new Set(['livré', 'rejete', 'annulé']);
 const PRET_OUVERT = new Set(['en_cours', 'en_retard', 'signale']);
-
-/** Libellé d'avancement d'une demande, dans les mots de l'agent. */
-function avancement(d) {
-  if (d.loan_etat === 'en_retard') return { texte: 'À rendre (en retard)', ton: 'rouge' };
-  if (PRET_OUVERT.has(d.loan_etat)) return { texte: 'Chez vous', ton: 'vert' };
-  if (d.loan_etat === 'retourne') return { texte: 'Rendu', ton: 'gris' };
-  switch (d.statut) {
-    case 'en attente': return { texte: 'Demandé', ton: 'ambre' };
-    case 'a traiter': return { texte: 'En recherche', ton: 'ambre' };
-    case 'transmis': return { texte: 'Transmis', ton: 'vert' };
-    case 'livré': return { texte: 'Reçu', ton: 'gris' };
-    case 'rejete': return { texte: 'Refusé', ton: 'rouge' };
-    case 'annulé': return { texte: 'Annulé', ton: 'gris' };
-    default: return { texte: d.statut || '—', ton: 'gris' };
-  }
-}
-
-const TONS = {
-  vert: 'bg-green-50 text-green-700',
-  ambre: 'bg-amber-50 text-amber-700',
-  rouge: 'bg-red-50 text-red-700',
-  gris: 'bg-slate-100 text-slate-500',
-};
-
-/** Comment désigner un dossier : l'entreprise d'abord, sinon la description. */
-function intitule(d) {
-  return d.nom_entreprise || d.description || 'Dossier sans intitulé';
-}
-
-/** Références lisibles : n° de dossier, n° d'acte, année. */
-function references(d) {
-  return [
-    d.num_dossier && `Dossier ${d.num_dossier}`,
-    d.num_acte && `Acte ${d.num_acte}`,
-    d.annee && String(d.annee),
-  ].filter(Boolean).join(' · ');
-}
 
 const joursDeRetard = (date) => {
   if (!date) return 0;
   const ecart = Date.now() - new Date(`${String(date).slice(0, 10)}T00:00:00`).getTime();
   return Math.max(0, Math.floor(ecart / 86400000));
 };
-
-const Pastille = ({ ton = 'gris', children }) => (
-  <span className={`px-3 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${TONS[ton]}`}>{children}</span>
-);
 
 /** Grande carte d'action. `principale` : le geste le plus fréquent, en vert. */
 const CarteAction = ({ to, icone: Icone, titre, texte, principale = false, children }) => (
@@ -94,10 +56,6 @@ const CarteAction = ({ to, icone: Icone, titre, texte, principale = false, child
   </Link>
 );
 
-const Chargement = () => (
-  <div className="py-6 text-center"><div className="w-6 h-6 border-2 border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto" /></div>
-);
-
 const AccueilAfgc = () => {
   const { can } = usePermissions();
   const user = authService.getCurrentUser();
@@ -105,6 +63,7 @@ const AccueilAfgc = () => {
 
   const [mesDemandes, setMesDemandes] = useState(null);
   const [aTraiter, setATraiter] = useState(null);
+  const [listesOuvertes, setListesOuvertes] = useState(null);
   const [sorties, setSorties] = useState(null);
 
   useTitrePage('Accueil');
@@ -112,9 +71,12 @@ const AccueilAfgc = () => {
   const charger = useCallback(async () => {
     if (traite) {
       await Promise.all([
-        requestService.getStats()
-          .then((s) => setATraiter((s?.['a traiter'] || 0) + (s?.['en attente'] || 0)))
+        requestService.getAllRequests()
+          .then((l) => setATraiter((Array.isArray(l) ? l : []).filter((d) => !d.lot_id && etatDemande(d).cle === 'demande').length))
           .catch(() => setATraiter(0)),
+        listeService.lister()
+          .then((l) => setListesOuvertes((Array.isArray(l) ? l : []).filter((x) => x.a_transmettre > 0).length))
+          .catch(() => setListesOuvertes(0)),
         requestService.getRegistrePrets()
           .then((l) => setSorties((Array.isArray(l) ? l : []).filter((p) => PRET_OUVERT.has(p.etat))))
           .catch(() => setSorties([])),
@@ -131,22 +93,21 @@ const AccueilAfgc = () => {
   const prenom = (user?.full_name || '').split(' ')[0] || 'bienvenue';
 
   // --- Agent ---
-  const enCours = (mesDemandes || []).filter((d) => !TERMINAUX.has(d.statut) || PRET_OUVERT.has(d.loan_etat));
-  const chezMoi = (mesDemandes || []).filter((d) => PRET_OUVERT.has(d.loan_etat));
-  const aRendreEnRetard = chezMoi.filter((d) => d.loan_etat === 'en_retard').length;
+  const enCours = (mesDemandes || []).filter((d) => ['demande', 'transmis'].includes(etatDemande(d).cle));
+  const transmis = (mesDemandes || []).filter((d) => etatDemande(d).cle === 'transmis');
+  const enRetardAgent = transmis.filter((d) => d.loan_etat === 'en_retard').length;
 
   // --- Archiviste ---
   const enRetard = (sorties || []).filter((p) => p.etat === 'en_retard');
 
   return (
     <div className="relative p-4 md:p-8 max-w-6xl mx-auto">
-      {/* En-tête : l'emblème de l'AFGC, puis le salut. */}
       <div className="flex items-center gap-4 md:gap-5 mb-8 animate-fade-in-up">
         <img src={edition?.embleme} alt="" className="w-14 h-14 md:w-16 md:h-16 object-contain flex-shrink-0" />
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Bonjour, {prenom}</h1>
           <p className="text-sm md:text-base text-slate-500">
-            {traite ? 'Archives de l\'AFGC : les demandes à traiter et les dossiers sortis.' : 'Archives de l\'AFGC : demandez un dossier, suivez-le, rendez-le.'}
+            {traite ? 'Archives de l\'AFGC : les demandes à traiter et les dossiers sortis.' : 'Archives de l\'AFGC : demandez un dossier, suivez-le, retournez-le.'}
           </p>
         </div>
         {traite && can('requests.create') && (
@@ -159,29 +120,24 @@ const AccueilAfgc = () => {
       {traite ? (
         <>
           <div className="grid gap-5 md:grid-cols-3">
-            <CarteAction
-              to="/demandes/a-traiter"
-              icone={ClipboardList}
-              titre="À traiter"
-              texte="Les demandes reçues : trouver le dossier, le remettre, noter son retour."
-              principale
-            >
+            <CarteAction to="/demandes/a-traiter" icone={ClipboardList} titre="À traiter" principale
+              texte="Les demandes et les listes reçues : transmettre le dossier, puis noter son retour.">
               {aTraiter !== null && (
                 <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold">
-                  {aTraiter === 0 ? 'Rien en attente' : `${aTraiter} demande${aTraiter > 1 ? 's' : ''}`}
+                  {aTraiter === 0 ? 'Aucune demande' : `${aTraiter} demande${aTraiter > 1 ? 's' : ''}`}
+                </span>
+              )}
+              {listesOuvertes > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold inline-flex items-center gap-1.5">
+                  <ListChecks size={13} /> {listesOuvertes} liste{listesOuvertes > 1 ? 's' : ''}
                 </span>
               )}
             </CarteAction>
-            <CarteAction
-              to="/demandes/prets"
-              icone={BookOpenCheck}
-              titre="Dossiers sortis"
-              texte="Qui a quel dossier, depuis quand, et pour quand il doit revenir."
-            >
-              {sorties !== null && <Pastille ton="vert">{sorties.length} sorti{sorties.length > 1 ? 's' : ''}</Pastille>}
+            <CarteAction to="/demandes/prets" icone={BookOpenCheck} titre="Dossiers sortis"
+              texte="Qui a quel dossier, dans quel cadre, et pour quand il doit revenir.">
+              {sorties !== null && <Pastille ton="vert">{sorties.length} transmis</Pastille>}
               {enRetard.length > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {enRetard.length} en retard</Pastille>}
             </CarteAction>
-            {/* Registres : trois liens dans une même carte. */}
             <div className="glass-card-premium rounded-3xl p-7 animate-fade-in-up">
               <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-6">
                 <BookOpen size={26} />
@@ -212,7 +168,7 @@ const AccueilAfgc = () => {
                   <li key={p.id} className="py-3 flex items-center gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-slate-800 truncate">{intitule(p)}</div>
-                      <div className="text-xs text-slate-400 truncate">{[references(p), p.emprunteur_name && `chez ${p.emprunteur_name}`].filter(Boolean).join(' · ')}</div>
+                      <div className="text-xs text-slate-400 truncate">{[references(p), p.cadre, p.emprunteur_name && `chez ${p.emprunteur_name}`].filter(Boolean).join(' · ')}</div>
                     </div>
                     <Pastille ton="rouge">{joursDeRetard(p.date_retour_prevue)} j de retard</Pastille>
                   </li>
@@ -226,29 +182,16 @@ const AccueilAfgc = () => {
       ) : (
         <>
           <div className="grid gap-5 md:grid-cols-3">
-            <CarteAction
-              to="/demandes/nouvelle"
-              icone={PlusCircle}
-              titre="Demander un dossier"
-              texte="Indiquez l'entreprise ou le n° de dossier : l'archiviste est prévenu aussitôt."
-              principale
-            />
-            <CarteAction
-              to="/demandes/mes-demandes"
-              icone={FileSearch}
-              titre="Mes dossiers"
-              texte="Où en est chacune de vos demandes, de l'envoi jusqu'au retour."
-            >
+            <CarteAction to="/demandes/nouvelle" icone={PlusCircle} titre="Demander un dossier" principale
+              texte="Tapez l'entreprise ou un numéro, un clic sur « Demander » : l'archive est prévenue. Une liste Excel se demande d'un coup." />
+            <CarteAction to="/demandes/mes-demandes" icone={FileSearch} titre="Mes dossiers"
+              texte="Où en est chaque demande : Demandé, Transmis, Retourné.">
               {mesDemandes !== null && <Pastille ton={enCours.length ? 'ambre' : 'gris'}>{enCours.length} en cours</Pastille>}
             </CarteAction>
-            <CarteAction
-              to="/demandes/mes-demandes"
-              icone={Undo2}
-              titre="Rendre un dossier"
-              texte="Rapportez-le à l'archiviste : il note le retour, et vous n'avez plus rien à signer."
-            >
-              {mesDemandes !== null && <Pastille ton={chezMoi.length ? 'vert' : 'gris'}>{chezMoi.length} chez vous</Pastille>}
-              {aRendreEnRetard > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {aRendreEnRetard} en retard</Pastille>}
+            <CarteAction to="/demandes/mes-demandes" icone={Undo2} titre="Retourner un dossier"
+              texte="Rapportez-le à l'archive : l'archiviste note le retour d'un clic et vous en êtes déchargé.">
+              {mesDemandes !== null && <Pastille ton={transmis.length ? 'vert' : 'gris'}>{transmis.length} transmis</Pastille>}
+              {enRetardAgent > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {enRetardAgent} en retard</Pastille>}
             </CarteAction>
           </div>
 
@@ -259,14 +202,14 @@ const AccueilAfgc = () => {
             {mesDemandes === null ? <Chargement /> : enCours.length ? (
               <ul className="divide-y divide-slate-100">
                 {enCours.slice(0, 6).map((d) => {
-                  const a = avancement(d);
+                  const e = etatDemande(d);
                   return (
                     <li key={d.id} className="py-3 flex items-center gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-slate-800 truncate">{intitule(d)}</div>
-                        <div className="text-xs text-slate-400 truncate">{references(d) || 'Sans référence'}</div>
+                        <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ') || 'Sans référence'}</div>
                       </div>
-                      <Pastille ton={a.ton}>{a.texte}</Pastille>
+                      <Pastille ton={e.ton}>{e.texte}</Pastille>
                     </li>
                   );
                 })}

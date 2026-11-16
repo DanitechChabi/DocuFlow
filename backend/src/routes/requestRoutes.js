@@ -4,6 +4,7 @@ const requestController = require('../controllers/requestController');
 const requestFieldController = require('../controllers/requestFieldController');
 const loanController = require('../controllers/loanController');
 const gedMatchController = require('../controllers/gedMatchController');
+const listeController = require('../controllers/listeController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
 const { PERMISSIONS_VUE_GLOBALE } = require('../services/requestAccessService');
@@ -33,6 +34,19 @@ router.get('/fields', requirePermission('settings.manage'), requestFieldControll
 router.put('/fields', requirePermission('settings.manage'), requestFieldController.syncFields);
 router.post('/fields/provision', requirePermission('settings.manage'), requestFieldController.provisionDefaults);
 router.patch('/fields/:id/visibility', requirePermission('settings.manage'), requestFieldController.setVisibility);
+
+// --- Listes de demandes et cadre des sorties (migration 047) ---
+// Avant les routes `/:id/...`, pour la même raison que `/fields`. Déposer et
+// suivre ses listes : qui peut demander ; transmettre et noter le retour :
+// l'archive (requests.process). Le service limite la lecture d'une liste à son
+// demandeur, à qui l'a déposée et à l'archive.
+router.get('/dossiers-connus', requirePermission('requests.create'), listeController.dossiersConnus);
+router.get('/cadres', requirePermission('requests.view'), listeController.cadres);
+router.get('/listes', requirePermission('requests.view'), listeController.lister);
+router.post('/listes', requirePermission('requests.create'), listeController.creer);
+router.get('/listes/:listeId', requirePermission('requests.view'), listeController.detail);
+router.post('/listes/:listeId/transmission', requirePermission('requests.process'), listeController.transmettre);
+router.post('/listes/:listeId/retour', requirePermission('requests.process'), listeController.retourner);
 
 // --- Prêt des dossiers physiques (migration 025) ---
 // Le registre est déclaré AVANT `/:id/...` (voir la note sur `/fields`).

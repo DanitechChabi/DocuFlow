@@ -62,6 +62,16 @@ import { edition } from './editions';
 // générale n'en télécharge rien.
 const AccueilEdition = edition?.accueil ? lazy(edition.accueil) : null;
 
+// Écrans qu'une édition substitue à ceux de DocuFlow, adresse par adresse.
+const PAGES_EDITION = Object.fromEntries(
+  Object.entries(edition?.pages || {}).map(([chemin, charger]) => [chemin, lazy(charger)])
+);
+/** L'écran de l'édition pour cette adresse s'il en existe un, sinon celui de DocuFlow. */
+const ecran = (chemin, defaut) => {
+  const Page = PAGES_EDITION[chemin];
+  return Page ? <Suspense fallback={null}><Page /></Suspense> : defaut;
+};
+
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = authService.getCurrentUser();
   if (!user) {
@@ -132,12 +142,12 @@ function App() {
           <Route path="/courrier/nouveau" element={<CourrierNouveauPage />} />
           <Route path="/courrier/registre" element={<CourrierRegistrePage />} />
           <Route path="/courrier/:id" element={<CourrierFichePage />} />
-          <Route path="/demandes/mes-demandes" element={<Dashboard tab="requests" />} />
-          <Route path="/demandes/nouvelle" element={<Dashboard tab="requests" nouveau />} />
-          <Route path="/demandes/a-traiter" element={<Dashboard tab="my_tasks" />} />
+          <Route path="/demandes/mes-demandes" element={ecran('/demandes/mes-demandes', <Dashboard tab="requests" />)} />
+          <Route path="/demandes/nouvelle" element={ecran('/demandes/nouvelle', <Dashboard tab="requests" nouveau />)} />
+          <Route path="/demandes/a-traiter" element={ecran('/demandes/a-traiter', <Dashboard tab="my_tasks" />)} />
           <Route path="/demandes/historique" element={<Dashboard tab="history" />} />
           <Route path="/demandes/toutes" element={<Dashboard tab="all_requests" />} />
-          <Route path="/demandes/prets" element={<PretsPage />} />
+          <Route path="/demandes/prets" element={ecran('/demandes/prets', <PretsPage />)} />
           <Route path="/dashboard" element={<Navigate to="/demandes" replace />} />
           <Route path="/dashboard/requests" element={<Navigate to="/demandes/mes-demandes" replace />} />
           <Route path="/dashboard/tasks" element={<Navigate to="/demandes/a-traiter" replace />} />
