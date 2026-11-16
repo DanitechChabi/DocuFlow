@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2,
+  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen,
 } from 'lucide-react';
 
 /**
@@ -49,6 +49,7 @@ const EDITIONS = {
       { to: '/demandes/mes-demandes', label: 'Mes dossiers', icone: FileSearch, permission: 'requests.view' },
       { to: '/demandes/a-traiter', label: 'À traiter', icone: ClipboardList, permission: 'requests.process' },
       { to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
+      { to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
       { to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
       { to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
       { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
@@ -84,6 +85,10 @@ const EDITIONS = {
     // Écrans propres à l'édition, à la place de ceux de DocuFlow aux mêmes
     // adresses : mêmes routes, mêmes permissions, vocabulaire de l'AFGC
     // (Demandé → Transmis → Retourné) et listes de dossiers.
+    // Écrans propres à l'édition, à des adresses nouvelles.
+    routes: {
+      '/archives/entrees': () => import('../pages/editions/afgc/EntreesAfgc'),
+    },
     pages: {
       // Connexion (identifiant ou adresse Outlook) et inscription en deux
       // temps (« Vous êtes… » : le département, puis l'identité).

@@ -66,6 +66,9 @@ const AccueilEdition = edition?.accueil ? lazy(edition.accueil) : null;
 const PAGES_EDITION = Object.fromEntries(
   Object.entries(edition?.pages || {}).map(([chemin, charger]) => [chemin, lazy(charger)])
 );
+// Écrans PROPRES à une édition, à des adresses que la plateforme générale
+// n'a pas (ex. l'entrée des dossiers de l'AFGC).
+const ROUTES_EDITION = Object.entries(edition?.routes || {}).map(([chemin, charger]) => [chemin, lazy(charger)]);
 /** L'écran de l'édition pour cette adresse s'il en existe un, sinon celui de DocuFlow. */
 const ecran = (chemin, defaut) => {
   const Page = PAGES_EDITION[chemin];
@@ -187,6 +190,9 @@ function App() {
           <Route path="/super-admin-portal" element={<ProtectedRoute allowedRoles={['superadmin']}><SuperAdminPage /></ProtectedRoute>} />
           <Route path="/admin-portal" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><CompanyAdminPage /></ProtectedRoute>} />
           <Route path="/admin/audit-logs" element={<ProtectedRoute allowedRoles={['admin', 'superadmin']}><AdminAuditLogsPage /></ProtectedRoute>} />
+          {ROUTES_EDITION.map(([chemin, Page]) => (
+            <Route key={chemin} path={chemin} element={<Suspense fallback={null}><Page /></Suspense>} />
+          ))}
         </Route>
 
         {/* Adresse inconnue — UNE SEULE route, déclarée en dernier.
