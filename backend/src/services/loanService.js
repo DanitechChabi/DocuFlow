@@ -379,7 +379,7 @@ async function registre(tenantId, { etat, cadre, liste, q, du, au, type } = {}) 
     : conds);
   const requete = (listes) => db.query(
     `SELECT l.*, to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue,
-            q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document, q.motif AS cadre,
+            q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document, q.banque, q.montant, q.motif AS cadre,
             ${listes ? 'q.lot_id AS liste_id, rl.libelle AS liste_libelle,' : ''}
             ue.full_name AS emprunteur_name, ur.full_name AS remis_par_name, ut.full_name AS retourne_par_name
        FROM request_loans l

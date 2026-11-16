@@ -30,6 +30,16 @@ const EDITIONS = {
     // manque peut le créer en s'inscrivant ; seules les adresses
     // professionnelles de l'AFGC (Outlook, @afgcsa.com) sont admises.
     reglages: { registration_new_department: true, registration_email_domains: 'afgcsa.com' },
+    // Ce qu'une demande doit comporter selon la typologie du dossier, pour que
+    // l'archive le retrouve sans rappeler le demandeur.
+    exigences: {
+      'Bonne exécution (CBE)': ['nom_entreprise', 'num_acte'],
+      'Avance de démarrage (CAD)': ['nom_entreprise', 'num_acte'],
+      'Caution professionnelle (CP)': ['nom_entreprise', 'num_acte'],
+      'Caution douanière (CD)': ['nom_entreprise', 'num_acte'],
+      'Prêt': ['nom_entreprise', 'annee'],
+      'Garantie bancaire': ['nom_entreprise', 'banque', 'annee'],
+    },
     // Départements : « SIGLE — intitulé ». Le sigle sert à proposer d'abord
     // les motifs habituels de chacun (édition AFGC du frontend).
     departements: [

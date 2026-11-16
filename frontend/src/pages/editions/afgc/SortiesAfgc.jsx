@@ -131,11 +131,11 @@ const SortiesAfgc = () => {
       const user = authService.getCurrentUser();
       await exporterClasseur(nomFichier('sorties', filtres.cadre, filtres.type, filtres.du, filtres.au || new Date().toISOString().slice(0, 10)), [{
         nom: 'Sorties et retours',
-        entetes: ['N°', 'Sortie le', 'Entreprise', 'Typologie', 'N° de dossier', 'N° d\'acte', 'Année', 'Motif', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
-        largeurs: [6, 12, 34, 24, 14, 16, 7, 22, 14, 22, 22, 12, 12, 11, 40],
+        entetes: ['N°', 'Sortie le', 'Entreprise', 'Typologie', 'N° de dossier', 'N° d\'acte', 'Banque', 'Année', 'Montant', 'Motif', 'Liste', 'Transmis à', 'Transmis par', 'Retour prévu', 'Retourné le', 'État', 'Observations'],
+        largeurs: [6, 12, 34, 24, 14, 16, 20, 7, 14, 22, 14, 22, 22, 12, 12, 11, 40],
         lignes: chronologique.map((p, i) => [
-          i + 1, dateExcel(p.remis_at), p.nom_entreprise || p.description || '', p.type_document || '', p.num_dossier || '', p.num_acte || '', p.annee || '',
-          p.cadre || '', p.liste_libelle || '', p.emprunteur_name || '', p.remis_par_name || '',
+          i + 1, dateExcel(p.remis_at), p.nom_entreprise || p.description || '', p.type_document || '', p.num_dossier || '', p.num_acte || '', p.banque || '', p.annee || '',
+          p.montant === null || p.montant === undefined ? '' : Number(p.montant), p.cadre || '', p.liste_libelle || '', p.emprunteur_name || '', p.remis_par_name || '',
           dateExcel(p.date_retour_prevue), dateExcel(p.retourne_at), etatSortie(p).texte, observations(p),
         ]),
       }, {

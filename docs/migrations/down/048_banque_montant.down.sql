@@ -1,0 +1,2 @@
+ALTER TABLE requests DROP COLUMN IF EXISTS montant;
+ALTER TABLE requests DROP COLUMN IF EXISTS banque;

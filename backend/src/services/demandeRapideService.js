@@ -19,6 +19,7 @@ const loanService = require('./loanService');
 const listeService = require('./listeService');
 const { allowedValues } = require('../helpers/requestOptions');
 const { lireSaisie, libelleDemande } = require('../helpers/requestInput');
+const exigencesTypologie = require('../helpers/exigencesTypologie');
 
 function erreur(statut, message, code) {
   const e = new Error(message);
@@ -59,6 +60,8 @@ async function pourAgent(tenantId, user, corps = {}) {
     num_acte: corps.num_acte,
     annee: corps.annee,
     description: corps.description,
+    banque: corps.banque,
+    montant: corps.montant,
   });
   if (errors.length) throw erreur(400, errors.join(' '));
 
@@ -71,13 +74,16 @@ async function pourAgent(tenantId, user, corps = {}) {
   if (type && !allowedValues(await listeService.typesAdmis(tenantId)).includes(type)) {
     throw erreur(400, `Typologie inconnue : « ${type} ».`);
   }
+  const manque = exigencesTypologie.manque(values, type, await exigencesTypologie.exigencesDe(tenantId));
+  if (manque) throw erreur(400, manque);
   const priorite = await listeService.prioriteParDefaut(tenantId);
 
   return loanService.enTransaction(async (client) => {
     const request = (await client.query(
-      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, type_document)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'en attente', $9, $10) RETURNING *`,
-      [tenantId, agent.id, values.nom_entreprise, values.num_dossier, values.num_acte, values.annee, cadre, priorite, values.description, type]
+      `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, type_document, banque, montant)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'en attente', $9, $10, $11, $12) RETURNING *`,
+      [tenantId, agent.id, values.nom_entreprise, values.num_dossier, values.num_acte, values.annee, cadre, priorite, values.description, type,
+        values.banque, values.montant]
     )).rows[0];
     await client.query(
       `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)

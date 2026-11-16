@@ -10,6 +10,7 @@ const requestFieldService = require('../services/requestFieldService');
 const catalog = require('../config/settingsCatalog');
 const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
 const { lireSaisie, libelleDemande } = require('../helpers/requestInput');
+const exigencesTypologie = require('../helpers/exigencesTypologie');
 const requestAccess = require('../services/requestAccessService');
 const roleService = require('../services/roleService');
 const loanService = require('../services/loanService');
@@ -128,6 +129,10 @@ exports.createRequest = async (req, res) => {
       });
     }
 
+    // Ce que la typologie exige (édition AFGC : n° d'acte des cautions…).
+    const manqueTypologie = exigencesTypologie.manque(v, typeFourni, await exigencesTypologie.exigencesDe(tenantId));
+    if (manqueTypologie) return res.status(400).json({ message: manqueTypologie });
+
     const motifFourni = String(motif || '').trim();
     if (motifFourni && !allowedValues(options.motifs).includes(motifFourni)) {
       return res.status(400).json({ message: `Motif non proposé : « ${motifFourni} ».` });
@@ -176,6 +181,10 @@ exports.createRequest = async (req, res) => {
     const colonnes = ['id_user', 'nom_entreprise', 'num_dossier', 'num_acte', 'annee', 'type_document', 'motif', 'priorite', 'statut'];
     const valeurs = [userId, v.nom_entreprise, v.num_dossier, v.num_acte, v.annee, typeFourni || null, motifRetenu, prioriteRetenue, 'en attente'];
     const nouvelles = { description: v.description, date_souhaitee: v.date_souhaitee, beneficiaire: v.beneficiaire, source_request_id: v.source_request_id };
+    // Banque et montant (048) : seulement s'ils sont donnés, pour qu'une base
+    // pas encore migrée continue d'enregistrer les demandes ordinaires.
+    if (v.banque) nouvelles.banque = v.banque;
+    if (v.montant !== null) nouvelles.montant = v.montant;
     let newRequest;
     try {
       newRequest = await tenantDb.insert(
