@@ -29,6 +29,7 @@ const catalog = require('../config/settingsCatalog');
 const { normalizeOptions, allowedValues } = require('../helpers/requestOptions');
 const { lireSaisie, aujourdhui, libelleDemande } = require('../helpers/requestInput');
 const exigencesTypologie = require('../helpers/exigencesTypologie');
+const mailService = require('./mailService');
 
 const LIMITE_LIGNES = 2000;
 
@@ -217,14 +218,16 @@ async function creer(tenantId, user, { libelle, cadre, fichier, lignes, demandeu
     return l;
   });
 
-  // Un seul avis à l'archive pour toute la liste.
-  for (const uid of await processeurs(tenantId)) {
-    if (uid === user.id) continue;
+  // Un seul avis à l'archive pour toute la liste (cloche et courriel).
+  const archive = (await processeurs(tenantId)).filter((uid) => uid !== user.id);
+  for (const uid of archive) {
     await loanService.notifier(db, tenantId, uid, 'Nouvelle liste de dossiers',
       `${nom} — ${leCadre} : ${valeurs.length} dossier${valeurs.length > 1 ? 's' : ''} demandé${valeurs.length > 1 ? 's' : ''}.`,
       'request_created', null);
   }
-  return detail(tenantId, liste.id, user);
+  const complete = await detail(tenantId, liste.id, user);
+  mailService.notifierComptes(tenantId, archive, 'nouvelle_liste', complete, { demandeur: complete.demandeur_name || user.full_name || null });
+  return complete;
 }
 
 /** Les listes visibles, avec leur avancement. */
@@ -295,6 +298,18 @@ function filtrerIds(dossiers, ids, garde) {
   return dossiers.filter((d) => garde(d) && (!voulus || voulus.has(d.id))).map((d) => d.id);
 }
 
+/** Regroupe des éléments par agent : Map(id → éléments). */
+function parAgent(elements, cle) {
+  const m = new Map();
+  for (const e of elements) {
+    const k = cle(e);
+    if (!k) continue;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(e);
+  }
+  return m;
+}
+
 async function avisGroupe(tenantId, demandes, titre, message, type) {
   const parEmprunteur = new Map();
   for (const d of demandes) parEmprunteur.set(d.id_user, (parEmprunteur.get(d.id_user) || 0) + 1);
@@ -325,6 +340,11 @@ async function transmettre(tenantId, listeId, user, { ids, date_retour_prevue } 
   await avisGroupe(tenantId, faits.map((f) => f.request), 'Dossiers transmis',
     (n) => `Liste « ${liste.libelle} » : ${n} dossier${n > 1 ? 's' : ''} transmis${date ? `, retour prévu le ${date}` : ''}.`,
     'loan_handover');
+  // Un courriel par agent, avec SES dossiers et la date de retour.
+  const retourIso = retour ? (retour instanceof Date ? aujourdhui(retour) : String(retour).slice(0, 10)) : null;
+  for (const [uid, dossiers] of parAgent(faits.map((f) => f.request), (r) => r.id_user)) {
+    mailService.notifierComptes(tenantId, [uid], 'liste_transmise', { libelle: liste.libelle, dossiers }, { dateRetour: retourIso, par: user.full_name || null });
+  }
   return { transmis: faits.length, liste: await detail(tenantId, listeId, user) };
 }
 
@@ -344,6 +364,11 @@ async function retourner(tenantId, listeId, user, { ids, observation } = {}) {
   await avisGroupe(tenantId, faits.map((f) => ({ id_user: f.pret.emprunteur_id })), 'Retour enregistré',
     (n) => `Liste « ${liste.libelle} » : retour de ${n} dossier${n > 1 ? 's' : ''} enregistré, vous en êtes déchargé.`,
     'loan_returned');
+  // Un courriel de décharge par agent : la preuve de restitution.
+  const parId = new Map(liste.dossiers.map((d) => [d.id, d]));
+  for (const [uid, dossiers] of parAgent(faits.map((f) => ({ ...parId.get(f.pret.request_id), id_user: f.pret.emprunteur_id })), (r) => r.id_user)) {
+    mailService.notifierComptes(tenantId, [uid], 'liste_retournee', { libelle: liste.libelle, dossiers }, { par: user.full_name || null });
+  }
   return { retournes: faits.length, liste: await detail(tenantId, listeId, user) };
 }
 

@@ -61,15 +61,6 @@ async function historiser(tenantId, { requestId, user, action, avant, apres, com
   }
 }
 
-async function courriel(tenantId, userId, request) {
-  try {
-    const email = (await db.query('SELECT email FROM users WHERE id = $1 AND tenant_id = $2', [userId, tenantId])).rows[0]?.email;
-    if (email) await mailService.notify({ tenantId, to: email, event: 'status_update', request });
-  } catch (err) {
-    console.error('[compléments] e-mail :', err.message);
-  }
-}
-
 const enumeration = (l) => (l.length > 1 ? `${l.slice(0, -1).join(', ')} et ${l[l.length - 1]}` : l[0] || '');
 
 /**
@@ -105,7 +96,8 @@ async function demander(tenantId, user, id, { champs, message } = {}) {
     'complement', request.id);
   await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, $3, $4)',
     [user.id, `A demandé des compléments pour ${libelleDemande(request)}`.slice(0, 500), request.id, tenantId]);
-  await courriel(tenantId, request.id_user, { ...request, statut: A_COMPLETER });
+  mailService.notifierComptes(tenantId, [request.id_user], 'complement_demande', { ...request, statut: A_COMPLETER },
+    { manque, message: mot, par: user.full_name || null });
   return { ...request, statut: A_COMPLETER, complement_message: mot, complement_champs: liste };
 }
 
@@ -151,7 +143,9 @@ async function completer(tenantId, user, id, corps = {}) {
   const apres = { ...request, ...fusion, statut: 'en attente' };
   await historiser(tenantId, { requestId: request.id, user, action: 'Demande complétée', avant: A_COMPLETER, apres: 'en attente', commentaire: reponse });
   // L'archiviste qui a demandé les compléments n'est pas forcément là : toute l'archive est prévenue.
-  for (const uid of await listeService.processeurs(tenantId)) {
+  const archive = await listeService.processeurs(tenantId);
+  mailService.notifierComptes(tenantId, archive, 'complement_fourni', apres, { demandeur: user.full_name || null, reponse });
+  for (const uid of archive) {
     await loanService.notifier(db, tenantId, uid, 'Demande complétée',
       `${user.full_name || 'Le demandeur'} a complété ${libelleDemande(apres)}${reponse ? ` : « ${reponse} »` : ''}.`.slice(0, 1000),
       'complement', request.id);

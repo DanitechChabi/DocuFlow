@@ -102,6 +102,7 @@ async function pourAgent(tenantId, user, corps = {}) {
     } else {
       await loanService.notifier(client, tenantId, agent.id, 'Demande enregistrée',
         `L'archive a enregistré votre demande : ${libelleDemande(request)}.`, 'request_created', request.id);
+      require('./mailService').notifierComptes(tenantId, [agent.id], 'request_created', request);
     }
     return { request: { ...request, statut: pret ? 'livré' : request.statut }, pret };
   });
