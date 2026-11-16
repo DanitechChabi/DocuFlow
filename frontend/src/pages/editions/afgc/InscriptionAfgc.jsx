@@ -58,7 +58,7 @@ const InscriptionAfgc = () => {
     if (cle === 'username') setIdentifiantTouche(true);
   };
 
-  // Un seul domaine admis (l'AFGC : @afgc.sa) : l'agent ne tape que le début
+  // Un seul domaine admis (l'AFGC : @afgcsa.com) : l'agent ne tape que le début
   // de son adresse, la fin est déjà écrite. Plusieurs domaines : l'adresse
   // entière, contrôlée.
   const domaineUnique = domaines.length === 1 ? domaines[0] : null;

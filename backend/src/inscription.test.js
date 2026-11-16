@@ -137,14 +137,14 @@ const appel = (handler, req) => new Promise((resolve) => {
     const editionService = require('./services/editionService');
     await editionService.appliquer(t2, admin, 'afgc');
     ok((await settingsService.get(t2, 'registration_new_department', false)) === true, 'configuration AFGC : un agent peut créer son département en s\'inscrivant');
-    ok((await settingsService.get(t2, 'registration_email_domains', '')) === 'afgc.sa', 'configuration AFGC : seules les adresses @afgc.sa sont admises');
+    ok((await settingsService.get(t2, 'registration_email_domains', '')) === 'afgcsa.com', 'configuration AFGC : seules les adresses @afgcsa.com sont admises');
     // Un choix de l'administrateur n'est pas écrasé par une nouvelle application.
     await db.query("UPDATE settings SET value = 'false' WHERE tenant_id = $1 AND key = 'registration_new_department'", [t2]);
-    await db.query("UPDATE settings SET value = 'afgc.sa, afgc-groupe.test' WHERE tenant_id = $1 AND key = 'registration_email_domains'", [t2]);
+    await db.query("UPDATE settings SET value = 'afgcsa.com, afgc-groupe.test' WHERE tenant_id = $1 AND key = 'registration_email_domains'", [t2]);
     settingsService.invalidate(t2);
     await editionService.appliquer(t2, admin, 'afgc');
     ok((await settingsService.get(t2, 'registration_new_department', true)) === false
-      && (await settingsService.get(t2, 'registration_email_domains', '')) === 'afgc.sa, afgc-groupe.test',
+      && (await settingsService.get(t2, 'registration_email_domains', '')) === 'afgcsa.com, afgc-groupe.test',
       'nouvelle application : les réglages choisis par l\'administrateur restent');
   }
 
