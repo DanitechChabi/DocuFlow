@@ -133,14 +133,21 @@ async function enTransaction(fn) {
 // Décret n° 2007-532, art. 35 : prêt d'original, copie, ou consultation sur place.
 const NATURES_PRET = ['original', 'copie', 'consultation'];
 
-async function remettre(tenantId, requestId, user, { date_retour_prevue, observation, nature = 'original', document_id: documentId = null, emplacement_id: emplacementId = null } = {}) {
+//
+// `options` sert aux listes (047), qui transmettent leurs dossiers dans UNE
+// transaction : `client` = cette transaction ; `avecNotification: false` = la
+// notification est regroupée par l'appelant (un avis pour la liste, pas
+// quarante) ; `avecSuites: false` = ni scan versé, ni e-mail par dossier.
+// Sans `options`, rien ne change.
+async function remettre(tenantId, requestId, user, { date_retour_prevue, observation, nature = 'original', document_id: documentId = null, emplacement_id: emplacementId = null } = {},
+  { client: clientExterne = null, avecNotification = true, avecSuites = true } = {}) {
   const settings = await settingsService.getAll(tenantId);
   const date = lireDateRetour(date_retour_prevue, { defautJours: settings.loan_default_days });
   if (date.erreur) throw erreur(400, date.erreur);
   const obs = texte(observation, 1000);
   if (!NATURES_PRET.includes(nature)) throw erreur(400, 'Nature du prêt attendue : original, copie ou consultation sur place.');
 
-  const { pret, request } = await enTransaction(async (client) => {
+  const travail = async (client) => {
     const r = await client.query(
       'SELECT * FROM requests WHERE id = $1 AND tenant_id = $2 FOR UPDATE',
       [requestId, tenantId]
@@ -190,11 +197,13 @@ async function remettre(tenantId, requestId, user, { date_retour_prevue, observa
     );
     await auditer(client, tenantId, user.id,
       `A remis le dossier « ${libelleDemande(request)} » à ${nomEmprunteur} (retour prévu le ${date.valeur.split('-').reverse().join('/')})`, requestId);
-    await notifier(client, tenantId, request.id_user, 'Dossier remis',
+    if (avecNotification) await notifier(client, tenantId, request.id_user, 'Dossier remis',
       `Le dossier « ${libelleDemande(request)} » vous a été remis. Retour prévu le ${date.valeur.split('-').reverse().join('/')}.`,
       'loan_handover', requestId);
     return { pret: ins.rows[0], request: { ...request, statut: 'livré' } };
-  });
+  };
+  const { pret, request } = clientExterne ? await travail(clientExterne) : await enTransaction(travail);
+  if (!avecSuites) return { pret, request, indexation: null };
 
   // Numérisé à la sortie : si l'archiviste a joint le scan à la demande, il
   // est versé dans la GED par le mécanisme de livraison habituel — la
@@ -223,9 +232,10 @@ async function remettre(tenantId, requestId, user, { date_retour_prevue, observa
 }
 
 /** Retour du dossier aux archives (et rangement). */
-async function retourner(tenantId, requestId, user, { observation } = {}) {
+async function retourner(tenantId, requestId, user, { observation } = {},
+  { client: clientExterne = null, avecNotification = true, avecSuites = true } = {}) {
   const obs = texte(observation, 1000);
-  const { pret, request } = await enTransaction(async (client) => {
+  const travail = async (client) => {
     // L'emprunteur ne se décharge pas lui-même : un agent qui détient aussi
     // requests.process pourrait sinon déclarer rendu un dossier qu'il garde.
     // Le retour est constaté par un AUTRE membre de l'archive.
@@ -255,10 +265,12 @@ async function retourner(tenantId, requestId, user, { observation } = {}) {
       [requestId, user.id, request.statut, obs, user.full_name || null, tenantId]
     );
     await auditer(client, tenantId, user.id, `A enregistré le retour du dossier « ${libelleDemande(request)} »${obs ? ` — ${obs}` : ''}`, requestId);
-    await notifier(client, tenantId, upd.rows[0].emprunteur_id, 'Retour enregistré',
+    if (avecNotification) await notifier(client, tenantId, upd.rows[0].emprunteur_id, 'Retour enregistré',
       `Le retour du dossier « ${libelleDemande(request)} » est enregistré : vous en êtes déchargé.`, 'loan_returned', requestId);
     return { pret: upd.rows[0], request };
-  });
+  };
+  const { pret, request } = clientExterne ? await travail(clientExterne) : await enTransaction(travail);
+  if (!avecSuites) return { pret, request };
   const par = await nomDe(tenantId, user.id).catch(() => null);
   await emailA(tenantId, pret.emprunteur_id, 'loan_returned', request, { par });
   return { pret };
@@ -313,28 +325,61 @@ async function confirmer(tenantId, requestId, user) {
 /**
  * Le registre des prêts d'une organisation.
  * @param {string} [etat] en_cours | en_retard | signale | retourne ; absent = tous
+ * @param {string} [cadre] cadre de la sortie (motif de la demande : « Soldes
+ *   créditeurs », « Commissaire aux comptes »…)
+ * @param {number} [liste] liste de demandes (047)
+ * @param {string} [q] entreprise, n° de dossier, n° d'acte, description ou emprunteur
  */
-async function registre(tenantId, { etat } = {}) {
+async function registre(tenantId, { etat, cadre, liste, q } = {}) {
   if (etat && !ETATS.includes(etat)) throw erreur(400, `État inconnu : ${etat} (attendu : ${ETATS.join(', ')}).`);
   const conds = ['l.tenant_id = $1'];
+  const params = [tenantId];
   if (etat === 'retourne') conds.push('l.retourne_at IS NOT NULL');
   if (etat === 'signale') conds.push('l.retourne_at IS NULL AND l.signale_at IS NOT NULL');
   if (etat === 'en_retard') conds.push('l.retourne_at IS NULL AND l.signale_at IS NULL AND l.date_retour_prevue < CURRENT_DATE');
   if (etat === 'en_cours') conds.push('l.retourne_at IS NULL AND l.signale_at IS NULL AND l.date_retour_prevue >= CURRENT_DATE');
-  const r = await db.query(
+  const leCadre = texte(cadre, 100);
+  if (leCadre) {
+    params.push(leCadre);
+    conds.push(`q.motif = $${params.length}`);
+  }
+  const avecListes = liste !== undefined && liste !== null && String(liste).trim() !== '';
+  if (avecListes) {
+    const n = Number(liste);
+    if (!Number.isInteger(n) || n <= 0) throw erreur(400, 'Liste invalide.');
+    params.push(n);
+    conds.push(`q.lot_id = $${params.length}`);
+  }
+  const recherche = texte(q, 100);
+  if (recherche) {
+    params.push(`%${recherche.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    const p = `$${params.length}`;
+    conds.push(`(q.nom_entreprise ILIKE ${p} OR q.num_dossier ILIKE ${p} OR q.num_acte ILIKE ${p} OR q.description ILIKE ${p} OR ue.full_name ILIKE ${p})`);
+  }
+  const requete = (listes) => db.query(
     `SELECT l.*, to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue,
-            q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document,
+            q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document, q.motif AS cadre,
+            ${listes ? 'q.lot_id AS liste_id, rl.libelle AS liste_libelle,' : ''}
             ue.full_name AS emprunteur_name, ur.full_name AS remis_par_name, ut.full_name AS retourne_par_name
        FROM request_loans l
        JOIN requests q ON q.id = l.request_id AND q.tenant_id = l.tenant_id
+       ${listes ? 'LEFT JOIN request_lots rl ON rl.id = q.lot_id' : ''}
        LEFT JOIN users ue ON ue.id = l.emprunteur_id
        LEFT JOIN users ur ON ur.id = l.remis_par
        LEFT JOIN users ut ON ut.id = l.retourne_par
       WHERE ${conds.join(' AND ')}
       ORDER BY (l.retourne_at IS NULL) DESC, l.date_retour_prevue ASC, l.remis_at DESC
       LIMIT 1000`,
-    [tenantId]
+    params
   );
+  let r;
+  try {
+    r = await requete(true);
+  } catch (err) {
+    // Base sans la migration 047 : le registre reste lisible, sans les listes.
+    if ((err.code !== '42703' && err.code !== '42P01') || avecListes) throw err;
+    r = await requete(false);
+  }
   const jour = aujourdhui();
   return r.rows.map((p) => ({ ...p, etat: etatPret(p, jour) }));
 }
@@ -421,4 +466,5 @@ async function annoterListe(tenantId, rows) {
 module.exports = {
   ETATS, etatPret, lireDateRetour,
   remettre, retourner, signaler, confirmer, registre, relancerRetards, pretDeLaDemande, annoterListe,
+  enTransaction, notifier,
 };

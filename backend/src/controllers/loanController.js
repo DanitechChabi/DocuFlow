@@ -60,7 +60,12 @@ exports.registre = async (req, res) => {
     // Les relances partent à la consultation (pas de tâche planifiée) ; leur
     // échec ne prive pas l'archiviste de son registre.
     await loanService.relancerRetards(tenantId).catch((e) => console.error('[prêts] relances :', e.message));
-    const prets = await loanService.registre(tenantId, { etat: req.query.etat || undefined });
+    const prets = await loanService.registre(tenantId, {
+      etat: req.query.etat || undefined,
+      cadre: req.query.cadre || undefined,
+      liste: req.query.liste || undefined,
+      q: req.query.q || undefined,
+    });
     res.json(prets);
   } catch (err) { repondreErreur(res, err, 'la lecture du registre des prêts'); }
 };

@@ -54,8 +54,20 @@ const EDITIONS = {
       { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
       { to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
     ],
+    // Espaces sans visite guidée automatique : l'édition en remplace les écrans,
+    // dont les phrases d'aide suffisent.
+    visitesMasquees: ['accueil', 'demandes'],
     // Page d'accueil propre à l'édition, chargée à la demande.
     accueil: () => import('../pages/editions/AccueilAfgc'),
+    // Écrans propres à l'édition, à la place de ceux de DocuFlow aux mêmes
+    // adresses : mêmes routes, mêmes permissions, vocabulaire de l'AFGC
+    // (Demandé → Transmis → Retourné) et listes de dossiers.
+    pages: {
+      '/demandes/nouvelle': () => import('../pages/editions/afgc/DemanderAfgc'),
+      '/demandes/mes-demandes': () => import('../pages/editions/afgc/MesDossiersAfgc'),
+      '/demandes/a-traiter': () => import('../pages/editions/afgc/TraitementAfgc'),
+      '/demandes/prets': () => import('../pages/editions/afgc/SortiesAfgc'),
+    },
   },
 };
 

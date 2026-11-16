@@ -5,6 +5,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useSettings } from '../../contexts/SettingsContext';
 import { authService } from '../../services/authService';
 import { construireVisite, moduleDeLaPage } from './visites';
+import { edition } from '../../editions';
 
 /**
  * VisiteGuidee — décide QUAND une visite se joue.
@@ -26,7 +27,10 @@ const VisiteGuidee = ({ onOccupe }) => {
   const perms = usePermissions();
   const { can, charge, visiteVue, marquerVisite, revoirVisite } = perms;
   const settings = useSettings();
-  const module = moduleDeLaPage(pathname);
+  // Sur le site d'une édition dédiée (ex. AFGC), les espaces dont elle remplace
+  // les écrans n'ont pas de visite : celle de DocuFlow décrirait d'autres pages.
+  const moduleDocuFlow = moduleDeLaPage(pathname);
+  const module = edition?.visitesMasquees?.includes(moduleDocuFlow) ? null : moduleDocuFlow;
 
   const [actif, setActif] = useState(false);
   const [moduleActif, setModuleActif] = useState(null);
