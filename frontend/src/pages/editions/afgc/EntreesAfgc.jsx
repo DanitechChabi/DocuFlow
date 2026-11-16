@@ -27,6 +27,12 @@ const jourLong = (iso) => {
   const d = new Date(Date.UTC(a, m - 1, j));
   return `${JOURS[d.getUTCDay()]} ${j} ${MOIS[m - 1]}`;
 };
+/** Jeudi qui clôt la semaine ouverte le vendredi `iso`. */
+const finSemaine = (iso) => {
+  const [a, m, j] = String(iso).split('-').map(Number);
+  const d = new Date(Date.UTC(a, m - 1, j + 6));
+  return d.toISOString().slice(0, 10);
+};
 const libelleSemaine = (s) => `Semaine du ${jourLong(s.semaine)} au ${jourLong(s.au)} ${s.au.slice(0, 4)}`;
 
 /** Import d'un ou plusieurs points : lecture dans le navigateur, envoi par paquets. */
@@ -177,6 +183,8 @@ const EntreesAfgc = () => {
   const [lettreVisee, setLettreVisee] = useState(null);
   const [critere, setCritere] = useState({ q: '', type: '', agent: '', du: '', au: '' });
   const [resultats, setResultats] = useState(null);
+  // Chaque recherche rallume les résultats (la lumière rejoue).
+  const [tour, setTour] = useState(0);
   const [cherche, setCherche] = useState(false);
 
   const chargerFiltres = useCallback(() => entreeService.filtres().then(setFiltres).catch(() => {}), []);
@@ -220,7 +228,7 @@ const EntreesAfgc = () => {
   const rechercher = async (e) => {
     e?.preventDefault();
     setCherche(true);
-    try { setResultats(await entreeService.rechercher(critere)); } catch (err) { toast.error(err.response?.data?.message || 'Recherche impossible.'); } finally { setCherche(false); }
+    try { setResultats(await entreeService.rechercher(critere)); setTour((t) => t + 1); } catch (err) { toast.error(err.response?.data?.message || 'Recherche impossible.'); } finally { setCherche(false); }
   };
   const ouvrirSemaine = (d) => {
     setAnnee(Number(d.date_point.slice(0, 4)));
@@ -260,7 +268,7 @@ const EntreesAfgc = () => {
               </select>
             </label>
             {liste === null ? <Chargement /> : !liste.length ? (
-              <p className="text-sm text-slate-400 py-4">Aucun point importé pour {annee}.</p>
+              <p className="text-sm text-slate-600 py-4">Aucun point importé pour {annee}.</p>
             ) : (
               <ul className="space-y-1 max-h-[65vh] overflow-y-auto pr-1">
                 {liste.map((s) => (
@@ -268,7 +276,7 @@ const EntreesAfgc = () => {
                     <button type="button" onClick={() => { setChoisie(s.semaine); setLettreVisee(null); }}
                       className={`w-full text-left rounded-xl px-3 py-2.5 transition-colors ${choisie === s.semaine ? 'bg-green-50 ring-1 ring-green-200' : 'hover:bg-slate-50'}`}>
                       <div className="text-sm font-bold text-slate-800">{jourLong(s.semaine)} → {jourLong(s.au)}</div>
-                      <div className="text-xs text-slate-400 flex flex-wrap gap-x-2">
+                      <div className="text-sm text-slate-600 flex flex-wrap gap-x-2">
                         <span>{s.dossiers} dossiers</span>
                         <span>{s.jours_ouvres.length} jours de production</span>
                         {s.feries.length > 0 && <span className="text-amber-700 font-semibold">férié : {s.feries.map(jourLong).join(', ')}</span>}
@@ -281,12 +289,12 @@ const EntreesAfgc = () => {
           </aside>
 
           <section className="glass-card-premium rounded-3xl p-5 md:p-6 min-w-0">
-            {!choisie ? <p className="text-sm text-slate-400">Choisissez une semaine.</p> : !detail ? <Chargement /> : (
+            {!choisie ? <p className="text-sm text-slate-600">Choisissez une semaine.</p> : !detail ? <Chargement /> : (
               <>
                 <div className="flex flex-wrap items-start gap-3 mb-4">
                   <div className="min-w-0 flex-1">
                     <h2 className="text-lg font-black text-slate-900">{libelleSemaine(detail)}</h2>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm font-semibold text-slate-700">
                       {detail.dossiers.length} dossiers à classer
                       {semaineInfo && ` · jours de production : ${semaineInfo.jours_ouvres.map(jourLong).join(', ')}`}
                       {semaineInfo?.feries.length > 0 && ` · férié : ${semaineInfo.feries.map(jourLong).join(', ')}`}
@@ -310,16 +318,22 @@ const EntreesAfgc = () => {
                 </div>
                 <div className="space-y-5">
                   {groupes.map(([l, ds]) => (
-                    <div key={l} id={`lettre-${l}`} className="scroll-mt-16">
-                      <h3 className="text-sm font-black text-slate-500 mb-1.5">{l === 'Sans nom' ? l : `Lettre ${l}`} · {ds.length}</h3>
-                      <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-100">
+                    // La lettre visée (depuis une recherche) s'allume.
+                    <div key={lettreVisee === l ? `${l}-vise` : l} id={`lettre-${l}`}
+                      className={`scroll-mt-16 ${lettreVisee === l ? 'resultat-lumiere rounded-2xl p-2 -m-2 bg-green-50/60' : ''}`}>
+                      <h3 className="mb-2 flex items-center gap-2">
+                        <span className={`min-w-[2.25rem] h-9 px-2 rounded-xl flex items-center justify-center text-lg font-black ${l === 'Sans nom' ? 'bg-slate-200 text-slate-700 text-sm' : 'bg-docuflow-secondary text-white'}`}>{l === 'Sans nom' ? '?' : l}</span>
+                        <span className="text-base font-black text-slate-800">{l === 'Sans nom' ? 'Sans nom' : `Lettre ${l}`}</span>
+                        <span className="text-sm font-bold text-slate-600">· {ds.length} dossier{ds.length > 1 ? 's' : ''}</span>
+                      </h3>
+                      <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
                         {ds.map((d) => (
                           <li key={d.id} className="px-3.5 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                            <span className="font-semibold text-slate-800 min-w-0 flex-1 basis-60">{d.denomination || '—'}</span>
-                            <span className="text-xs text-slate-500">{d.num_actes ? `Acte ${d.num_actes}` : 'sans n° d\'acte'}</span>
+                            <span className="font-bold text-slate-900 min-w-0 flex-1 basis-60">{d.denomination || '—'}</span>
+                            <span className="text-sm font-semibold text-slate-700">{d.num_actes ? `Acte ${d.num_actes}` : 'sans n° d\'acte'}</span>
                             <Pastille ton={/att/i.test(d.type_garantie || '') ? 'gris' : 'vert'}>{d.type_garantie || '—'}</Pastille>
-                            <span className="text-xs text-slate-400 w-24">{jourLong(d.date_point)}</span>
-                            <span className="text-xs text-slate-400 w-20 truncate">{d.agent}</span>
+                            <span className="text-sm font-semibold text-slate-700 w-28">{jourLong(d.date_point)}</span>
+                            <span className="text-sm text-slate-600 w-24 truncate">{d.agent}</span>
                           </li>
                         ))}
                       </ul>
@@ -333,7 +347,7 @@ const EntreesAfgc = () => {
       ) : (
         <section className="glass-card-premium rounded-3xl p-5 md:p-6">
           <form onSubmit={rechercher} className="flex flex-wrap items-end gap-3 mb-5">
-            <label className="flex-1 min-w-[240px] text-xs font-bold text-slate-500">
+            <label className="flex-1 min-w-[240px] text-sm font-bold text-slate-700">
               Nom ou n° d'acte
               <div className="relative mt-1">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -341,44 +355,69 @@ const EntreesAfgc = () => {
                   placeholder="ex. CREDO BTP, 1964, 2026/58" className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-docuflow-secondary" />
               </div>
             </label>
-            <label className="text-xs font-bold text-slate-500">Type
+            <label className="text-sm font-bold text-slate-700">Type
               <select value={critere.type} onChange={(e) => setCritere((c) => ({ ...c, type: e.target.value }))} className="mt-1 block px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
                 <option value="">Tous</option>{filtres.types.map((t) => <option key={t.v} value={t.v}>{t.v}</option>)}
               </select>
             </label>
-            <label className="text-xs font-bold text-slate-500">Agent
+            <label className="text-sm font-bold text-slate-700">Agent
               <select value={critere.agent} onChange={(e) => setCritere((c) => ({ ...c, agent: e.target.value }))} className="mt-1 block px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
                 <option value="">Tous</option>{filtres.agents.map((t) => <option key={t.v} value={t.v}>{t.v}</option>)}
               </select>
             </label>
-            <label className="text-xs font-bold text-slate-500">Du<input type="date" value={critere.du} onChange={(e) => setCritere((c) => ({ ...c, du: e.target.value }))} className="mt-1 block px-3 py-2 rounded-xl border border-slate-200 text-sm" /></label>
-            <label className="text-xs font-bold text-slate-500">Au<input type="date" value={critere.au} onChange={(e) => setCritere((c) => ({ ...c, au: e.target.value }))} className="mt-1 block px-3 py-2 rounded-xl border border-slate-200 text-sm" /></label>
+            <label className="text-sm font-bold text-slate-700">Du<input type="date" value={critere.du} onChange={(e) => setCritere((c) => ({ ...c, du: e.target.value }))} className="mt-1 block px-3 py-2 rounded-xl border border-slate-200 text-sm" /></label>
+            <label className="text-sm font-bold text-slate-700">Au<input type="date" value={critere.au} onChange={(e) => setCritere((c) => ({ ...c, au: e.target.value }))} className="mt-1 block px-3 py-2 rounded-xl border border-slate-200 text-sm" /></label>
             <button type="submit" disabled={cherche} className="px-5 py-2.5 rounded-xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60">
               {cherche ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Rechercher
             </button>
           </form>
           {resultats === null ? (
-            <p className="text-sm text-slate-400">Un nom (« CREDO BTP »), un n° d'acte (« 1964 » le trouve aussi dans « 1963-1964-1965 ») ou « 2026/58 ».</p>
-          ) : !resultats.length ? <p className="text-sm text-slate-400">Aucun dossier ne correspond.</p> : (
-            <>
-              <p className="text-sm text-slate-500 mb-2">{resultats.length >= 300 ? 'Les 300 plus récents' : `${resultats.length} dossier${resultats.length > 1 ? 's' : ''}`}</p>
-              <ul className="divide-y divide-slate-100">
-                {resultats.map((d) => (
-                  <li key={d.id} className="py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <div className="min-w-0 flex-1 basis-60">
-                      <div className="font-semibold text-slate-800">{d.denomination || '—'}</div>
-                      <div className="text-xs text-slate-400">
-                        {[d.num_actes && `Acte ${d.num_actes}`, d.type_garantie, `point du ${dateCourte(d.date_point)}`, d.agent, montantLisible(d.montant)].filter(Boolean).join(' · ')}
+            <p className="text-base text-slate-600">Un nom (« CREDO BTP »), un n° d'acte (« 1964 » le trouve aussi dans « 1963-1964-1965 ») ou « 2026/58 ».</p>
+          ) : !resultats.length ? (
+            <div key={`vide-${tour}`} className="animate-fade-in-up rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
+              <div className="text-lg font-black text-slate-700">Aucun dossier ne correspond.</div>
+              <div className="text-sm text-slate-600 mt-1">Essayez une partie du nom, ou le n° d'acte seul.</div>
+            </div>
+          ) : (
+            <div key={`res-${tour}`}>
+              <p className="text-base font-bold text-slate-700 mb-3 animate-fade-in-up">
+                {resultats.length >= 300 ? 'Les 300 plus récents' : `${resultats.length} dossier${resultats.length > 1 ? 's' : ''} trouvé${resultats.length > 1 ? 's' : ''}`}
+              </p>
+              <ul className="space-y-3">
+                {resultats.map((d, i) => (
+                  <li key={d.id} className="resultat-lumiere rounded-2xl border-2 border-green-200 bg-white p-4 md:p-5"
+                    style={{ '--delai': `${Math.min(i, 8) * 0.09}s` }}>
+                    <div className="flex flex-wrap items-start gap-4">
+                      {/* La lettre de classement, comme l'onglet d'un classeur. */}
+                      <div className="lumiere-pastille w-14 h-14 rounded-2xl bg-docuflow-secondary text-white flex flex-col items-center justify-center flex-shrink-0 shadow-lg shadow-green-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">lettre</span>
+                        <span className="text-2xl font-black leading-none">{d.lettre || '—'}</span>
                       </div>
+                      <div className="min-w-0 flex-1 basis-60">
+                        <div className="text-lg md:text-xl font-black text-slate-900 leading-tight">{d.denomination || '—'}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-700">
+                          {[d.num_actes && `Acte ${d.num_actes}`, d.type_garantie, d.agent && `agent ${d.agent}`, montantLisible(d.montant)].filter(Boolean).join(' · ')}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="inline-flex items-baseline gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-green-700">Semaine</span>
+                            <span className="text-base font-black text-green-900">{jourLong(d.semaine)} → {jourLong(d.au || finSemaine(d.semaine))} {d.semaine.slice(0, 4)}</span>
+                          </span>
+                          <span className="inline-flex items-baseline gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Point du</span>
+                            <span className="text-base font-black text-amber-900">{jourLong(d.date_point)} {d.date_point.slice(0, 4)}</span>
+                          </span>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => ouvrirSemaine(d)}
+                        className="self-center px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 hover:opacity-90 shadow-md shadow-green-200">
+                        Ouvrir la semaine <ArrowRight size={15} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => ouvrirSemaine(d)}
-                      className="px-3 py-2 rounded-xl bg-green-50 text-green-800 text-sm font-bold inline-flex items-center gap-1.5 hover:bg-green-100">
-                      Semaine du {dateCourte(d.semaine)} · {d.lettre ? `lettre ${d.lettre}` : 'sans nom'} <ArrowRight size={14} />
-                    </button>
                   </li>
                 ))}
               </ul>
-            </>
+            </div>
           )}
         </section>
       )}

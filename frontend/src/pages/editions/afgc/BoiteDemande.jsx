@@ -357,7 +357,7 @@ const BoiteDemande = ({
         {pied}
       </div>
 
-      {(!colles || cumuler) && q.length >= 2 && <Presence resultat={presence} archiviste={!retenir} className="mt-2.5 px-1" />}
+      {(!colles || cumuler) && q.length >= 2 && <Presence resultat={presence} archiviste={!retenir} className="mt-3" />}
 
       {envoyee && (
         <div className="mt-3 flex items-center gap-3 rounded-2xl bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold animate-fade-in-up" role="status">

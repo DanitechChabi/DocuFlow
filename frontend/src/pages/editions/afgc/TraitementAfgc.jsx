@@ -49,7 +49,7 @@ const Ligne = ({ d, presence, children }) => (
       <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif, d.requester_name && `pour ${d.requester_name}`].filter(Boolean).join(' · ')}</div>
       {/* Où le chercher : semaine de production, date du point, lettre. */}
-      <Presence resultat={presence} archiviste className="mt-1" />
+      <Presence resultat={presence} archiviste className="mt-2" />
     </div>
     {/* Les gestes restent groupés, à droite, même quand ils passent à la ligne. */}
     <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">{children}</div>
@@ -340,7 +340,7 @@ const TraitementAfgc = () => {
                                 <div className="min-w-0 flex-1">
                                   <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                                   <div className="text-xs text-slate-400 truncate">{references(d) || d.description || 'Sans référence'}</div>
-                                  {d.etat === 'demande' && <Presence resultat={presencesListe[d.id]} archiviste className="mt-1" />}
+                                  {d.etat === 'demande' && <Presence resultat={presencesListe[d.id]} archiviste className="mt-2" />}
                                 </div>
                                 {(d.etat === 'demande' || d.etat === 'transmis') && (
                                   <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />

@@ -63,17 +63,27 @@ export function usePresence(dossier) {
   return res && res.cle === cle ? res : null;
 }
 
+/** Une étiquette bien visible : « SEMAINE  ven. 17 → jeu. 23 avr. 2026 ». */
+const Etiquette = ({ titre, children, ton }) => (
+  <span className={`inline-flex items-baseline gap-1.5 rounded-lg border px-2.5 py-1 ${ton}`}>
+    <span className="text-[10px] font-bold uppercase tracking-wide opacity-80">{titre}</span>
+    <span className="text-sm font-black">{children}</span>
+  </span>
+);
+
 const Detail = ({ e, archiviste }) => (
-  <>
-    semaine <strong>{semaineLisible(e.semaine, e.au)}</strong> · point du <strong>{jourLisible(e.date_point)}</strong>
-    {archiviste && e.lettre && <> · lettre <strong>{e.lettre}</strong></>}
-  </>
+  <span className="flex flex-wrap gap-1.5">
+    <Etiquette titre="Semaine" ton="bg-white border-green-300 text-green-900">{semaineLisible(e.semaine, e.au).replace(/^du /, '').replace(' au ', ' → ')}</Etiquette>
+    <Etiquette titre="Point du" ton="bg-amber-50 border-amber-300 text-amber-900">{jourLisible(e.date_point)}</Etiquette>
+    {archiviste && e.lettre && <Etiquette titre="Lettre" ton="bg-docuflow-secondary border-docuflow-secondary text-white">{e.lettre}</Etiquette>}
+  </span>
 );
 
 /**
- * Le résultat : « Aux archives · semaine du … · point du … », « Pas trouvé
- * dans les entrées », ou, pour un n° d'acte entré sous un autre nom, à vérifier.
- * `archiviste` ajoute la lettre de classement et le n° d'acte tel qu'écrit.
+ * Le résultat : « Aux archives » avec la semaine et la date du point, « Pas
+ * trouvé dans les entrées », ou, pour un n° d'acte entré sous un autre nom,
+ * à vérifier. Il s'allume à son arrivée (lumière, halo). `archiviste` ajoute
+ * la lettre de classement et le n° d'acte tel qu'écrit.
  */
 export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   const [ouvert, setOuvert] = useState(false);
@@ -81,8 +91,8 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   const { total, entrees } = resultat;
   if (!total) {
     return (
-      <div className={`flex items-start gap-1.5 text-xs text-slate-500 ${className}`}>
-        <SearchX size={13} className="mt-0.5 flex-shrink-0" />
+      <div className={`animate-fade-in-up flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 ${className}`}>
+        <SearchX size={16} className="flex-shrink-0 text-slate-500" />
         <span>Pas trouvé dans les entrées des archives{archiviste ? '' : ' — l\'archive vérifiera'}.</span>
       </div>
     );
@@ -90,30 +100,36 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   const [e, ...autres] = entrees;
   const douteux = !e.nom_concorde;
   return (
-    <div className={`text-xs ${className}`}>
-      <div className={`flex items-start gap-1.5 ${douteux ? 'text-amber-700' : 'text-green-800'}`}>
-        {douteux ? <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> : <Archive size={13} className="mt-0.5 flex-shrink-0" />}
-        <span className="min-w-0">
-          {douteux
-            ? <>Acte {e.num_actes} entré au nom de « {e.denomination} » — à vérifier · </>
-            : <><strong>Aux archives</strong>{archiviste || total > 1 ? <> ({e.denomination}{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''})</> : null} · </>}
+    // Nouvelle clé à chaque nouveau résultat : la lumière rejoue.
+    <div key={`${e.date_point}-${e.num_actes}-${e.denomination}`}
+      className={`resultat-lumiere ${douteux ? 'ambre border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'} rounded-xl border-2 px-3 py-2.5 ${className}`}>
+      <div className={`flex items-start gap-2 ${douteux ? 'text-amber-900' : 'text-green-900'}`}>
+        <span className={`lumiere-pastille mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-white ${douteux ? 'bg-amber-500' : 'bg-docuflow-secondary'}`}>
+          {douteux ? <AlertTriangle size={15} /> : <Archive size={15} />}
+        </span>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="text-sm leading-snug">
+            {douteux
+              ? <><strong className="font-black">À vérifier</strong> : acte {e.num_actes} entré au nom de « <strong>{e.denomination}</strong> »</>
+              : <><strong className="font-black text-base">Aux archives</strong>{archiviste || total > 1 ? <span className="font-semibold"> — {e.denomination}{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''}</span> : null}</>}
+          </div>
           <Detail e={e} archiviste={archiviste} />
           {total > 1 && (
-            <button type="button" onClick={() => setOuvert((v) => !v)} className="ml-1.5 font-bold underline decoration-dotted inline-flex items-center gap-0.5">
-              {total - 1} autre{total > 2 ? 's' : ''} entrée{total > 2 ? 's' : ''} <ChevronDown size={11} className={ouvert ? 'rotate-180' : ''} />
+            <button type="button" onClick={() => setOuvert((v) => !v)} className="text-sm font-bold underline decoration-dotted inline-flex items-center gap-1">
+              {total - 1} autre{total > 2 ? 's' : ''} entrée{total > 2 ? 's' : ''} <ChevronDown size={13} className={ouvert ? 'rotate-180' : ''} />
             </button>
           )}
-        </span>
+        </div>
       </div>
       {ouvert && autres.length > 0 && (
-        <ul className="mt-1 ml-5 space-y-0.5 text-slate-600">
+        <ul className="mt-2 ml-9 space-y-2 text-sm text-slate-800 animate-fade-in-up">
           {autres.map((x) => (
             <li key={`${x.date_point}-${x.num_actes}-${x.denomination}`}>
-              {x.denomination}{x.num_actes ? `, acte ${x.num_actes}` : ''} · <Detail e={x} archiviste={archiviste} />
-              {!x.nom_concorde && <span className="text-amber-700"> (autre nom)</span>}
+              <div className="font-semibold">{x.denomination}{x.num_actes ? `, acte ${x.num_actes}` : ''}{!x.nom_concorde && <span className="text-amber-700"> (autre nom)</span>}</div>
+              <Detail e={x} archiviste={archiviste} />
             </li>
           ))}
-          {archiviste && total > entrees.length && <li className="text-slate-400">… et {total - entrees.length} de plus (Entrée des dossiers → Rechercher)</li>}
+          {archiviste && total > entrees.length && <li className="text-slate-600">… et {total - entrees.length} de plus (Entrée des dossiers → Rechercher)</li>}
         </ul>
       )}
     </div>
