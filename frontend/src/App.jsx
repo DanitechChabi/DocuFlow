@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -56,6 +56,11 @@ import { LicenseProvider, useLicense } from './contexts/LicenseContext';
 import { authService } from './services/authService';
 import ErrorBoundary from './components/ErrorBoundary';
 import LicenseGuard from './components/LicenseGuard';
+import { edition } from './editions';
+
+// Accueil d'une édition dédiée (ex. AFGC), chargé à la demande : la plateforme
+// générale n'en télécharge rien.
+const AccueilEdition = edition?.accueil ? lazy(edition.accueil) : null;
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = authService.getCurrentUser();
@@ -93,7 +98,9 @@ function App() {
         <Route path="/:slug/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/:slug/register" element={<RegisterPage />} />
-        <Route path="/register-company" element={<CompanyRegisterPage />} />
+        {/* Le site d'une édition dédiée sert une seule organisation : on n'y
+            crée pas d'autre espace entreprise. */}
+        <Route path="/register-company" element={edition ? <Navigate to="/login" replace /> : <CompanyRegisterPage />} />
         <Route path="/about" element={<AboutPage />} />
         {/* Lien de partage public (033) : hors connexion, hors mise en page. */}
         <Route path="/partage/:jeton" element={<PartagePublicPage />} />
@@ -111,8 +118,9 @@ function App() {
 
         {/* Layout partagé : sidebar à deux modules + barre d'outils + contenu */}
         <Route element={<ProtectedRoute><LicenseGuard><AppLayout /></LicenseGuard></ProtectedRoute>}>
-          {/* Accueil global — vision synthétique des deux modules */}
-          <Route path="/" element={<HomePage />} />
+          {/* Accueil global — vision synthétique des deux modules ; sur le site
+              d'une édition dédiée, son accueil propre. */}
+          <Route path="/" element={AccueilEdition ? <Suspense fallback={null}><AccueilEdition /></Suspense> : <HomePage />} />
           <Route path="/mon-espace" element={<MonEspacePage />} />
 
           {/* Module DEMANDES — les anciennes routes /dashboard/* redirigent

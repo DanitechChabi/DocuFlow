@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:afgc": "vite --mode afgc",
     "build": "vite build",
+    "build:afgc": "vite build --mode afgc",
     "lint": "oxlint",
     "preview": "vite preview"
   },
