@@ -214,13 +214,60 @@ revenir.
 
 ---
 
-## 8. Courriels
+## 8. Courriels (Outlook)
 
-Les notifications par courriel (nouvelle demande, dossier transmis, rappel de
-retour…) sont prévues pour passer par la messagerie de l'AFGC (Outlook /
-Microsoft 365). Le raccordement est en préparation ; les variables à ajouter à
-`docuflow.env` seront fournies avec. En attendant, les notifications restent
-visibles dans l'application (cloche).
+L'application prévient par courriel, depuis la boîte des archives :
+
+| Événement | Destinataire |
+|---|---|
+| Nouvelle demande, nouvelle liste, demande complétée | l'archive |
+| Accusé de réception de la demande | le demandeur |
+| Dossier transmis (avec la date de retour) | le demandeur |
+| Demande renvoyée pour compléments (avec le mot de l'archive) | le demandeur |
+| Retour enregistré (preuve de restitution) | le demandeur |
+| Retour en retard (rappel, une fois par jour) | le demandeur |
+
+Les messages partent par **le serveur de messagerie de l'AFGC** (SMTP).
+Ajoutez à `C:\DocuFlow\config\docuflow.env` les lignes de **l'un** des deux cas :
+
+**Exchange interne (relais)** — demander à l'administrateur Exchange
+d'autoriser l'adresse IP du serveur DocuFlow sur un connecteur de réception
+« relais anonyme » :
+
+```
+SMTP_HOST=mail.afgcsa.com
+SMTP_PORT=25
+SMTP_FROM=archives@afgcsa.com
+MAIL_FROM_NAME=Archives AFGC
+```
+
+**Microsoft 365** — une boîte (ou boîte partagée avec licence) dédiée,
+avec « SMTP authentifié » activé pour elle dans le centre d'administration
+Microsoft 365 :
+
+```
+SMTP_HOST=smtp.office365.com
+SMTP_PORT=587
+SMTP_USER=archives@afgcsa.com
+SMTP_PASSWORD=<mot de passe de la boîte>
+SMTP_FROM=archives@afgcsa.com
+MAIL_FROM_NAME=Archives AFGC
+```
+
+Si le serveur Exchange présente un certificat de l'autorité interne et que
+l'envoi échoue sur une erreur de certificat, ajoutez
+`SMTP_TLS_ACCEPTER_CERTIFICAT_INTERNE=true`.
+
+Puis redémarrez et faites un essai :
+
+```powershell
+C:\DocuFlow\scripts\redemarrer.ps1
+C:\DocuFlow\scripts\tester-courriel.ps1 -Adresse prenom.nom@afgcsa.com
+```
+
+Dans l'application, **Réglages → Notifications** permet de couper chaque
+type de courriel (par exemple l'accusé de réception au demandeur, ou les
+courriels à l'archive pour chaque demande), ou tous.
 
 ---
 
@@ -233,6 +280,7 @@ visibles dans l'application (cloche).
 | `"base"` différent de `"ok"` dans `/api/health` | Service « postgresql-x64-17 » arrêté ? Le redémarrer (services.msc), puis la tâche DocuFlow. |
 | `"migration_en_echec"` dans `/api/health` | Une mise à jour de la base a échoué : envoyer le journal du jour à l'équipe DocuFlow ; restaurer la sauvegarde de la veille si l'application est inutilisable. |
 | Port 443 déjà utilisé (IIS…) | Installer avec `-Port 8443`, ou retirer la liaison 443 du site IIS. |
+| Aucun courriel ne part | `tester-courriel.ps1` donne la cause : serveur injoignable (port 25/587 fermé), authentification refusée (SMTP authentifié désactivé dans Microsoft 365), relais refusé (adresse IP non autorisée sur Exchange). Voir aussi le journal du jour (lignes `[mail]`). |
 | Échec de la sauvegarde | Voir `sauvegardes.log` dans le dossier de sauvegarde (disque plein, droits). |
 
 ---

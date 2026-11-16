@@ -214,6 +214,8 @@ const CATALOG = [
   // ----------------------------------------------------------- NOTIFICATIONS
   { key: 'enable_email_notifications', group: 'notifications', label: 'Notifications par e-mail', description: 'Envoyer les alertes par courrier électronique.', type: 'boolean', default: 'true' },
   { key: 'notify_on_assignment',       group: 'notifications', label: "Alerte d'affectation",    description: "Prévenir l'utilisateur lorsqu'une tâche lui est assignée.", type: 'boolean', default: 'true' },
+  { key: 'notify_archive_on_request',  group: 'notifications', label: 'Courriel à l\'archive pour chaque demande', description: "Prévenir l'archive par courriel d'une nouvelle demande, d'une nouvelle liste ou d'une demande complétée.", type: 'boolean', default: 'true' },
+  { key: 'notify_on_request_created',  group: 'notifications', label: 'Accusé de réception au demandeur', description: "Envoyer au demandeur un courriel confirmant sa demande (l'écran la confirme déjà).", type: 'boolean', default: 'true' },
   { key: 'notify_on_status_change',    group: 'notifications', label: 'Alerte de changement de statut', description: "Prévenir lors d'une transition de workflow.", type: 'boolean', default: 'true' },
   { key: 'notify_on_share',            group: 'notifications', label: 'Alerte de partage',        description: "Prévenir le destinataire d'un document partagé.", type: 'boolean', default: 'true' },
   { key: 'email_sender_name',          group: 'notifications', label: "Nom de l'expéditeur",      description: 'Nom affiché comme expéditeur des e-mails.', type: 'string', default: 'DocuFlow' },

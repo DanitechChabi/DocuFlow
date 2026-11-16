@@ -274,6 +274,8 @@ exports.createRequest = async (req, res) => {
     } catch (notifErr) {
       console.error('[request] notifications de création non enregistrées :', notifErr.message);
     }
+    // Et par courriel (Outlook), sans faire attendre le demandeur.
+    mailService.notifierComptes(tenantId, admins.rows.map((a) => a.id), 'nouvelle_demande', requestRow, { demandeur: req.user.full_name || null });
 
     // 4. Log l'action dans l'historique général
     await tenantDb.insert(

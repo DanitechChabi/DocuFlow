@@ -15,6 +15,9 @@ const { Resend } = require('resend');
 const { escapeHtml, escapeOr, sanitizeHeader } = require('../helpers/htmlEscape');
 const { libelleDemande } = require('../helpers/requestInput');
 const settings = require('./settingsService');
+const db = require('../config/db');
+const microsoft365 = require('./microsoft365Mail');
+const smtp = require('./smtpMail');
 require('dotenv').config({ path: './.env' });
 
 const isConfigured = Boolean(process.env.RESEND_API_KEY);
@@ -44,10 +47,19 @@ function buildFrom(senderName) {
 /**
  * Bascule d'activation propre à chaque événement, en complément de
  * l'interrupteur général `enable_email_notifications`.
- * `request_created` n'en a pas : c'est l'accusé de réception du demandeur, pas
- * une alerte de suivi — le désactiver laisserait une demande sans confirmation.
  */
 const EVENT_SETTING = {
+  // Avec des demandes en un clic, l'accusé de réception peut devenir de trop :
+  // l'organisation peut le couper (l'écran confirme déjà chaque demande).
+  request_created: 'notify_on_request_created',
+  // Nouvelles demandes et listes : un e-mail à l'archive, si l'organisation le veut.
+  nouvelle_demande: 'notify_archive_on_request',
+  nouvelle_liste: 'notify_archive_on_request',
+  // Listes transmises ou retournées d'un geste : un e-mail par agent.
+  liste_transmise: 'notify_on_status_change',
+  liste_retournee: 'notify_on_status_change',
+  complement_demande: 'notify_on_status_change',
+  complement_fourni: 'notify_archive_on_request',
   status_update: 'notify_on_status_change',
   delivered: 'notify_on_status_change',
   assigned: 'notify_on_assignment',
@@ -69,6 +81,7 @@ async function loadBranding(tenantId) {
     signature: null,
     footerText: null,
     emailsEnabled: true,
+    appUrl: APP_URL,
     values: null,
   };
   if (!tenantId) return fallback;
@@ -81,6 +94,11 @@ async function loadBranding(tenantId) {
       signature: values.email_signature || null,
       footerText: values.footer_text || null,
       emailsEnabled: values.enable_email_notifications !== false,
+      // Le site de l'organisation (ex. son site dédié) : les liens des e-mails
+      // y mènent, plutôt qu'à la plateforme générale.
+      appUrl: /^https?:\/\/[^\s"'<>]+$/.test(String(values.app_url || '').trim())
+        ? String(values.app_url).trim().replace(/\/+$/, '')
+        : APP_URL,
       values,
     };
   } catch (err) {
@@ -206,6 +224,29 @@ function statusPill(status) {
   return `<div style="display:inline-block;padding:6px 14px;border-radius:999px;background:${color}1a;color:${color};border:1px solid ${color}44;font-weight:700;font-size:13px;">${escapeHtml(STATUS_LABELS[status] || status)}</div>`;
 }
 
+/** Lien vers une page du site de l'organisation (habillage chargé), sinon de la plateforme. */
+function lien(branding, chemin) {
+  return `${(branding && branding.appUrl) || APP_URL}${chemin}`;
+}
+
+/** Les dossiers d'une liste, en tableau (intitulé, références) ; les suivants résumés. */
+function dossiersBlock(dossiers = [], max = 15) {
+  const lignes = dossiers.slice(0, max).map((d) => {
+    const refs = [d.num_dossier && `Dossier ${d.num_dossier}`, d.num_acte && `Acte ${d.num_acte}`, d.annee].filter(Boolean).join(' · ');
+    return `<tr><td style="padding:10px 16px;border-top:1px solid ${COLORS.border};font-size:14px;">
+      <div style="font-weight:700;color:${COLORS.primary};">${escapeHtml(libelleDemande(d))}</div>
+      ${refs ? `<div style="font-size:12px;color:${COLORS.slate};margin-top:2px;">${escapeHtml(refs)}</div>` : ''}
+    </td></tr>`;
+  }).join('');
+  const reste = dossiers.length - max;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${COLORS.border};border-radius:12px;margin:16px 0;border-collapse:separate;">
+    ${lignes}
+    ${reste > 0 ? `<tr><td style="padding:10px 16px;border-top:1px solid ${COLORS.border};font-size:13px;color:${COLORS.slate};">… et ${reste} autre${reste > 1 ? 's' : ''}</td></tr>` : ''}
+  </table>`;
+}
+
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+
 function ctaButton(label, url) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
     <tr>
@@ -235,7 +276,7 @@ const TEMPLATES = {
       <p style="font-size:13px;color:${COLORS.slate};line-height:1.6;margin:16px 0 0;">
         Vous serez notifié par e-mail à chaque changement de statut.
       </p>
-      ${ctaButton('Suivre ma demande', `${APP_URL}/dashboard`)}
+      ${ctaButton('Suivre ma demande', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 
@@ -249,7 +290,7 @@ const TEMPLATES = {
       </p>
       <div style="margin:8px 0 0;">${statusPill(r.statut)}</div>
       ${requestBlock(r)}
-      ${ctaButton('Voir ma demande', `${APP_URL}/dashboard`)}
+      ${ctaButton('Voir ma demande', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 
@@ -266,7 +307,7 @@ const TEMPLATES = {
       <p style="font-size:13px;color:${COLORS.slate};line-height:1.6;margin:16px 0 0;">
         Merci de confirmer la bonne réception via votre espace de suivi.
       </p>
-      ${ctaButton('Télécharger / confirmer', `${APP_URL}/dashboard`)}
+      ${ctaButton('Télécharger / confirmer', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 
@@ -280,7 +321,7 @@ const TEMPLATES = {
       </p>
       ${requestBlock(r)}
       ${statusPill(r.statut)}
-      ${ctaButton('Traiter la demande', `${APP_URL}/dashboard`)}
+      ${ctaButton('Traiter la demande', lien(branding, '/demandes/a-traiter'))}
     `, branding),
   }),
 
@@ -302,7 +343,7 @@ const TEMPLATES = {
           ? 'Merci de <b>confirmer la réception</b> depuis votre espace.'
           : 'Vous n\'avez rien à faire. <b>Si vous n\'avez pas reçu ce dossier</b>, signalez-le depuis votre espace.'}
       </p>
-      ${ctaButton(extra.requireConfirmation ? 'Confirmer la réception' : 'Voir ma demande', `${APP_URL}/dashboard`)}
+      ${ctaButton(extra.requireConfirmation ? 'Confirmer la réception' : 'Voir ma demande', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 
@@ -319,6 +360,101 @@ const TEMPLATES = {
     `, branding),
   }),
 
+  // --- Archive : nouvelles demandes et listes ---
+  // `extra` : { demandeur (nom de l'agent) }
+
+  nouvelle_demande: (r, branding, extra = {}) => ({
+    subject: `Nouvelle demande — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Nouvelle demande de dossier</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        ${extra.demandeur ? `<b>${escapeHtml(extra.demandeur)}</b> demande` : 'Un agent demande'} le dossier ci-dessous${r.motif ? ` (motif : <b>${escapeHtml(r.motif)}</b>)` : ''}.
+      </p>
+      ${requestBlock(r)}
+      ${ctaButton('Voir les demandes à traiter', lien(branding, '/demandes/a-traiter'))}
+    `, branding),
+  }),
+
+  nouvelle_liste: (l, branding, extra = {}) => ({
+    subject: `Nouvelle liste — ${sanitizeHeader(l.libelle)} (${pluriel((l.dossiers || []).length, 'dossier')})`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Nouvelle liste de dossiers</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        ${extra.demandeur ? `<b>${escapeHtml(extra.demandeur)}</b> a déposé` : 'Un agent a déposé'} la liste
+        « <b>${escapeHtml(l.libelle)}</b> »${l.cadre ? ` (motif : <b>${escapeHtml(l.cadre)}</b>)` : ''} :
+        ${pluriel((l.dossiers || []).length, 'dossier')} à sortir.
+      </p>
+      ${dossiersBlock(l.dossiers)}
+      ${ctaButton('Voir la liste', lien(branding, '/demandes/a-traiter'))}
+    `, branding),
+  }),
+
+  // --- Listes transmises ou retournées d'un geste : un e-mail par agent ---
+  // `extra` : { dateRetour (AAAA-MM-JJ), par (nom de l'archiviste) }
+
+  liste_transmise: (l, branding, extra = {}) => ({
+    subject: `Dossiers transmis — ${sanitizeHeader(l.libelle)} (${pluriel((l.dossiers || []).length, 'dossier')})`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Des dossiers vous ont été transmis</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        ${pluriel((l.dossiers || []).length, 'dossier')} de la liste « <b>${escapeHtml(l.libelle)}</b> » vous
+        ${(l.dossiers || []).length > 1 ? 'ont été transmis' : 'a été transmis'}${extra.par ? ` par <b>${escapeHtml(extra.par)}</b>` : ''}.
+        ${extra.dateRetour ? `Merci de ${(l.dossiers || []).length > 1 ? 'les' : 'le'} retourner aux archives avant le <b>${escapeHtml(dateFr(extra.dateRetour))}</b>.` : ''}
+      </p>
+      ${dossiersBlock(l.dossiers)}
+      ${ctaButton('Voir mes dossiers', lien(branding, '/demandes/mes-demandes'))}
+    `, branding),
+  }),
+
+  liste_retournee: (l, branding, extra = {}) => ({
+    subject: `Retour enregistré — ${sanitizeHeader(l.libelle)} (${pluriel((l.dossiers || []).length, 'dossier')})`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour des dossiers enregistré ✅</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        Le retour aux archives de ${pluriel((l.dossiers || []).length, 'dossier')} de la liste « <b>${escapeHtml(l.libelle)}</b> »
+        a été enregistré${extra.par ? ` par <b>${escapeHtml(extra.par)}</b>` : ''}. Ce message vous en décharge :
+        conservez-le comme preuve de restitution.
+      </p>
+      ${dossiersBlock(l.dossiers)}
+    `, branding),
+  }),
+
+  // --- Compléments (051) ---
+  // complement_demande, au demandeur : `extra` : { manque (texte), message, par }
+  complement_demande: (r, branding, extra = {}) => ({
+    subject: `Demande à compléter — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">L'archive a besoin de précisions</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        L'archive ne peut pas retrouver le dossier ci-dessous${extra.manque ? ` : il manque <b>${escapeHtml(extra.manque)}</b>` : ''}.
+      </p>
+      ${extra.message ? `<div style="margin:12px 0;padding:12px 16px;border-left:4px solid #f59e0b;background:#fffbeb;border-radius:8px;font-size:15px;color:#78350f;font-style:italic;">« ${escapeHtml(extra.message)} »${extra.par ? `<div style="font-style:normal;font-size:12px;margin-top:4px;">— ${escapeHtml(extra.par)}</div>` : ''}</div>` : ''}
+      ${requestBlock(r)}
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:12px 0 0;">Complétez-la puis renvoyez-la depuis « Mes dossiers ».</p>
+      ${ctaButton('Compléter ma demande', lien(branding, '/demandes/mes-demandes'))}
+    `, branding),
+  }),
+
+  // complement_fourni, à l'archive : `extra` : { demandeur, reponse }
+  complement_fourni: (r, branding, extra = {}) => ({
+    subject: `Demande complétée — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Demande complétée</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        ${extra.demandeur ? `<b>${escapeHtml(extra.demandeur)}</b> a complété` : 'Le demandeur a complété'} sa demande : elle est de retour dans « À traiter ».
+      </p>
+      ${extra.reponse ? `<div style="margin:12px 0;padding:12px 16px;border-left:4px solid #16a34a;background:#f0fdf4;border-radius:8px;font-size:15px;color:#14532d;font-style:italic;">« ${escapeHtml(extra.reponse)} »</div>` : ''}
+      ${requestBlock(r)}
+      ${ctaButton('Voir les demandes à traiter', lien(branding, '/demandes/a-traiter'))}
+    `, branding),
+  }),
+
   loan_overdue: (r, branding, extra = {}) => ({
     subject: `Dossier à retourner — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
@@ -329,7 +465,7 @@ const TEMPLATES = {
         Merci de le rapporter dès que possible.
       </p>
       ${requestBlock(r)}
-      ${ctaButton('Voir ma demande', `${APP_URL}/dashboard`)}
+      ${ctaButton('Voir ma demande', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 };
@@ -340,6 +476,21 @@ function dateFr(d) {
   const s = d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
+
+// Code (slug) de chaque organisation, pour savoir par quelle voie elle envoie.
+const slugs = new Map();
+async function parMicrosoft365(tenantId) {
+  if (!tenantId || !microsoft365.estConfigure()) return false;
+  if (!slugs.has(tenantId)) {
+    try {
+      const r = await db.query('SELECT slug FROM tenants WHERE id = $1', [tenantId]);
+      slugs.set(tenantId, r.rows[0]?.slug || null);
+    } catch {
+      return false;
+    }
+  }
+  return microsoft365.concerne(slugs.get(tenantId));
 }
 
 /**
@@ -355,8 +506,13 @@ function dateFr(d) {
  * @returns {Promise<{sent: boolean, skipped?: boolean, reason?: string, id?: string, error?: string}>}
  */
 async function sendMail({ to, subject, html, tenantId = null, event = null, branding = null }) {
-  if (!isConfigured || !resend) {
-    console.log(`[mail] Resend non configuré — e-mail ignoré pour ${to} : « ${subject} »`);
+  // Voie d'envoi, dans l'ordre : le serveur de messagerie de l'organisation
+  // (SMTP : installation sur son serveur interne), sa boîte Microsoft 365
+  // (Graph, MS365_ORGANISATIONS), sinon le service d'envoi en ligne (Resend).
+  const viaSmtp = smtp.estConfigure();
+  const viaMicrosoft = !viaSmtp && await parMicrosoft365(tenantId);
+  if (!viaSmtp && !viaMicrosoft && (!isConfigured || !resend)) {
+    console.log(`[mail] aucun envoi configuré — e-mail ignoré pour ${to} : « ${subject} »`);
     return { sent: false, skipped: true, reason: 'not_configured' };
   }
 
@@ -381,6 +537,28 @@ async function sendMail({ to, subject, html, tenantId = null, event = null, bran
   const testTo = process.env.MAIL_TEST_TO;
   const actualTo = testTo || to;
   const actualSubject = sanitizeHeader(testTo ? `${subject} [→ ${to}]` : subject);
+
+  if (viaSmtp) {
+    try {
+      const r = await smtp.envoyer({ to: actualTo, subject: actualSubject, html, nomExpediteur: brand.senderName });
+      console.log(`[mail] E-mail envoyé par le serveur de messagerie à ${actualTo}${testTo ? ` (redirigé depuis ${to})` : ''} : « ${subject} »`);
+      return r;
+    } catch (err) {
+      console.error('[mail] Erreur d\'envoi SMTP :', err.message);
+      return { sent: false, error: err.message };
+    }
+  }
+
+  if (viaMicrosoft) {
+    try {
+      await microsoft365.envoyer({ to: actualTo, subject: actualSubject, html });
+      console.log(`[mail] E-mail envoyé par la boîte Microsoft 365 à ${actualTo}${testTo ? ` (redirigé depuis ${to})` : ''} : « ${subject} »`);
+      return { sent: true, via: 'microsoft365' };
+    } catch (err) {
+      console.error('[mail] Erreur d\'envoi Microsoft 365 :', err.message);
+      return { sent: false, error: err.message };
+    }
+  }
 
   try {
     const { data, error } = await resend.emails.send({
@@ -424,4 +602,33 @@ async function notify({ tenantId, to, event, request, assigneeName = null, extra
   return sendMail({ to, subject, html, tenantId, event, branding });
 }
 
-module.exports = { sendMail, notify, loadBranding, TEMPLATES, isConfigured, APP_URL };
+/**
+ * Envoie l'e-mail d'un événement à des comptes de l'organisation (par leur
+ * id) : adresse lue en base, comptes sans adresse ignorés. Ne lève jamais —
+ * un courriel manqué ne doit pas défaire le geste qui l'a déclenché ; les
+ * appelants peuvent donc ne pas l'attendre (réponse immédiate à l'écran).
+ * @returns {Promise<number>} nombre d'e-mails envoyés
+ */
+async function notifierComptes(tenantId, userIds, event, objet, extra = null) {
+  const ids = [...new Set((userIds || []).filter(Boolean).map(Number))];
+  if (!ids.length || !envoiPossible()) return 0;
+  let envoyes = 0;
+  try {
+    const r = await db.query(
+      "SELECT email FROM users WHERE tenant_id = $1 AND id = ANY($2::int[]) AND COALESCE(email, '') <> ''",
+      [tenantId, ids]
+    );
+    for (const u of r.rows) {
+      const res = await notify({ tenantId, to: u.email, event, request: objet, extra });
+      if (res.sent) envoyes += 1;
+    }
+  } catch (err) {
+    console.error(`[mail] « ${event} » non envoyé :`, err.message);
+  }
+  return envoyes;
+}
+
+/** Un envoi est-il possible (serveur de messagerie, Microsoft 365 ou service en ligne) ? */
+const envoiPossible = () => smtp.estConfigure() || microsoft365.estConfigure() || isConfigured;
+
+module.exports = { sendMail, notify, notifierComptes, loadBranding, TEMPLATES, isConfigured, envoiPossible, APP_URL, EVENT_SETTING };

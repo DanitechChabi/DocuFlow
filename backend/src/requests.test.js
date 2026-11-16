@@ -76,7 +76,10 @@ doubler('services/requestFieldService.js', {
 });
 doubler('services/settingsService.js', { getAll: async () => ({}) });
 const mails = [];
-doubler('services/mailService.js', { notify: async (m) => { mails.push(m); return { sent: true }; } });
+doubler('services/mailService.js', {
+  notify: async (m) => { mails.push(m); return { sent: true }; },
+  notifierComptes: async (tenantId, ids, event) => { mails.push({ event, ids }); return 0; },
+});
 
 const access = require('./services/requestAccessService');
 const utilisateur = (id, role) => ({ id, tenant_id: 1, role });
