@@ -87,6 +87,16 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     ok((await e.presence(t, { nom_entreprise: 'ab' })).recherche === false, 'trop peu pour chercher');
     const lot = await e.presences(t, [{ cle: 'a', num_acte: '1964' }, { cle: 'b', nom_entreprise: 'Cabinet Fictif' }]);
     ok(lot.a.total === 1 && lot.b.entrees[0].semaine === '2026-01-09', 'plusieurs d\'un coup');
+    console.log('\n4. Classeurs importés');
+    await e.importer(t, u, { fichier: 'autre.xlsx', lignes: [{ date: '2026-02-03', ordre: 1, actes: '500', denomination: 'Delta Fictif' }] });
+    const f = await e.fichiers(t);
+    ok(f.length === 2 && f.find((x) => x.fichier === 'point.xlsx').lignes === 4 && f.find((x) => x.fichier === 'autre.xlsx').au === '2026-02-03', 'classeurs listés : lignes et période');
+    ok((await e.supprimerFichier(t, u, { fichier: 'autre.xlsx' })).supprimees === 1 && (await e.fichiers(t)).length === 1, 'un classeur supprimé, l\'autre gardé');
+    let absent = null; try { await e.supprimerFichier(t, u, { fichier: 'autre.xlsx' }); } catch (err) { absent = err.statut; }
+    let vide = null; try { await e.supprimerFichier(t, u, {}); } catch (err) { vide = err.statut; }
+    ok(absent === 404 && vide === 400, 'classeur absent : 404 ; rien d\'indiqué : 400');
+    ok((await e.importer(t, u, { fichier: 'autre.xlsx', lignes: [{ date: '2026-02-03', ordre: 1, actes: '500', denomination: 'Delta Fictif' }] })).ajoutees === 1, 'réimportable aussitôt');
+    ok((await e.supprimerFichier(t, u, { tous: true })).supprimees === 5 && (await e.fichiers(t)).length === 0, 'tout supprimer');
     let trop = null; try { await e.presences(t, Array(e.MAX_PRESENCES + 1).fill({})); } catch (err) { trop = err.statut; }
     ok(trop === 400, 'au plus 200 dossiers à la fois');
   }

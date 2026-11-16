@@ -336,7 +336,54 @@ async function presences(tenantId, dossiers) {
   return res;
 }
 
+// ---------------------------------------------------------------------------
+// Classeurs importés : la liste, et leur suppression (un classeur périmé, mal
+// lu ou importé par erreur). Les lignes d'un classeur partent toutes ; le
+// classeur corrigé peut être réimporté aussitôt.
+// ---------------------------------------------------------------------------
+
+/** Les classeurs importés : nom, nombre de lignes, période couverte, dernier import. */
+async function fichiers(tenantId) {
+  const r = await db.query(
+    `SELECT d.fichier, count(*)::int AS lignes,
+            to_char(min(d.date_point), 'YYYY-MM-DD') AS du, to_char(max(d.date_point), 'YYYY-MM-DD') AS au,
+            max(d.created_at) AS importe_le,
+            (array_agg(u.full_name ORDER BY d.created_at DESC))[1] AS importe_par
+       FROM dossiers_entres d LEFT JOIN users u ON u.id = d.cree_par
+      WHERE d.tenant_id = $1
+      GROUP BY d.fichier
+      ORDER BY max(d.created_at) DESC, d.fichier`,
+    [tenantId]
+  );
+  return r.rows;
+}
+
+/**
+ * Supprime les lignes d'un classeur (`fichier` : son nom, ou null pour les
+ * lignes importées sans nom), ou de tous (`tous: true`). Journalisé.
+ */
+async function supprimerFichier(tenantId, user, { fichier, tous } = {}) {
+  let r;
+  let libelle;
+  if (tous === true) {
+    r = await db.query('DELETE FROM dossiers_entres WHERE tenant_id = $1', [tenantId]);
+    libelle = 'tous les classeurs';
+  } else if (fichier === null || (typeof fichier === 'string' && fichier.trim())) {
+    r = fichier === null
+      ? await db.query('DELETE FROM dossiers_entres WHERE tenant_id = $1 AND fichier IS NULL', [tenantId])
+      : await db.query('DELETE FROM dossiers_entres WHERE tenant_id = $1 AND fichier = $2', [tenantId, fichier]);
+    libelle = fichier === null ? 'les lignes importées sans nom de classeur' : `le classeur « ${fichier} »`;
+  } else {
+    throw erreur(400, 'Indiquez le classeur à supprimer.');
+  }
+  if (!r.rowCount) throw erreur(404, 'Aucune ligne de ce classeur n\'est enregistrée.');
+  await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
+    [user.id, `A supprimé ${libelle} de l'entrée des dossiers (${r.rowCount} ligne${r.rowCount > 1 ? 's' : ''})`.slice(0, 500), tenantId]);
+  return { supprimees: r.rowCount };
+}
+
 module.exports = {
+  fichiers, supprimerFichier,
   importer, semaines, semaine, rechercher, filtres, presence, presences,
   semaineDe, actesDe, lettreDe, feriesDe, paques, nomSimple, acteDemande, LIMITE, MAX_PRESENCES,
 };
