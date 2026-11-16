@@ -7,6 +7,7 @@ import { listeService } from '../../../services/listeService';
 import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements';
+import { Presence, usePresences } from './presence';
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 
 // ============================================================================
@@ -18,11 +19,13 @@ import { etatDemande, etatDossierListe, intitule, references, dateCourte } from 
 const correspond = (d, q) => !q || [d.nom_entreprise, d.num_dossier, d.num_acte, d.description, d.libelle]
   .some((x) => x && String(x).toLowerCase().includes(q.toLowerCase()));
 
-const LigneDossier = ({ d, etat, children }) => (
+const LigneDossier = ({ d, etat, presence, children }) => (
   <li className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
     <div className="min-w-0 flex-1 basis-60">
       <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif].filter(Boolean).join(' · ') || 'Sans référence'}</div>
+      {/* Entré aux archives ? dans quelle semaine, à quelle date ? */}
+      <Presence resultat={presence} className="mt-1" />
     </div>
     {children}
     <Pastille ton={etat.ton}>{etat.texte}</Pastille>
@@ -54,6 +57,9 @@ const MesDossiersAfgc = () => {
   const enCours = seules.filter((d) => ['demande', 'transmis'].includes(etatDemande(d).cle));
   const terminees = seules.filter((d) => !['demande', 'transmis'].includes(etatDemande(d).cle));
   const listesVues = (listes || []).filter((l) => (!cadre || l.cadre === cadre) && correspond(l, q));
+  // Les dossiers encore attendus : sont-ils entrés aux archives, et quand ?
+  const presences = usePresences(useMemo(() => enCours.filter((d) => etatDemande(d).cle === 'demande'), [enCours]));
+  const presencesListe = usePresences(useMemo(() => (ouverte?.dossiers || []).filter((d) => d.etat === 'demande'), [ouverte]));
 
   const ouvrir = async (id) => {
     if (ouverte?.id === id) { setOuverte(null); return; }
@@ -115,7 +121,7 @@ const MesDossiersAfgc = () => {
                   {enCours.map((d) => {
                     const etat = etatDemande(d);
                     return (
-                      <LigneDossier key={d.id} d={d} etat={etat}>
+                      <LigneDossier key={d.id} d={d} etat={etat} presence={presences[d.id]}>
                         {etat.cle === 'transmis' && d.loan_retour_prevu && (
                           <span className="text-xs text-slate-500">retour prévu le <strong>{dateCourte(d.loan_retour_prevu)}</strong></span>
                         )}
@@ -171,7 +177,7 @@ const MesDossiersAfgc = () => {
                       </div>
                       <ul className="divide-y divide-slate-100">
                         {ouverte.dossiers.map((d) => (
-                          <LigneDossier key={d.id} d={d} etat={etatDossierListe(d)}>
+                          <LigneDossier key={d.id} d={d} etat={etatDossierListe(d)} presence={presencesListe[d.id]}>
                             {d.etat === 'transmis' && d.date_retour_prevue && <span className="text-xs text-slate-500">retour prévu le <strong>{dateCourte(d.date_retour_prevue)}</strong></span>}
                           </LigneDossier>
                         ))}
