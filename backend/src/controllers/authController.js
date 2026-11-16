@@ -26,11 +26,39 @@ function normalizeSlug(value) {
     .replace(/^-+|-+$/g, '');
 }
 
+// Adresse électronique : forme simple ; la messagerie fera le reste.
+const ADRESSE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Domaines admis à l'inscription (réglage registration_email_domains), sans « @ ». */
+function domainesAdmis(valeur) {
+  return String(valeur || '').split(/[\s,;]+/).map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
+}
+
 exports.register = async (req, res) => {
-  const { username, password, full_name, email, section, tenant_slug } = req.body;
+  const {
+    username, password, full_name, email, section, tenant_slug,
+    // Le département ne figure pas dans la liste : l'agent le crée en
+    // s'inscrivant, si l'organisation le permet (registration_new_department).
+    nouveau_departement: nouveauDepartement,
+  } = req.body || {};
 
   if (!password) {
     return res.status(400).json({ message: 'Le mot de passe est obligatoire' });
+  }
+  if (!String(username || '').trim()) {
+    return res.status(400).json({ message: 'Choisissez un identifiant.' });
+  }
+  if (!String(full_name || '').trim()) {
+    return res.status(400).json({ message: 'Indiquez votre nom complet.' });
+  }
+  // L'adresse est obligatoire (users.email NOT NULL) : un message clair plutôt
+  // qu'une erreur de la base.
+  const adresse = String(email || '').trim();
+  if (!adresse) {
+    return res.status(400).json({ message: 'Indiquez votre adresse électronique professionnelle.' });
+  }
+  if (!ADRESSE.test(adresse)) {
+    return res.status(400).json({ message: 'Adresse électronique invalide.' });
   }
 
   try {
@@ -62,18 +90,45 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: passwordError });
     }
 
-    // Vérifier si l'utilisateur existe déjà (avec fallback si tenant_id absent)
+    // Adresse professionnelle : si l'organisation a fixé ses domaines, seules
+    // ses adresses sont admises.
+    const domaines = domainesAdmis(await settingsService.get(tenantId, 'registration_email_domains', ''));
+    if (domaines.length && !domaines.includes(adresse.split('@')[1]?.toLowerCase())) {
+      return res.status(400).json({
+        message: `Utilisez votre adresse professionnelle (${domaines.map((d) => `@${d}`).join(' ou ')}).`,
+      });
+    }
+
+    // Département à créer : un nom propre, absent de la liste (sinon on reprend
+    // celui de la liste, tel qu'il y est écrit).
+    let departement = section;
+    let departementCree = null;
+    if (nouveauDepartement) {
+      const nom = String(section || '').trim().replace(/\s+/g, ' ');
+      if (nom.length < 2 || nom.length > 100) {
+        return res.status(400).json({ message: 'Donnez le nom de votre département (2 à 100 caractères).' });
+      }
+      if ((await settingsService.get(tenantId, 'registration_new_department', false)) !== true) {
+        return res.status(403).json({ message: 'Choisissez votre département dans la liste : seul l\'administrateur peut en ajouter.' });
+      }
+      const existant = await db.query('SELECT name FROM sections WHERE tenant_id = $1 AND lower(name) = lower($2)', [tenantId, nom]);
+      departement = existant.rows[0]?.name || nom;
+      if (!existant.rows[0]) departementCree = nom;
+    }
+
+    // Vérifier si l'utilisateur existe déjà (avec fallback si tenant_id absent).
+    // Une adresse vide ne désigne personne.
     let userCheck;
     try {
       userCheck = await db.query(
-        'SELECT * FROM users WHERE (username = $1 OR email = $2) AND tenant_id = $3',
-        [username, email, tenantId]
+        `SELECT * FROM users WHERE (username = $1 OR ($2 <> '' AND lower(email) = lower($2))) AND tenant_id = $3`,
+        [username, adresse, tenantId]
       );
     } catch (err) {
       if (err.code === '42703') {
         userCheck = await db.query(
-          'SELECT * FROM users WHERE username = $1 OR email = $2',
-          [username, email]
+          `SELECT * FROM users WHERE username = $1 OR ($2 <> '' AND lower(email) = lower($2))`,
+          [username, adresse]
         );
       } else {
         throw err;
@@ -93,19 +148,33 @@ exports.register = async (req, res) => {
       newUser = await db.query(
         `INSERT INTO users (tenant_id, username, password_hash, full_name, email, section, role)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, username, email, role, tenant_id`,
-        [tenantId, username, hashedPassword, full_name, email, section, 'demandeur']
+        [tenantId, username, hashedPassword, full_name, adresse || email, departement, 'demandeur']
       );
     } catch (err) {
       if (err.code === '42703') {
         newUser = await db.query(
           `INSERT INTO users (username, password_hash, full_name, email, section, role)
            VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, email, role`,
-          [username, hashedPassword, full_name, email, section, 'demandeur']
+          [username, hashedPassword, full_name, adresse || email, departement, 'demandeur']
         );
       } else {
         throw err;
       }
     }
+
+    // Le département créé rejoint la liste de l'organisation ; l'inscription
+    // est inscrite au journal (qui, quand, dans quel département).
+    if (departementCree) {
+      await db.query(
+        `INSERT INTO sections (tenant_id, name) SELECT $1, $2::varchar
+          WHERE NOT EXISTS (SELECT 1 FROM sections WHERE tenant_id = $1 AND lower(name) = lower($2::varchar))`,
+        [tenantId, departementCree]
+      );
+    }
+    await db.query(
+      'INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
+      [newUser.rows[0].id, `S'est inscrit${departement ? ` (département : ${departement})` : ''}${departementCree ? ` et a créé le département « ${departementCree} »` : ''}`.slice(0, 500), tenantId]
+    ).catch((e) => console.warn('[register] journal d\'audit :', e.message));
 
     res.status(201).json({
       message: 'Utilisateur créé avec succès',
@@ -140,6 +209,16 @@ exports.login = async (req, res) => {
           'SELECT * FROM users WHERE username = $1 AND tenant_id = $2',
           [username, tenant.id]
         );
+        // Dans un espace, l'adresse professionnelle sert aussi d'identifiant.
+        if (!userResult.rows.length && ADRESSE.test(String(username || '').trim())) {
+          userResult = await db.query(
+            'SELECT * FROM users WHERE lower(email) = lower($1) AND tenant_id = $2 ORDER BY id LIMIT 2',
+            [String(username).trim(), tenant.id]
+          );
+          if (userResult.rows.length > 1) {
+            return res.status(400).json({ message: 'Plusieurs comptes utilisent cette adresse : connectez-vous avec votre identifiant.' });
+          }
+        }
       } else {
         userResult = await db.query(
           'SELECT * FROM users WHERE username = $1',
@@ -313,6 +392,31 @@ exports.registerCompany = async (req, res) => {
 };
 
 // Infos publiques d'une entreprise + ses réglages (pour la page de connexion dédiée)
+/**
+ * Départements d'un espace, pour la page d'inscription (publique) : leurs
+ * noms, si l'agent peut créer le sien, et les domaines d'adresse admis.
+ */
+exports.departementsPublics = async (req, res) => {
+  try {
+    const tenant = (await db.query('SELECT id, status FROM tenants WHERE slug = $1', [req.params.slug])).rows[0];
+    if (!tenant || tenant.status === 'suspended') return res.status(404).json({ message: 'Entreprise non trouvée' });
+    const [sections, creation, domaines] = await Promise.all([
+      db.query('SELECT id, name FROM sections WHERE tenant_id = $1', [tenant.id]),
+      settingsService.get(tenant.id, 'registration_new_department', false),
+      settingsService.get(tenant.id, 'registration_email_domains', ''),
+    ]);
+    res.json({
+      departements: sections.rows.sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+      creation: creation === true,
+      domaines: domainesAdmis(domaines),
+    });
+  } catch (err) {
+    if (err.code === '42P01' || err.code === '42703') return res.status(404).json({ message: 'Entreprise non trouvée' });
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors du chargement des départements' });
+  }
+};
+
 exports.getCompanyPublic = async (req, res) => {
   const { slug } = req.params;
   try {

@@ -15,6 +15,7 @@ import { edition } from '../../editions';
 import { Pastille, Chargement } from './afgc/elements';
 import { etatDemande, intitule, references } from './afgc/vocabulaire';
 import BoiteDemande from './afgc/BoiteDemande';
+import { prenomDe } from './afgc/identite';
 
 // ============================================================================
 // Accueil de l'édition AFGC : l'essentiel en trois boutons.
@@ -121,7 +122,7 @@ const AccueilAfgc = () => {
     return () => window.removeEventListener('afgc:demande-envoyee', recharger);
   }, [charger]);
 
-  const prenom = (user?.full_name || '').split(' ')[0] || 'bienvenue';
+  const prenom = prenomDe(user?.full_name) || 'bienvenue';
 
   // --- Agent ---
   const enCours = (mesDemandes || []).filter((d) => ['demande', 'transmis'].includes(etatDemande(d).cle));

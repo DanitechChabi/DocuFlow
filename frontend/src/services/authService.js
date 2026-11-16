@@ -35,6 +35,8 @@ export const authService = {
     const response = await api.get(`/auth/company/${slug}`);
     return response.data;
   },
+  /** Départements d'un espace, pour l'inscription : { departements, creation, domaines }. */
+  departements: async (slug) => (await api.get(`/auth/company/${encodeURIComponent(slug)}/departements`)).data,
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');

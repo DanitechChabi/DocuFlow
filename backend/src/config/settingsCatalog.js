@@ -196,6 +196,8 @@ const CATALOG = [
   // ---------------------------------------------------------------- SÉCURITÉ
   { key: 'password_min_length',      group: 'security', label: 'Longueur minimale du mot de passe', description: 'Nombre minimal de caractères exigé.', type: 'number', default: '8', min: 6, max: 128 },
   { key: 'password_require_symbols', group: 'security', label: 'Exiger un caractère spécial',       description: 'Imposer au moins un symbole dans les mots de passe.', type: 'boolean', default: 'false' },
+  { key: 'registration_email_domains', group: 'security', label: 'Adresses admises à l\'inscription', description: 'Domaines des adresses professionnelles acceptées à l\'inscription, séparés par des virgules (ex. « exemple.bj, exemple.com »). Vide : toute adresse.', type: 'string', default: null },
+  { key: 'registration_new_department', group: 'security', label: 'Créer son département à l\'inscription', description: 'Un agent dont le département ne figure pas dans la liste peut le créer en s\'inscrivant.', type: 'boolean', default: 'false' },
   { key: 'session_duration_days',    group: 'security', label: 'Durée de session',                  description: "Validité du jeton d'authentification, en jours.", type: 'number', default: '30', min: 1, max: 365 },
   { key: 'enable_google_auth',       group: 'security', label: 'Connexion Google',                  description: "Autoriser l'authentification via Google OAuth (nécessite la configuration serveur).", type: 'boolean', default: 'true' },
   { key: 'enable_audit_log',         group: 'security', label: "Journal d'audit",                   description: 'Tracer toutes les actions (append-only, inaltérable).', type: 'boolean', default: 'true' },
