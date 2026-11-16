@@ -97,6 +97,44 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     ok(absent === 404 && vide === 400, 'classeur absent : 404 ; rien d\'indiqué : 400');
     ok((await e.importer(t, u, { fichier: 'autre.xlsx', lignes: [{ date: '2026-02-03', ordre: 1, actes: '500', denomination: 'Delta Fictif' }] })).ajoutees === 1, 'réimportable aussitôt');
     ok((await e.supprimerFichier(t, u, { tous: true })).supprimees === 5 && (await e.fichiers(t)).length === 0, 'tout supprimer');
+
+    console.log('\n5. Plan de rangement (armoires)');
+    const rg = require('./services/rangementService');
+    await e.importer(t, u, { fichier: 'rangement.xlsx', lignes: [
+      { date: '2025-02-10', ordre: 1, actes: '10', denomination: 'Bravo Fictif' },
+      { date: '2025-02-11', ordre: 2, actes: '11', denomination: 'Charlie Fictif' },
+      { date: '2025-02-24', ordre: 1, actes: '20', denomination: 'Alpha Fictif' },
+      { date: '2025-02-25', ordre: 2, actes: '21', denomination: 'Sika Fictif' },
+      { date: '2025-02-27', ordre: 3, actes: '22', denomination: 'Zeta Fictif' },
+      { date: '2025-07-01', ordre: 1, actes: '30', denomination: 'Hors Plan Fictif' },
+    ] });
+    await rg.creer(t, u, { nom: 'Armoire 2', debut_semaine: '2025-01-17', fin_semaine: '2025-02-07', fin_lettre: 'B' });
+    await rg.creer(t, u, { nom: 'Armoire 3', debut_semaine: '2025-02-10', debut_lettre: 'c', fin_semaine: '2025-02-21', fin_lettre: 'S' });
+    const a4 = await rg.creer(t, u, { nom: 'Armoire 4', lieu: 'Couloir', debut_semaine: '2025-02-21', debut_lettre: "S'", fin_semaine: '2025-04-04', fin_lettre: 'C' });
+    ok(a4.debut_lettre === 'S' && (await rg.lister(t))[1].debut_semaine === '2025-02-07', 'date ramenée au vendredi, « S\' » lu comme S');
+    const armoireDe = (w, nom) => w.dossiers.find((x) => x.denomination === nom).armoire;
+    const w1 = await e.semaine(t, '2025-02-07');
+    ok(armoireDe(w1, 'Bravo Fictif') === 'Armoire 2' && armoireDe(w1, 'Charlie Fictif') === 'Armoire 3', 'même semaine : B dans l\'armoire 2, C dans la 3');
+    const w2 = await e.semaine(t, '2025-02-21');
+    ok(armoireDe(w2, 'Alpha Fictif') === 'Armoire 3' && armoireDe(w2, 'Zeta Fictif') === 'Armoire 4 · Couloir', 'A dans la 3, Z dans la 4 (avec le lieu)');
+    ok(armoireDe(w2, 'Sika Fictif') === 'Armoire 3 ou Armoire 4 · Couloir', 'lettre partagée (S, S\') : les deux armoires');
+    ok((await e.semaine(t, '2025-07-01')).dossiers[0].armoire === null, 'hors plan : pas d\'armoire');
+    ok((await e.rechercher(t, { q: 'Bravo' }))[0].armoire === 'Armoire 2', 'recherche : l\'armoire');
+    ok((await e.presence(t, { nom_entreprise: 'Charlie Fictif' })).entrees[0].armoire === 'Armoire 3', 'présence : l\'armoire');
+    let inv = []; for (const c of [{ nom: 'X', debut_semaine: '2025-03-07', fin_semaine: '2025-02-07' }, { nom: 'X', debut_semaine: '2025-02-07', fin_semaine: '2025-02-07', debut_lettre: 'AB' }, { debut_semaine: '2025-02-07', fin_semaine: '2025-02-07' }, { nom: 'X', debut_semaine: '2025-02-07', debut_lettre: 'S', fin_semaine: '2025-02-07', fin_lettre: 'C' }]) {
+      try { await rg.creer(t, u, c); inv.push(200); } catch (err) { inv.push(err.statut); }
+    }
+    ok(inv.join() === '400,400,400,400', 'gardes : fin avant début, lettre invalide, sans nom, lettres inversées');
+    await rg.modifier(t, u, a4.id, { nom: 'Armoire 4', debut_semaine: '2025-02-21', debut_lettre: 'T', fin_semaine: '2025-04-04', fin_lettre: 'C' });
+    ok(armoireDe(await e.semaine(t, '2025-02-21'), 'Sika Fictif') === 'Armoire 3', 'armoire modifiée : S n\'est plus partagé');
+    await rg.supprimer(t, u, a4.id);
+    ok((await rg.lister(t)).length === 2 && armoireDe(await e.semaine(t, '2025-02-21'), 'Zeta Fictif') === null, 'armoire retirée du plan');
+    ok((await rg.planPropose(t)).plan.length === 0, 'organisation sans plan fourni : rien à installer');
+    let sansPlan = null; try { await rg.installerPlan(t, u); } catch (err) { sansPlan = err.statut; }
+    ok(sansPlan === 404, 'installer un plan absent : 404');
+    const preset = require('./config/editions').EDITIONS.afgc.rangements;
+    ok(preset.length === 8 && preset.every((a, i) => rg.vendredi(a.debut_semaine) === a.debut_semaine && rg.vendredi(a.fin_semaine) === a.fin_semaine
+      && (i === 0 || `${preset[i - 1].fin_semaine}${preset[i - 1].fin_lettre}` <= `${a.debut_semaine}${a.debut_lettre}`)), 'plan AFGC : semaines du vendredi, armoires qui se suivent');
     let trop = null; try { await e.presences(t, Array(e.MAX_PRESENCES + 1).fill({})); } catch (err) { trop = err.statut; }
     ok(trop === 400, 'au plus 200 dossiers à la fois');
   }

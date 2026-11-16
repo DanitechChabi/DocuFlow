@@ -21,3 +21,12 @@ exports.presence = geste((req) => entreeService.presence(req.user.tenant_id, req
 exports.presences = geste((req) => entreeService.presences(req.user.tenant_id, req.body?.dossiers), 'la recherche de présence');
 exports.fichiers = geste((req) => entreeService.fichiers(req.user.tenant_id), 'la lecture des classeurs');
 exports.supprimerFichier = geste((req) => entreeService.supprimerFichier(req.user.tenant_id, req.user, req.body || {}), 'la suppression du classeur');
+
+// Plan de rangement (052) : les armoires et ce qu'elles contiennent.
+const rangementService = require('../services/rangementService');
+exports.rangements = geste((req) => rangementService.lister(req.user.tenant_id), 'la lecture du plan de rangement');
+exports.creerRangement = geste((req) => rangementService.creer(req.user.tenant_id, req.user, req.body || {}), 'l\'ajout de l\'armoire');
+exports.modifierRangement = geste((req) => rangementService.modifier(req.user.tenant_id, req.user, req.params.id, req.body || {}), 'la modification de l\'armoire');
+exports.supprimerRangement = geste((req) => rangementService.supprimer(req.user.tenant_id, req.user, req.params.id), 'la suppression de l\'armoire');
+exports.planRangement = geste((req) => rangementService.planPropose(req.user.tenant_id), 'la lecture du plan proposé');
+exports.installerPlan = geste((req) => rangementService.installerPlan(req.user.tenant_id, req.user), 'l\'installation du plan');

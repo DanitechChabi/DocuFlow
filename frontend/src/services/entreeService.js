@@ -7,6 +7,13 @@ export const entreeService = {
   semaine: async (debut) => (await api.get(`/entrees/semaines/${debut}`)).data,
   rechercher: async (params) => (await api.get('/entrees/recherche', { params })).data,
   filtres: async () => (await api.get('/entrees/filtres')).data,
+  // Plan de rangement (052) : les armoires.
+  rangements: async () => (await api.get('/entrees/rangements')).data,
+  creerRangement: async (corps) => (await api.post('/entrees/rangements', corps)).data,
+  modifierRangement: async (id, corps) => (await api.put(`/entrees/rangements/${id}`, corps)).data,
+  supprimerRangement: async (id) => (await api.delete(`/entrees/rangements/${id}`)).data,
+  planRangement: async () => (await api.get('/entrees/rangements/plan')).data,
+  installerPlan: async () => (await api.post('/entrees/rangements/plan')).data,
   fichiers: async () => (await api.get('/entrees/fichiers')).data,
   supprimerFichier: async (corps) => (await api.delete('/entrees/fichiers', { data: corps })).data,
   // Présence d'un dossier demandé aux archives (050) : ouverte aux demandeurs.
