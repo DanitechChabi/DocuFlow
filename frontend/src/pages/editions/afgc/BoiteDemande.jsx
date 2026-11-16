@@ -9,6 +9,7 @@ import { intitule, references, dateCourte, ressembleAReference, analyserCollage,
 import { edition } from '../../../editions';
 import { lireCadre, ecrireCadre, cadreActif } from './cadreRetenu';
 import { departementDe, motifsHabituels } from './departements';
+import { Presence, usePresence } from './presence';
 
 // ============================================================================
 // La boîte de demande : on tape le nom de l'entreprise ou un numéro, on
@@ -262,6 +263,8 @@ const BoiteDemande = ({
   const memeType = (s) => !typeEffectif || !s.type_document || s.type_document === typeEffectif;
   const memeNom = suggestions.filter((s) => egal(s.nom_entreprise) && memeType(s));
   const exacte = suggestions.find((s) => egal(s.num_dossier) || egal(s.num_acte)) || (memeNom.length === 1 ? memeNom[0] : null);
+  // Le dossier est-il entré aux archives, et dans quelle semaine ?
+  const presence = usePresence(q.length >= 2 && (!colles || cumuler) ? (exacte || detail) : null);
   const valider = (e) => {
     e.preventDefault();
     if (desactive || envoi) return;
@@ -353,6 +356,8 @@ const BoiteDemande = ({
         {cumuler && <span className="inline-flex items-center gap-1 text-slate-400"><Plus size={12} /> un dossier, Entrée, le suivant… ou collez-les d'un coup</span>}
         {pied}
       </div>
+
+      {(!colles || cumuler) && q.length >= 2 && <Presence resultat={presence} archiviste={!retenir} className="mt-2.5 px-1" />}
 
       {envoyee && (
         <div className="mt-3 flex items-center gap-3 rounded-2xl bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold animate-fade-in-up" role="status">

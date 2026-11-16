@@ -17,3 +17,5 @@ exports.semaines = geste((req) => entreeService.semaines(req.user.tenant_id, req
 exports.semaine = geste((req) => entreeService.semaine(req.user.tenant_id, req.params.debut), 'la lecture de la semaine');
 exports.rechercher = geste((req) => entreeService.rechercher(req.user.tenant_id, req.query), 'la recherche');
 exports.filtres = geste((req) => entreeService.filtres(req.user.tenant_id), 'la lecture des filtres');
+exports.presence = geste((req) => entreeService.presence(req.user.tenant_id, req.query), 'la recherche de présence');
+exports.presences = geste((req) => entreeService.presences(req.user.tenant_id, req.body?.dossiers), 'la recherche de présence');

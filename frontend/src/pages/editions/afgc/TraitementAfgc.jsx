@@ -9,6 +9,7 @@ import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, ChoixCadre, Pastille, Chargement, Avancement } from './elements';
 import { etatDemande, etatDossierListe, intitule, references, dateCourte } from './vocabulaire';
 import { parDepartement } from './departements';
+import { Presence, usePresences } from './presence';
 
 // ============================================================================
 // À traiter (archive) : chaque dossier se TRANSMET d'un clic, et son RETOUR se
@@ -42,11 +43,13 @@ const PreciserTypologie = ({ d, typologies, onChoix, desactive }) => (d.type_doc
 ));
 
 /** Une demande dans la file : intitulé, références, motif, demandeur. */
-const Ligne = ({ d, children }) => (
+const Ligne = ({ d, presence, children }) => (
   <li className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
     <div className="min-w-0 flex-1 basis-64">
       <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
       <div className="text-xs text-slate-400 truncate">{[references(d), d.motif, d.requester_name && `pour ${d.requester_name}`].filter(Boolean).join(' · ')}</div>
+      {/* Où le chercher : semaine de production, date du point, lettre. */}
+      <Presence resultat={presence} archiviste className="mt-1" />
     </div>
     {/* Les gestes restent groupés, à droite, même quand ils passent à la ligne. */}
     <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">{children}</div>
@@ -87,6 +90,8 @@ const TraitementAfgc = () => {
 
   const seules = useMemo(() => (demandes || []).filter((d) => !d.lot_id && (!cadre || d.motif === cadre) && correspond(d, q)), [demandes, cadre, q]);
   const aTransmettre = seules.filter((d) => etatDemande(d).cle === 'demande').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  // Pour chaque dossier à sortir : semaine et date du point où il est entré.
+  const presences = usePresences(aTransmettre);
   const sortis = seules.filter((d) => etatDemande(d).cle === 'transmis').sort((a, b) => String(a.loan_retour_prevu).localeCompare(String(b.loan_retour_prevu)));
   const listesVues = (listes || []).filter((l) => (!cadre || l.cadre === cadre) && correspond(l, q));
   const listesOuvertes = listesVues.filter((l) => l.a_transmettre + l.transmis > 0);
@@ -161,6 +166,7 @@ const TraitementAfgc = () => {
     }
   };
 
+  const presencesListe = usePresences(useMemo(() => (ouverte?.dossiers || []).filter((d) => d.etat === 'demande'), [ouverte]));
   const basculer = (id) => setCoches((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const cochesEtat = (etat) => (ouverte?.dossiers || []).filter((d) => coches.has(d.id) && d.etat === etat).length;
   const compte = (etat) => (ouverte?.dossiers || []).filter((d) => d.etat === etat).length;
@@ -247,7 +253,7 @@ const TraitementAfgc = () => {
               {aTransmettre.length ? (
                 <ul className="divide-y divide-slate-100">
                   {aTransmettre.map((d) => (
-                    <Ligne key={d.id} d={d}>
+                    <Ligne key={d.id} d={d} presence={presences[d.id]}>
                       <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                       <span className="text-xs text-slate-400">demandé le {dateCourte(d.created_at)}</span>
                       <button type="button" onClick={() => transmettre(d)} disabled={Boolean(geste)}
@@ -334,6 +340,7 @@ const TraitementAfgc = () => {
                                 <div className="min-w-0 flex-1">
                                   <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
                                   <div className="text-xs text-slate-400 truncate">{references(d) || d.description || 'Sans référence'}</div>
+                                  {d.etat === 'demande' && <Presence resultat={presencesListe[d.id]} archiviste className="mt-1" />}
                                 </div>
                                 {(d.etat === 'demande' || d.etat === 'transmis') && (
                                   <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />

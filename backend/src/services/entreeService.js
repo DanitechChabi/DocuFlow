@@ -228,4 +228,115 @@ async function filtres(tenantId) {
   return { types: types.rows, agents: agents.rows, annees: annees.rows.map((x) => x.v) };
 }
 
-module.exports = { importer, semaines, semaine, rechercher, filtres, semaineDe, actesDe, lettreDe, feriesDe, paques, LIMITE };
+// ---------------------------------------------------------------------------
+// Présence d'un dossier demandé aux archives : est-il entré, et quand ?
+// La semaine de production et la date du point sont ce dont l'archiviste a
+// besoin pour aller le chercher ; le demandeur le voit en demandant.
+// ---------------------------------------------------------------------------
+
+// Même expression que l'index de la migration 050.
+const NOM_SIMPLE = "trim(regexp_replace(translate(lower(denomination), 'àáâäãéèêëíîïóôöõúùûüçñ', 'aaaaaeeeeiiioooouuuucn'), '[^a-z0-9]+', ' ', 'g'))";
+const FORMES = new Set(['sarl', 'sa', 'sas', 'sasu', 'suarl', 'sarlu', 'ets', 'etablissement', 'etablissements', 'ste', 'societe', 'sci', 'gie', 'scs', 'snc', 'ong', 'cie']);
+
+/** Nom simplifié comme en base, sans forme juridique : « Ets Agro-Fictive SARL » → « agro fictive ». */
+function nomSimple(nom) {
+  const s = String(nom ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const coeur = s.split(' ').filter((m) => m && !FORMES.has(m)).join(' ');
+  return coeur.length >= 2 ? coeur : s;
+}
+
+/**
+ * Le n° d'acte d'une demande : « 2026/58 » ou « CBE-2026-0058 » → 58 de
+ * 2026 ; « 71 à 74 », « 1963-1964 » → ces numéros ; « 13802 » → 13802.
+ */
+function acteDemande(brut) {
+  const s = String(brut ?? '').trim();
+  const m = /^((?:19|20)\d{2})\s*\/\s*(\d+)$/.exec(s) || /(?:^|\D)((?:19|20)\d{2})\s*[-/.]\s*(\d{1,6})$/.exec(s);
+  if (m && (/[^\d\s/-]/.test(s) || s.includes('/'))) return { numeros: [Number(m[2])], annee: Number(m[1]) };
+  return { numeros: actesDe(s).filter((n) => n < 1e9), annee: null };
+}
+
+const MAX_PRESENCES = 200;
+// Ressemblance minimale de deux noms (trigrammes) : une faute de frappe passe
+// (« Zenit » / « Zénith » : 0,8), deux sociétés voisines non (0,48).
+const SEUIL_NOM = 0.6;
+
+/** Une recherche : par n° d'acte (le nom ne fait que classer) ou par nom. */
+async function chercherEntrees(tenantId, { nom, numeros, annee }) {
+  const params = [tenantId];
+  const p = (v) => { params.push(v); return `$${params.length}`; };
+  const conds = ['tenant_id = $1'];
+  let scoreNom = '0';
+  if (nom.length >= 2) {
+    const like = p(`%${nom.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    const pn = p(nom);
+    scoreNom = `CASE WHEN ${NOM_SIMPLE} LIKE ${like} THEN 1 ELSE similarity(${NOM_SIMPLE}, ${pn}) END`;
+    if (!numeros.length) conds.push(`(${NOM_SIMPLE} LIKE ${like} OR ${NOM_SIMPLE} % ${pn})`);
+  }
+  if (numeros.length) conds.push(`actes && ${p(numeros)}::int[]`);
+  let ordreAnnee = '0';
+  if (annee) {
+    conds.push(`date_point BETWEEN ${p(`${annee}-01-01`)}::date AND ${p(`${annee + 1}-12-31`)}::date`);
+    ordreAnnee = `CASE WHEN extract(year FROM date_point) = ${p(annee)} THEN 0 ELSE 1 END`;
+  }
+  const r = await db.query(
+    `SELECT *, count(*) OVER ()::int AS total FROM (
+       SELECT to_char(date_point, 'YYYY-MM-DD') AS date_point, to_char(semaine, 'YYYY-MM-DD') AS semaine,
+              to_char(semaine + 6, 'YYYY-MM-DD') AS au, rubrique, num_actes, denomination, lettre, type_garantie,
+              (${scoreNom})::float AS score_nom, ${ordreAnnee} AS ordre_annee
+         FROM dossiers_entres WHERE ${conds.join(' AND ')}
+     ) t
+     WHERE ${numeros.length ? 'true' : `score_nom >= ${SEUIL_NOM}`}
+     ORDER BY score_nom DESC, ordre_annee, date_point DESC
+     LIMIT 5`,
+    params
+  );
+  const avecNom = nom.length >= 2;
+  return {
+    total: r.rows[0]?.total || 0,
+    entrees: r.rows.map(({ score_nom: s, ordre_annee: _o, total: _t, ...e }) => ({ ...e, nom_concorde: !avecNom || s >= SEUIL_NOM })),
+  };
+}
+
+/**
+ * Les entrées qui correspondent à un dossier demandé ({ nom_entreprise,
+ * num_acte, annee }). Par n° d'acte s'il y en a un, sinon par nom. Si l'acte
+ * n'est entré que sous un autre nom, le nom est cherché à son tour ; à
+ * défaut, l'acte trouvé reste signalé « à vérifier ». L'année (celle de
+ * l'acte ou le champ année) retient le point de cette année ou de la
+ * suivante : un acte de décembre est souvent retiré en janvier. Seuls la
+ * dénomination, les actes, le type et le classement sont rendus — ni
+ * montants, ni commissions, ni agent.
+ */
+async function presence(tenantId, demande = {}) {
+  const nom = nomSimple(texte(demande.nom_entreprise, 255));
+  const acte = acteDemande(texte(demande.num_acte, 100));
+  const anneeChamp = Number(String(demande.annee ?? '').trim());
+  const annee = acte.annee || (Number.isInteger(anneeChamp) && anneeChamp >= 1950 && anneeChamp <= 2100 ? anneeChamp : null);
+  if (!acte.numeros.length && nom.length < 3) return { recherche: false, total: 0, entrees: [] };
+  const parActe = await chercherEntrees(tenantId, { nom, numeros: acte.numeros, annee });
+  if (acte.numeros.length && nom.length >= 3 && !parActe.entrees.some((e) => e.nom_concorde)) {
+    const parNom = await chercherEntrees(tenantId, { nom, numeros: [], annee });
+    if (parNom.total) return { recherche: true, ...parNom };
+  }
+  return { recherche: true, ...parActe };
+}
+
+/** Présence de plusieurs dossiers d'un coup ({ cle, nom_entreprise, num_acte, annee }[]) → { cle: résultat }. */
+async function presences(tenantId, dossiers) {
+  if (!Array.isArray(dossiers)) throw erreur(400, 'Liste de dossiers attendue.');
+  if (dossiers.length > MAX_PRESENCES) throw erreur(400, `Au plus ${MAX_PRESENCES} dossiers à la fois.`);
+  const res = {};
+  // Par paquets de 10 : la base n'est pas inondée, la réponse reste rapide.
+  for (let i = 0; i < dossiers.length; i += 10) {
+    const paquet = dossiers.slice(i, i + 10);
+    const resultats = await Promise.all(paquet.map((d) => presence(tenantId, d || {})));
+    paquet.forEach((d, k) => { res[String(d?.cle ?? i + k)] = resultats[k]; });
+  }
+  return res;
+}
+
+module.exports = {
+  importer, semaines, semaine, rechercher, filtres, presence, presences,
+  semaineDe, actesDe, lettreDe, feriesDe, paques, nomSimple, acteDemande, LIMITE, MAX_PRESENCES,
+};

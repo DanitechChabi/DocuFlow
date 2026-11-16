@@ -1,8 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
-const { requirePermission } = require('../middlewares/requirePermission');
+const { requirePermission, requireAnyPermission } = require('../middlewares/requirePermission');
 const entreeController = require('../controllers/entreeController');
+
+// Présence d'un dossier aux archives (050) : le demandeur la voit en
+// demandant ; seuls la dénomination, les actes et le classement sont rendus.
+const demandeur = requireAnyPermission(['requests.create', 'requests.process']);
+router.get('/presence', authMiddleware, demandeur, entreeController.presence);
+router.post('/presences', authMiddleware, demandeur, entreeController.presences);
 
 // Entrée des dossiers aux archives (049) : gestes de l'archive.
 router.use(authMiddleware, requirePermission('requests.process'));
