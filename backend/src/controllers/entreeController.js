@@ -30,3 +30,20 @@ exports.modifierRangement = geste((req) => rangementService.modifier(req.user.te
 exports.supprimerRangement = geste((req) => rangementService.supprimer(req.user.tenant_id, req.user, req.params.id), 'la suppression de l\'armoire');
 exports.planRangement = geste((req) => rangementService.planPropose(req.user.tenant_id), 'la lecture du plan proposé');
 exports.installerPlan = geste((req) => rangementService.installerPlan(req.user.tenant_id, req.user), 'l\'installation du plan');
+
+// Douchette (053) : sorties et retours en scannant l'étiquette du dossier.
+const douchetteService = require('../services/douchetteService');
+const gesteMetier = (fn, contexte) => async (req, res) => {
+  try {
+    res.json(await fn(req));
+  } catch (err) {
+    // Erreurs des prêts (déjà remis, date invalide…) : leur message, leur statut.
+    if (err.statut) return res.status(err.statut).json({ message: err.message, ...(err.code && typeof err.code === 'string' && !/^\d/.test(err.code) ? { code: err.code } : {}) });
+    if (err.code === '42703') return res.status(503).json({ message: 'La douchette n\'est pas encore disponible (migration 053 à appliquer).' });
+    console.error(`[douchette] ${contexte} :`, err);
+    return res.status(500).json({ message: `Erreur lors de ${contexte}.` });
+  }
+};
+exports.lireScan = gesteMetier((req) => douchetteService.lire(req.user.tenant_id, req.query.code), 'la lecture du code');
+exports.sortieScan = gesteMetier((req) => douchetteService.sortir(req.user.tenant_id, req.user, req.body || {}), 'la sortie du dossier');
+exports.retourScan = gesteMetier((req) => douchetteService.rentrer(req.user.tenant_id, req.user, req.body || {}), 'le retour du dossier');

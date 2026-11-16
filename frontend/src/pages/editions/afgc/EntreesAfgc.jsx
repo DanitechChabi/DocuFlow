@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2, Archive, Pencil, Plus } from 'lucide-react';
+import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2, Archive, Pencil, Plus, Tag } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { lireClasseur } from '../../../utils/classeur';
 import { entreeService } from '../../../services/entreeService';
@@ -10,6 +10,7 @@ import { EnTete, Pastille, Chargement } from './elements';
 import { dateCourte, montantLisible } from './vocabulaire';
 import { exporterClasseur, dateExcel, nomFichier } from './exportExcel';
 import { lirePoint } from './pointsExcel';
+import { ModaleEtiquettes, ImpressionEtiquettes } from './etiquettes';
 
 // ============================================================================
 // Entrée des dossiers : les « points des dossiers retirés » (Excel) importés,
@@ -476,6 +477,10 @@ const EntreesAfgc = () => {
   const [resultats, setResultats] = useState(null);
   // Chaque recherche rallume les résultats (la lumière rejoue).
   const [tour, setTour] = useState(0);
+  // Étiquettes à code-barres (053) : choix du format, puis impression.
+  const [etiquettes, setEtiquettes] = useState(null);
+  const [impression, setImpression] = useState(null);
+  const avecSemaine = (liste) => liste.map((d) => ({ ...d, semaine: d.semaine || detail?.semaine, au: d.au || (d.semaine ? undefined : detail?.au) }));
   const [cherche, setCherche] = useState(false);
 
   const chargerFiltres = useCallback(() => entreeService.filtres().then(setFiltres).catch(() => {}), []);
@@ -594,6 +599,10 @@ const EntreesAfgc = () => {
                   <button type="button" onClick={() => window.print()} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 hover:border-docuflow-secondary">
                     <Printer size={15} /> Bordereau de classement
                   </button>
+                  <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(detail.dossiers), titre: libelleSemaine(detail) })}
+                    className="px-3.5 py-2 rounded-xl border-2 border-violet-200 bg-violet-50 text-sm font-bold text-violet-800 inline-flex items-center gap-1.5 hover:border-violet-400">
+                    <Tag size={15} /> Étiquettes
+                  </button>
                   <button type="button" onClick={exporter} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 hover:border-docuflow-secondary">
                     <FileSpreadsheet size={15} /> Excel
                   </button>
@@ -621,6 +630,10 @@ const EntreesAfgc = () => {
                             <Archive size={14} /> {armoiresCourtes(ds)}
                           </span>
                         ) : <span className="ml-auto text-xs font-bold text-slate-500">armoire non renseignée</span>}
+                        <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(ds), titre: `${libelleSemaine(detail)} — ${l === 'Sans nom' ? 'sans nom' : `lettre ${l}`}` })}
+                          className="p-2 rounded-lg text-violet-700 hover:bg-violet-50" title={`Étiquettes de la lettre ${l}`} aria-label={`Étiquettes de la lettre ${l}`}>
+                          <Tag size={16} />
+                        </button>
                       </h3>
                       <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
                         {ds.map((d) => (
@@ -717,6 +730,10 @@ const EntreesAfgc = () => {
                           )}
                         </div>
                       </div>
+                      <button type="button" onClick={() => setEtiquettes({ dossiers: [d], titre: d.denomination })}
+                        className="self-center p-2.5 rounded-xl border-2 border-violet-200 text-violet-700 hover:bg-violet-50" title="Imprimer l'étiquette" aria-label="Imprimer l'étiquette">
+                        <Tag size={17} />
+                      </button>
                       <button type="button" onClick={() => ouvrirSemaine(d)}
                         className="self-center px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 hover:opacity-90 shadow-md shadow-green-200">
                         Ouvrir la semaine <ArrowRight size={15} />
@@ -731,7 +748,12 @@ const EntreesAfgc = () => {
       )}
 
       <ImportPoints open={importOuvert} onClose={() => setImportOuvert(false)} onFini={() => { chargerFiltres(); chargerSemaines(); }} />
-      {detail && onglet === 'semaines' && createPortal(
+      {etiquettes && (
+        <ModaleEtiquettes dossiers={etiquettes.dossiers} titre={etiquettes.titre} onClose={() => setEtiquettes(null)}
+          onImprimer={(format) => { setImpression({ dossiers: etiquettes.dossiers, format }); setEtiquettes(null); }} />
+      )}
+      {impression && <ImpressionEtiquettes dossiers={impression.dossiers} format={impression.format} onFini={() => setImpression(null)} />}
+      {detail && onglet === 'semaines' && !impression && createPortal(
         <div className="portail-impression"><BordereauImprime detail={detail} groupes={groupes} /></div>,
         document.body,
       )}
