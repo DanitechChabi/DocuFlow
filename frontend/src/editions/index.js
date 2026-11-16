@@ -74,6 +74,10 @@ const EDITIONS = {
     // adresses : mêmes routes, mêmes permissions, vocabulaire de l'AFGC
     // (Demandé → Transmis → Retourné) et listes de dossiers.
     pages: {
+      // Connexion (identifiant ou adresse Outlook) et inscription en deux
+      // temps (« Vous êtes… » : le département, puis l'identité).
+      '/login': () => import('../pages/editions/afgc/ConnexionAfgc'),
+      '/register': () => import('../pages/editions/afgc/InscriptionAfgc'),
       '/demandes/nouvelle': () => import('../pages/editions/afgc/DemanderAfgc'),
       '/demandes/mes-demandes': () => import('../pages/editions/afgc/MesDossiersAfgc'),
       '/demandes/a-traiter': () => import('../pages/editions/afgc/TraitementAfgc'),

@@ -104,9 +104,9 @@ function App() {
       <LicenseProvider>
       <ErrorBoundary>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={ecran('/login', <LoginPage />)} />
         <Route path="/:slug/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register" element={ecran('/register', <RegisterPage />)} />
         <Route path="/:slug/register" element={<RegisterPage />} />
         {/* Le site d'une édition dédiée sert une seule organisation : on n'y
             crée pas d'autre espace entreprise. */}

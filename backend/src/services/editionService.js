@@ -104,10 +104,11 @@ async function appliquer(tenantId, user, cle) {
   const reglages = [
     ['request_motifs', fusionner(edition.motifs, motifsActuels, valeursParDefaut('request_motifs'))],
     ['request_document_types', fusionner(edition.types, typesActuels, valeursParDefaut('request_document_types'))],
+    ...Object.entries(edition.reglages || {}),
   ].map(([cleReglage, valeur]) => {
     const definition = catalog.BY_KEY.get(cleReglage);
     if (!definition) throw erreur(500, `Réglage absent du catalogue : ${cleReglage}.`);
-    return [cleReglage, catalog.coerce(definition, valeur), valeur.length];
+    return [cleReglage, catalog.coerce(definition, valeur), Array.isArray(valeur) ? valeur.length : 1];
   });
 
   const client = await db.pool.connect();
