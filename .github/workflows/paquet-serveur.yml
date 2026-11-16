@@ -1,0 +1,94 @@
+# ============================================================================
+# Paquet d'installation « serveur interne » de l'édition AFGC (Windows Server).
+#
+# Déclenchement :
+#   - étiquette :  git tag serveur-v2.4.0 && git push origin serveur-v2.4.0
+#   - ou à la main : onglet Actions › « Paquet serveur AFGC » › Run workflow
+#
+# Résultat : une release « DocuFlow AFGC serveur <version> » portant
+#   DocuFlow-AFGC-Serveur-<version>.zip
+#     app\backend    l'API (dépendances de production incluses : rien à
+#                    télécharger sur le serveur)
+#     app\docs       schéma et migrations (appliqués au démarrage)
+#     app\frontend   l'interface AFGC compilée, servie par l'API (même adresse)
+#     scripts\       installer, mettre à jour, sauvegarder, restaurer, transférer
+#     LISEZ-MOI.md   le guide de la DSI
+# Voir deploiement/windows-server/LISEZ-MOI.md.
+# ============================================================================
+name: Paquet serveur AFGC
+
+on:
+  push:
+    tags: ['serveur-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numéro de version (ex. 2.4.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  paquet:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then V="${GITHUB_REF_NAME#serveur-v}"; else V="${{ inputs.version }}"; fi
+          V="${V#v}"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "Version invalide : $V (attendu : 2.4.0)"; exit 1; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: API (dépendances de production)
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Interface AFGC (même adresse que l'API)
+        working-directory: frontend
+        env:
+          VITE_EDITION: afgc
+          VITE_API_URL: /api
+        run: |
+          npm ci
+          npx vite build --mode afgc
+
+      - name: Assemblage
+        shell: pwsh
+        run: |
+          $nom = "DocuFlow-AFGC-Serveur-$env:VERSION"
+          $r = Join-Path $env:RUNNER_TEMP $nom
+          New-Item -ItemType Directory -Force -Path "$r\app\backend", "$r\app\docs", "$r\app\frontend", "$r\scripts" | Out-Null
+          foreach ($e in 'src', 'scripts', 'node_modules', 'package.json', 'package-lock.json') { Copy-Item "backend\$e" "$r\app\backend\" -Recurse }
+          Get-ChildItem "$r\app\backend\src" -Recurse -Filter '*.test.js' | Remove-Item -Force
+          Copy-Item docs\migrations "$r\app\docs\" -Recurse
+          Copy-Item docs\setup_db.sql "$r\app\docs\"
+          Copy-Item frontend\dist\* "$r\app\frontend\" -Recurse
+          Copy-Item deploiement\windows-server\*.ps1 "$r\scripts\"
+          Copy-Item deploiement\windows-server\LISEZ-MOI.md "$r\"
+          Set-Content -Path "$r\VERSION.txt" -Value "DocuFlow AFGC serveur $env:VERSION — commit $env:GITHUB_SHA" -Encoding UTF8
+          Compress-Archive -Path $r -DestinationPath "$nom.zip" -CompressionLevel Optimal
+          "PAQUET=$nom.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PAQUET }}
+          path: ${{ env.PAQUET }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: serveur-v${{ env.VERSION }}
+          name: DocuFlow AFGC serveur ${{ env.VERSION }}
+          body: |
+            Paquet d'installation de DocuFlow AFGC sur un Windows Server du réseau interne.
+            Décompresser, puis suivre LISEZ-MOI.md (installation : scripts\installer.ps1 ; mise à jour : scripts\mettre-a-jour.ps1).
+          files: ${{ env.PAQUET }}
