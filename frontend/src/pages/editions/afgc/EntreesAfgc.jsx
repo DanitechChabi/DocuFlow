@@ -12,6 +12,7 @@ import { exporterClasseur, dateExcel, nomFichier } from './exportExcel';
 import { lirePoint } from './pointsExcel';
 import { ModaleEtiquettes, ImpressionEtiquettes } from './etiquettes';
 import { edition } from '../../../editions';
+import Armoires3D from './Armoires3D';
 
 // Impression des étiquettes : réglée par l'édition (désactivée pour l'instant).
 const ETIQUETTES = edition?.etiquettes !== false;
@@ -305,7 +306,7 @@ const borne = (semaine, lettre, debut) => {
  * lettre). Les dossiers entrés y sont situés automatiquement — semaines,
  * recherche, demandes.
  */
-const PlanRangement = ({ onChange }) => {
+const PlanRangement = ({ onChange, cible, onFermerCible }) => {
   const [armoires, setArmoires] = useState(null);
   const [plan, setPlan] = useState({ plan: [], manquants: 0 });
   const [edite, setEdite] = useState(null); // null, 'nouvelle' ou l'id
@@ -375,6 +376,8 @@ const PlanRangement = ({ onChange }) => {
           <Plus size={16} /> Ajouter une armoire
         </button>
       </div>
+
+      {armoires.length > 0 && <Armoires3D armoires={armoires} cible={cible} onFermerCible={onFermerCible} />}
 
       {plan.manquants > 0 && (
         <div className="resultat-lumiere mb-4 rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4 flex flex-wrap items-center gap-3">
@@ -484,6 +487,14 @@ const EntreesAfgc = () => {
   // Étiquettes à code-barres (053) : choix du format, puis impression.
   const [etiquettes, setEtiquettes] = useState(null);
   const [impression, setImpression] = useState(null);
+  // Armoire d'un dossier, montrée en 3D dans l'onglet Rangement.
+  const [cibleArmoire, setCibleArmoire] = useState(null);
+  const voirArmoire = (armoire, semaine) => {
+    const nom = String(armoire || '').split(' ou ')[0].split(' · ')[0];
+    if (!nom) return;
+    setCibleArmoire({ nom, semaine });
+    setOnglet('rangement');
+  };
   const avecSemaine = (liste) => liste.map((d) => ({ ...d, semaine: d.semaine || detail?.semaine, au: d.au || (d.semaine ? undefined : detail?.au) }));
   const [cherche, setCherche] = useState(false);
 
@@ -630,9 +641,10 @@ const EntreesAfgc = () => {
                         <span className="text-base font-black text-slate-800">{l === 'Sans nom' ? 'Sans nom' : `Lettre ${l}`}</span>
                         <span className="text-sm font-bold text-slate-600">· {ds.length} dossier{ds.length > 1 ? 's' : ''}</span>
                         {armoiresDe(ds) ? (
-                          <span className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-sm font-black shadow-sm shadow-violet-200">
+                          <button type="button" onClick={() => voirArmoire(armoiresCourtes(ds), detail.semaine)} title="Voir l'armoire en 3D"
+                            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-sm font-black shadow-sm shadow-violet-200 hover:bg-violet-700">
                             <Archive size={14} /> {armoiresCourtes(ds)}
-                          </span>
+                          </button>
                         ) : <span className="ml-auto text-xs font-bold text-slate-500">armoire non renseignée</span>}
                         {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(ds), titre: `${libelleSemaine(detail)} — ${l === 'Sans nom' ? 'sans nom' : `lettre ${l}`}` })}
                           className="p-2 rounded-lg text-violet-700 hover:bg-violet-50" title={`Étiquettes de la lettre ${l}`} aria-label={`Étiquettes de la lettre ${l}`}>
@@ -658,7 +670,8 @@ const EntreesAfgc = () => {
           </section>
         </div>
       ) : onglet === 'rangement' ? (
-        <PlanRangement onChange={() => { if (choisie) entreeService.semaine(choisie).then(setDetail).catch(() => {}); setResultats(null); }} />
+        <PlanRangement cible={cibleArmoire} onFermerCible={() => setCibleArmoire(null)}
+          onChange={() => { if (choisie) entreeService.semaine(choisie).then(setDetail).catch(() => {}); setResultats(null); }} />
       ) : onglet === 'classeurs' ? (
         <ClasseursImportes onImporter={() => setImportOuvert(true)} onChange={() => { chargerFiltres(); chargerSemaines(); setResultats(null); setChoisie(null); }} />
       ) : (
@@ -725,10 +738,12 @@ const EntreesAfgc = () => {
                             <span className="text-base font-black text-amber-900">{jourLong(d.date_point)} {d.date_point.slice(0, 4)}</span>
                           </span>
                           {d.armoire ? (
-                            <span className="inline-flex items-baseline gap-2 rounded-xl bg-violet-600 border border-violet-600 px-3 py-2 shadow-md shadow-violet-200">
+                            <button type="button" onClick={() => voirArmoire(d.armoire, d.semaine)} title="Voir l'armoire en 3D"
+                              className="inline-flex items-baseline gap-2 rounded-xl bg-violet-600 border border-violet-600 px-3 py-2 shadow-md shadow-violet-200 hover:bg-violet-700">
                               <span className="text-[11px] font-bold uppercase tracking-wide text-violet-100">Armoire</span>
                               <span className="text-base font-black text-white">{d.armoire}</span>
-                            </span>
+                              <span className="text-[11px] font-bold text-violet-100">voir ›</span>
+                            </button>
                           ) : (
                             <span className="inline-flex items-center rounded-xl bg-slate-100 border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">Armoire non renseignée</span>
                           )}
