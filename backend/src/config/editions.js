@@ -29,7 +29,7 @@ const EDITIONS = {
     // l'administrateur n'est jamais écrasé) : un agent dont le département
     // manque peut le créer en s'inscrivant ; seules les adresses
     // professionnelles de l'AFGC (Outlook, @afgcsa.com) sont admises.
-    reglages: { registration_new_department: true, registration_email_domains: 'afgcsa.com' },
+    reglages: { registration_new_department: true, registration_email_domains: 'afgcsa.com', mfiles_annees: '2025' },
     // Ce qu'une demande doit comporter selon la typologie du dossier, pour que
     // l'archive le retrouve sans rappeler le demandeur.
     exigences: {

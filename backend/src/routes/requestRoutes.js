@@ -93,6 +93,16 @@ router.get('/:id/matching-document', requirePermission('requests.process'), requ
 // requests.create admis pour l'annulation par l'auteur — le contrôleur borne
 // alors la transition (sa demande, vers « annulé » seulement).
 // Compléments (051) : l'archive renvoie la demande à son auteur, qui la complète.
+// Dossier numérisé : copie envoyée depuis M-Files, le papier ne sort pas.
+router.post('/:id/servi-mfiles', requirePermission('requests.process'), async (req, res) => {
+  try {
+    res.json(await require('../services/mfilesService').servir(req.user.tenant_id, req.user, req.params.id, req.body || {}));
+  } catch (err) {
+    if (err.statut) return res.status(err.statut).json({ message: err.message });
+    console.error('[m-files] servir :', err);
+    res.status(500).json({ message: 'Erreur lors de l\'enregistrement.' });
+  }
+});
 router.post('/:id/complement', requirePermission('requests.process'), complementController.demander);
 router.post('/:id/completer', requireAnyPermission(['requests.create', 'requests.process']), complementController.completer);
 router.patch('/:id/status', requireAnyPermission(['requests.process', 'requests.create']), requestController.updateRequestStatus);

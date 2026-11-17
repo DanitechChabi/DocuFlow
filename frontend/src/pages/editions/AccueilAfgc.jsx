@@ -17,6 +17,7 @@ import { AlerteACompleter } from './afgc/complements';
 import { etatDemande, intitule, references } from './afgc/vocabulaire';
 import BoiteDemande from './afgc/BoiteDemande';
 import { prenomDe } from './afgc/identite';
+import MaJournee from './afgc/MaJournee';
 
 // ============================================================================
 // Accueil de l'édition AFGC : l'essentiel en trois boutons.
@@ -69,6 +70,7 @@ const AccueilAfgc = () => {
 
   const [mesDemandes, setMesDemandes] = useState(null);
   const [aTraiter, setATraiter] = useState(null);
+  const [demandesArchive, setDemandesArchive] = useState(null);
   const [listesOuvertes, setListesOuvertes] = useState(null);
   const [sorties, setSorties] = useState(null);
 
@@ -100,8 +102,12 @@ const AccueilAfgc = () => {
     if (traite) {
       await Promise.all([
         requestService.getAllRequests()
-          .then((l) => setATraiter((Array.isArray(l) ? l : []).filter((d) => !d.lot_id && etatDemande(d).cle === 'demande').length))
-          .catch(() => setATraiter(0)),
+          .then((l) => {
+            const toutes = Array.isArray(l) ? l : [];
+            setDemandesArchive(toutes);
+            setATraiter(toutes.filter((d) => !d.lot_id && etatDemande(d).cle === 'demande').length);
+          })
+          .catch(() => { setATraiter(0); setDemandesArchive([]); }),
         listeService.lister()
           .then((l) => setListesOuvertes((Array.isArray(l) ? l : []).filter((x) => x.a_transmettre > 0).length))
           .catch(() => setListesOuvertes(0)),
@@ -171,6 +177,7 @@ const AccueilAfgc = () => {
 
       {traite ? (
         <>
+          <MaJournee demandes={demandesArchive} enRetard={enRetard.length} admin={can('users.view')} configure={configure} />
           <div className="grid gap-5 md:grid-cols-3">
             <CarteAction to="/demandes/a-traiter" icone={ClipboardList} titre="À traiter" principale
               texte="Les demandes et les listes reçues : transmettre le dossier, puis noter son retour.">

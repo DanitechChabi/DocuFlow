@@ -243,6 +243,10 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Identifiant ou mot de passe incorrect' });
     }
+    if (user.desactive_le) {
+      return res.status(403).json({ message: 'Ce compte a été désactivé. Adressez-vous à l\'administrateur des archives.', code: 'COMPTE_DESACTIVE' });
+    }
+    db.query('UPDATE users SET derniere_connexion = now() WHERE id = $1', [user.id]).catch(() => {});
 
     // Génération du Token JWT incluant tenant_id
     // Fallback à 1 (DocuFlow) si la colonne n'existe pas encore (pré-migration)

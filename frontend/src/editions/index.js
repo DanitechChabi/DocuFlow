@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3,
+  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
 } from 'lucide-react';
 
 /**
@@ -45,21 +45,24 @@ const EDITIONS = {
     // l'instant. La douchette reste utilisable avec le n° d'acte tapé.
     // Passer à true pour rendre l'impression des étiquettes.
     etiquettes: false,
-    // Menu à plat : des chemins existants de DocuFlow, nommés avec les mots de
-    // l'AFGC. Chaque entrée garde la permission de sa route.
+    // Menu par usage : chaque entrée garde la permission de sa route ; une
+    // rubrique sans entrée accessible ne s'affiche pas (un agent ne voit que
+    // « Demandes »).
     menu: [
       { to: '/', label: 'Accueil', icone: LayoutDashboard, end: true },
-      { to: '/demandes/nouvelle', label: 'Demander un dossier', icone: PlusCircle, permission: 'requests.create' },
-      { to: '/demandes/mes-demandes', label: 'Mes dossiers', icone: FileSearch, permission: 'requests.view' },
-      { to: '/demandes/a-traiter', label: 'À traiter', icone: ClipboardList, permission: 'requests.process' },
-      { to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
-      { to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
-      { to: '/archives/douchette', label: 'Douchette', icone: ScanBarcode, permission: 'requests.process' },
-      { to: '/archives/tableau-de-bord', label: 'Tableau de bord', icone: BarChart3, permission: 'requests.process' },
-      { to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
-      { to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
-      { to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
-      { to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
+      { section: 'Demandes', to: '/demandes/nouvelle', label: 'Demander un dossier', icone: PlusCircle, permission: 'requests.create' },
+      { section: 'Demandes', to: '/demandes/mes-demandes', label: 'Mes dossiers', icone: FileSearch, permission: 'requests.view' },
+      { section: 'Au quotidien', to: '/demandes/a-traiter', label: 'À traiter', icone: ClipboardList, permission: 'requests.process' },
+      { section: 'Au quotidien', to: '/archives/douchette', label: 'Douchette', icone: ScanBarcode, permission: 'requests.process' },
+      { section: 'Au quotidien', to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
+      { section: 'Au quotidien', to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
+      { section: 'Les fonds', to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
+      { section: 'Les fonds', to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
+      { section: 'Les fonds', to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
+      { section: 'Les fonds', to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
+      { section: 'Pilotage', to: '/archives/tableau-de-bord', label: 'Tableau de bord', icone: BarChart3, permission: 'requests.process' },
+      { section: 'Administration', to: '/admin/comptes', label: 'Comptes', icone: Users, permission: 'users.view' },
+      { section: 'Administration', to: '/admin/reglages', label: 'Réglages', icone: Settings2, permission: 'settings.manage' },
     ],
     // Départements dont les demandes suivent des motifs habituels : ces motifs
     // sont proposés en premier — le premier d'entre eux par défaut — à leurs
@@ -96,6 +99,8 @@ const EDITIONS = {
       '/archives/entrees': () => import('../pages/editions/afgc/EntreesAfgc'),
       '/archives/douchette': () => import('../pages/editions/afgc/DouchetteAfgc'),
       '/archives/tableau-de-bord': () => import('../pages/editions/afgc/TableauBordAfgc'),
+      '/admin/comptes': () => import('../pages/editions/afgc/ComptesAfgc'),
+      '/admin/reglages': () => import('../pages/editions/afgc/AdministrationAfgc'),
     },
     pages: {
       // Connexion (identifiant ou adresse Outlook) et inscription en deux

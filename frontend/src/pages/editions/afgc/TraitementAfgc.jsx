@@ -11,6 +11,7 @@ import { etatDemande, etatDossierListe, intitule, references, dateCourte } from 
 import { parDepartement } from './departements';
 import { Presence, usePresences } from './presence';
 import SupprimerListe from './SupprimerListe';
+import { useMfiles, estNumerise, ServirMfiles } from './mfiles';
 import { ModaleComplement, EchangeComplement, BoutonComplement } from './complements';
 
 // ============================================================================
@@ -45,7 +46,7 @@ const PreciserTypologie = ({ d, typologies, onChoix, desactive }) => (d.type_doc
 ));
 
 /** Une demande dans la file : intitulé, références, motif, demandeur. */
-const Ligne = ({ d, presence, children }) => (
+const Ligne = ({ d, presence, children, extra = null }) => (
   <li className="py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
     <div className="min-w-0 flex-1 basis-64">
       <div className="text-sm font-semibold text-slate-800 line-clamp-2">{intitule(d)}</div>
@@ -53,6 +54,7 @@ const Ligne = ({ d, presence, children }) => (
       {/* Où le chercher : semaine de production, date du point, lettre. */}
       <Presence resultat={presence} archiviste className="mt-2" />
       <EchangeComplement d={d} />
+      {extra && <div className="mt-2">{extra}</div>}
     </div>
     {/* Les gestes restent groupés, à droite, même quand ils passent à la ligne. */}
     <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">{children}</div>
@@ -97,6 +99,8 @@ const TraitementAfgc = () => {
   const aTransmettre = seules.filter((d) => etatDemande(d).cle === 'demande').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   // Pour chaque dossier à sortir : semaine et date du point où il est entré.
   const presences = usePresences(aTransmettre);
+  // Dossiers numérisés dans M-Files : la copie part, le papier reste.
+  const mf = useMfiles();
   const enAttenteComplements = seules.filter((d) => etatDemande(d).cle === 'a_completer');
   const sortis = seules.filter((d) => etatDemande(d).cle === 'transmis').sort((a, b) => String(a.loan_retour_prevu).localeCompare(String(b.loan_retour_prevu)));
   const listesVues = (listes || []).filter((l) => (!cadre || l.cadre === cadre) && correspond(l, q));
@@ -259,12 +263,14 @@ const TraitementAfgc = () => {
               {aTransmettre.length ? (
                 <ul className="divide-y divide-slate-100">
                   {aTransmettre.map((d) => (
-                    <Ligne key={d.id} d={d} presence={presences[d.id]}>
+                    <Ligne key={d.id} d={d} presence={presences[d.id]}
+                      extra={estNumerise(d, presences[d.id], mf.annees) ? <ServirMfiles d={d} url={mf.url} onFait={charger} /> : null}>
                       <PreciserTypologie d={d} typologies={typologies} onChoix={preciser} desactive={Boolean(geste)} />
                       <span className="text-xs text-slate-400">demandé le {dateCourte(d.created_at)}</span>
                       <BoutonComplement onClick={() => setARenvoyer(d)} desactive={Boolean(geste)} />
                       <button type="button" onClick={() => transmettre(d)} disabled={Boolean(geste)}
-                        className="px-3.5 py-2 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60">
+                        className={`px-3.5 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${estNumerise(d, presences[d.id], mf.annees) ? 'border-2 border-slate-200 text-slate-600 hover:border-docuflow-secondary' : 'bg-docuflow-secondary text-white'}`}
+                        title={estNumerise(d, presences[d.id], mf.annees) ? 'Sortir quand même le papier' : undefined}>
                         {geste === `t-${d.id}` ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Transmettre
                       </button>
                     </Ligne>

@@ -155,6 +155,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 // Entrée des dossiers aux archives (049) : points journaliers, semaines de production, recherche.
 app.use('/api/entrees', require('./routes/entreeRoutes'));
+app.use('/api/comptes', require('./routes/comptesRoutes'));
 app.use('/api/users', userRoutes);
 app.use('/api/sections', sectionRoutes);
 app.use('/api/notifications', notificationRoutes);
