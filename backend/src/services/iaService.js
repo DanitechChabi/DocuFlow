@@ -114,6 +114,11 @@ async function charger(nom) {
   return promesse;
 }
 
+/** Oublie l'échec d'un modèle : le prochain appel le recharge. */
+function oublierEchec(nom) {
+  if (etats[nom]?.statut === 'erreur') delete etats[nom];
+}
+
 /** Le modèle s'il est déjà prêt ; sinon lance son chargement et rend null (pour ne pas faire attendre). */
 function siPret(nom) {
   if (substituts[nom]) return substituts[nom];
@@ -276,6 +281,6 @@ async function lireDemande(texte, types = []) {
 }
 
 module.exports = {
-  MODELES, modelesActifs, memoireMo, actif, charger, siPret, etat, prechauffer, vecteurs,
+  MODELES, modelesActifs, memoireMo, actif, charger, oublierEchec, siPret, etat, prechauffer, vecteurs,
   regrouper, acteDans, typeNomme, entrepriseNommee, typologieDe, lireDemande, estPhrase, dossierModeles, _substituer,
 };
