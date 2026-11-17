@@ -13,7 +13,13 @@ const path = require('path');
   console.log(`Modèles dans ${ia.dossierModeles()}`);
   for (const nom of Object.keys(ia.MODELES)) {
     process.stdout.write(`- ${nom} (${ia.MODELES[nom].id})… `);
-    const p = await ia.charger(nom);
+    // Sous Windows, un gros fichier tout juste téléchargé peut être encore
+    // verrouillé à la première ouverture : on réessaie.
+    let p = null;
+    for (let essai = 1; essai <= 4 && !p; essai += 1) {
+      p = await ia.charger(nom);
+      if (!p) { ia.oublierEchec(nom); await new Promise((r) => setTimeout(r, 5000 * essai)); }
+    }
     if (!p) { console.log('ÉCHEC'); process.exit(1); }
     console.log('prêt');
   }
