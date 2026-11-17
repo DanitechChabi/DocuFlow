@@ -11,6 +11,10 @@ import { dateCourte, montantLisible } from './vocabulaire';
 import { exporterClasseur, dateExcel, nomFichier } from './exportExcel';
 import { lirePoint } from './pointsExcel';
 import { ModaleEtiquettes, ImpressionEtiquettes } from './etiquettes';
+import { edition } from '../../../editions';
+
+// Impression des étiquettes : réglée par l'édition (désactivée pour l'instant).
+const ETIQUETTES = edition?.etiquettes !== false;
 
 // ============================================================================
 // Entrée des dossiers : les « points des dossiers retirés » (Excel) importés,
@@ -599,10 +603,10 @@ const EntreesAfgc = () => {
                   <button type="button" onClick={() => window.print()} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 hover:border-docuflow-secondary">
                     <Printer size={15} /> Bordereau de classement
                   </button>
-                  <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(detail.dossiers), titre: libelleSemaine(detail) })}
+                  {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(detail.dossiers), titre: libelleSemaine(detail) })}
                     className="px-3.5 py-2 rounded-xl border-2 border-violet-200 bg-violet-50 text-sm font-bold text-violet-800 inline-flex items-center gap-1.5 hover:border-violet-400">
                     <Tag size={15} /> Étiquettes
-                  </button>
+                  </button>}
                   <button type="button" onClick={exporter} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 hover:border-docuflow-secondary">
                     <FileSpreadsheet size={15} /> Excel
                   </button>
@@ -630,10 +634,10 @@ const EntreesAfgc = () => {
                             <Archive size={14} /> {armoiresCourtes(ds)}
                           </span>
                         ) : <span className="ml-auto text-xs font-bold text-slate-500">armoire non renseignée</span>}
-                        <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(ds), titre: `${libelleSemaine(detail)} — ${l === 'Sans nom' ? 'sans nom' : `lettre ${l}`}` })}
+                        {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(ds), titre: `${libelleSemaine(detail)} — ${l === 'Sans nom' ? 'sans nom' : `lettre ${l}`}` })}
                           className="p-2 rounded-lg text-violet-700 hover:bg-violet-50" title={`Étiquettes de la lettre ${l}`} aria-label={`Étiquettes de la lettre ${l}`}>
                           <Tag size={16} />
-                        </button>
+                        </button>}
                       </h3>
                       <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
                         {ds.map((d) => (
@@ -730,10 +734,10 @@ const EntreesAfgc = () => {
                           )}
                         </div>
                       </div>
-                      <button type="button" onClick={() => setEtiquettes({ dossiers: [d], titre: d.denomination })}
+                      {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: [d], titre: d.denomination })}
                         className="self-center p-2.5 rounded-xl border-2 border-violet-200 text-violet-700 hover:bg-violet-50" title="Imprimer l'étiquette" aria-label="Imprimer l'étiquette">
                         <Tag size={17} />
-                      </button>
+                      </button>}
                       <button type="button" onClick={() => ouvrirSemaine(d)}
                         className="self-center px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 hover:opacity-90 shadow-md shadow-green-200">
                         Ouvrir la semaine <ArrowRight size={15} />

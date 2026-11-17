@@ -41,6 +41,10 @@ const EDITIONS = {
     logoConnexion: '/editions/afgc/embleme-blanc.png',
     // Emblème en couleurs, pour les fonds clairs (accueil).
     embleme: '/editions/afgc/embleme.png',
+    // Étiquettes à code-barres des dossiers entrés (053) : désactivées pour
+    // l'instant. La douchette reste utilisable avec le n° d'acte tapé.
+    // Passer à true pour rendre l'impression des étiquettes.
+    etiquettes: false,
     // Menu à plat : des chemins existants de DocuFlow, nommés avec les mots de
     // l'AFGC. Chaque entrée garde la permission de sa route.
     menu: [
