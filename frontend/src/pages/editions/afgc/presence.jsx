@@ -63,20 +63,11 @@ export function usePresence(dossier) {
   return res && res.cle === cle ? res : null;
 }
 
-/** Une étiquette bien visible : « SEMAINE  ven. 17 → jeu. 23 avr. 2026 ». */
-const Etiquette = ({ titre, children, ton }) => (
-  <span className={`inline-flex items-baseline gap-1.5 rounded-lg border px-2.5 py-1 ${ton}`}>
-    <span className="text-[10px] font-bold uppercase tracking-wide opacity-80">{titre}</span>
-    <span className="text-sm font-black">{children}</span>
-  </span>
-);
-
 const Detail = ({ e, archiviste }) => (
-  <span className="flex flex-wrap gap-1.5">
-    <Etiquette titre="Semaine" ton="bg-white border-green-300 text-green-900">{semaineLisible(e.semaine, e.au).replace(/^du /, '').replace(' au ', ' → ')}</Etiquette>
-    <Etiquette titre="Point du" ton="bg-amber-50 border-amber-300 text-amber-900">{jourLisible(e.date_point)}</Etiquette>
-    {archiviste && e.lettre && <Etiquette titre="Lettre" ton="bg-docuflow-secondary border-docuflow-secondary text-white">{e.lettre}</Etiquette>}
-    {archiviste && e.armoire && <Etiquette titre="Armoire" ton="bg-violet-600 border-violet-600 text-white">{e.armoire}</Etiquette>}
+  <span className="text-sm text-slate-700">
+    Semaine {semaineLisible(e.semaine, e.au)}, point du <strong className="text-slate-900">{jourLisible(e.date_point)}</strong>
+    {archiviste && e.lettre && <>, lettre <strong className="text-slate-900">{e.lettre}</strong></>}
+    {archiviste && e.armoire && <>, <strong className="text-slate-900">{e.armoire.split(' · ')[0]}{e.armoire.includes(' ou ') ? ` ou ${e.armoire.split(' ou ')[1].split(' · ')[0]}` : ''}</strong></>}
   </span>
 );
 
@@ -92,9 +83,9 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   const { total, entrees } = resultat;
   if (!total) {
     return (
-      <div className={`animate-fade-in-up flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 ${className}`}>
+      <div className={`flex items-center gap-2 border-l-4 border-slate-300 bg-slate-50 rounded-r-md px-3 py-2 text-sm text-slate-700 ${className}`}>
         <SearchX size={16} className="flex-shrink-0 text-slate-500" />
-        <span>Pas trouvé dans les entrées des archives{archiviste ? '' : ' — l\'archive vérifiera'}.</span>
+        <span>Pas trouvé dans les entrées des archives{archiviste ? '' : ' : l\'archive vérifiera'}.</span>
       </div>
     );
   }
@@ -103,20 +94,18 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   return (
     // Nouvelle clé à chaque nouveau résultat : la lumière rejoue.
     <div key={`${e.date_point}-${e.num_actes}-${e.denomination}`}
-      className={`resultat-lumiere ${douteux ? 'ambre border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'} rounded-xl border-2 px-3 py-2.5 ${className}`}>
-      <div className={`flex items-start gap-2 ${douteux ? 'text-amber-900' : 'text-green-900'}`}>
-        <span className={`lumiere-pastille mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-white ${douteux ? 'bg-amber-500' : 'bg-docuflow-secondary'}`}>
-          {douteux ? <AlertTriangle size={15} /> : <Archive size={15} />}
-        </span>
-        <div className="min-w-0 flex-1 space-y-1.5">
+      className={`animate-fade-in border-l-4 ${douteux ? 'border-amber-500 bg-amber-50/70' : 'border-[#2C9C0A] bg-slate-50'} rounded-r-md px-3 py-2 ${className}`}>
+      <div className={`flex items-start gap-2 ${douteux ? 'text-amber-900' : 'text-slate-900'}`}>
+        {douteux ? <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> : <Archive size={15} className="mt-0.5 flex-shrink-0 text-[#2C9C0A]" />}
+        <div className="min-w-0 flex-1 space-y-0.5">
           <div className="text-sm leading-snug">
             {douteux
-              ? <><strong className="font-black">À vérifier</strong> : acte {e.num_actes} entré au nom de « <strong>{e.denomination}</strong> »</>
-              : <><strong className="font-black text-base">Aux archives</strong>{archiviste || total > 1 ? <span className="font-semibold"> — {e.denomination}{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''}</span> : null}</>}
+              ? <><strong className="font-bold">À vérifier</strong> : acte {e.num_actes} entré au nom de « <strong>{e.denomination}</strong> »</>
+              : <><strong className="font-bold">Aux archives</strong>{archiviste || total > 1 ? <span className="font-semibold"> : {e.denomination}{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''}</span> : null}</>}
           </div>
           <Detail e={e} archiviste={archiviste} />
           {total > 1 && (
-            <button type="button" onClick={() => setOuvert((v) => !v)} className="text-sm font-bold underline decoration-dotted inline-flex items-center gap-1">
+            <button type="button" onClick={() => setOuvert((v) => !v)} className="text-sm font-semibold text-slate-600 underline decoration-dotted inline-flex items-center gap-1">
               {total - 1} autre{total > 2 ? 's' : ''} entrée{total > 2 ? 's' : ''} <ChevronDown size={13} className={ouvert ? 'rotate-180' : ''} />
             </button>
           )}

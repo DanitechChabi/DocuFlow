@@ -106,10 +106,10 @@ const InscriptionAfgc = () => {
 
   return (
     <CadreConnexion enHaut>
-      <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/70 border border-slate-100 p-6 sm:p-9">
+      <div className="bg-white rounded-xl shadow-xl/70 border border-slate-100 p-6 sm:p-9">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Créer mon compte</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Créer mon compte</h1>
             <p className="text-sm text-slate-500 mt-1">
               Étape {departement ? 2 : 1} sur 2 · {departement ? 'vos informations' : 'votre département'}
             </p>
@@ -130,16 +130,16 @@ const InscriptionAfgc = () => {
         )}
 
         <section className="mt-6">
-          <h2 className="text-xl font-black text-slate-900 mb-3">Vous êtes…</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-3">Vous êtes…</h2>
           {erreurListe ? (
-            <div className="rounded-2xl bg-slate-50 p-5 text-sm text-slate-600">
+            <div className="rounded-lg bg-slate-50 p-5 text-sm text-slate-600">
               La liste des départements n'a pas pu être chargée.
               <button type="button" onClick={charger} className="ml-2 font-bold inline-flex items-center gap-1" style={{ color: VERT }}>
                 <RotateCcw size={14} /> Réessayer
               </button>
             </div>
           ) : !infos ? (
-            <div className="h-[70px] rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400">
+            <div className="h-[70px] rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400">
               <Loader2 size={20} className="animate-spin" />
             </div>
           ) : (
@@ -209,7 +209,7 @@ const InscriptionAfgc = () => {
 
         <div className="mt-7 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm text-slate-500">Déjà inscrit ?</span>
-          <Link to="/login" className="inline-flex items-center gap-2 text-sm font-black hover:underline underline-offset-4" style={{ color: VERT }}>
+          <Link to="/login" className="inline-flex items-center gap-2 text-sm font-bold hover:underline underline-offset-4" style={{ color: VERT }}>
             <LogIn size={16} /> Se connecter
           </Link>
         </div>

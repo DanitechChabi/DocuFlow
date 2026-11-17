@@ -38,7 +38,7 @@ const HistoryTable = ({ logs, onRequestClick, loading = false }) => {
             <tr key={log.id ?? idx} className="hover:bg-slate-50/80 transition-all duration-150 animate-fade-in-up group" style={{ animationDelay: `${idx * 30}ms` }}>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-docuflow-secondary flex items-center justify-center text-white font-bold text-xs shadow-sm">
                     {actor.charAt(0).toUpperCase()}
                   </div>
                   <span className="font-medium text-slate-700 text-sm">{actor}</span>

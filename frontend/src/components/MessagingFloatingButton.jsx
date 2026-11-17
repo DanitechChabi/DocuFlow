@@ -50,7 +50,7 @@ const MessagingFloatingButton = () => {
         className={`fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-30 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 group ${
           isPanelOpen
             ? 'bg-slate-800 rotate-90 shadow-lg'
-            : 'bg-gradient-to-br from-docuflow-secondary to-blue-600 hover:shadow-glow-blue'
+            : 'bg-docuflow-secondary'
         }`}
         title="Messagerie"
       >

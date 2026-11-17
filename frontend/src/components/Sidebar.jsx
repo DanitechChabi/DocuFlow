@@ -328,7 +328,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     return (
       <div key={section.cle || section.titre} className="space-y-1">
         {section.titre && !repliee && !mobile && (
-          <div className="px-3 pt-4 pb-1 text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: tMuted }}>
+          <div className="px-3 pt-4 pb-1 text-xs font-semibold" style={{ color: tMuted }}>
             {section.titre}
           </div>
         )}
@@ -481,7 +481,7 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
       <div className="flex items-center gap-2 px-3 h-16 flex-shrink-0">
         <NavLink to="/" data-tour="sidebar" className="flex items-center gap-2 min-w-0 flex-1" onClick={() => onDrawerChange(false)}>
           <div
-            className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${hasCustomLogo ? 'rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 overflow-hidden' : ''}`}
+            className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${hasCustomLogo ? 'rounded-md bg-docuflow-secondary overflow-hidden' : ''}`}
           >
             <img
               src={logoSrc}

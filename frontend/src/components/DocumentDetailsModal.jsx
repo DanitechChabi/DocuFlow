@@ -510,7 +510,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white flex-shrink-0">
+                          <div className="w-9 h-9 rounded-lg bg-docuflow-secondary flex items-center justify-center text-white flex-shrink-0">
                             <File size={16} />
                           </div>
                           <div className="min-w-0">

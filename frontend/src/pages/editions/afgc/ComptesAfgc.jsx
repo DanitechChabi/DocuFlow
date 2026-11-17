@@ -71,9 +71,9 @@ const ComptesAfgc = () => {
         <div className="relative flex-1 min-w-[220px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom, identifiant, adresse, département…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-semibold focus:outline-none focus:border-docuflow-secondary" />
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:border-docuflow-secondary" />
         </div>
-        <div className="inline-flex flex-wrap p-1 rounded-2xl bg-slate-100">
+        <div className="inline-flex flex-wrap p-1 rounded-lg bg-slate-100">
           {[['actifs', `Actifs (${actifs})`], ...(donnees?.roles || []).map((r) => [r.cle, r.libelle]), ['desactives', `Désactivés (${desactives})`], ['tous', 'Tous']].map(([cle, libelle]) => (
             <button key={cle} type="button" onClick={() => setFiltre(cle)}
               className={`px-3 py-1.5 rounded-xl text-sm font-bold ${filtre === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{libelle}</button>
@@ -82,28 +82,28 @@ const ComptesAfgc = () => {
       </div>
 
       {donnees === null ? <Chargement /> : (
-        <div className="glass-card-premium rounded-3xl overflow-hidden">
+        <div className="glass-card-premium rounded-xl overflow-hidden">
           {vus.length ? (
             <ul className="divide-y divide-slate-100">
               {vus.map((c) => {
                 const moiMeme = c.id === moi?.id;
                 return (
                   <li key={c.id} className={`px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-3 ${c.desactive_le ? 'bg-slate-50' : ''}`}>
-                    <span className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-white flex-shrink-0 ${c.desactive_le ? 'bg-slate-400' : 'bg-docuflow-secondary'}`}>
+                    <span className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${c.desactive_le ? 'bg-slate-400' : 'bg-docuflow-secondary'}`}>
                       {(c.full_name || c.username || '?').trim().charAt(0).toUpperCase()}
                     </span>
                     <div className="min-w-0 flex-1 basis-56">
                       {edite?.id === c.id ? (
                         <div className="flex flex-wrap gap-2">
-                          <input value={edite.full_name} onChange={(e) => setEdite((x) => ({ ...x, full_name: e.target.value }))} className="px-2.5 py-1.5 rounded-lg border-2 border-slate-200 text-sm font-bold" aria-label="Nom complet" />
-                          <input value={edite.email} onChange={(e) => setEdite((x) => ({ ...x, email: e.target.value }))} className="px-2.5 py-1.5 rounded-lg border-2 border-slate-200 text-sm flex-1 min-w-[180px]" aria-label="Adresse" />
+                          <input value={edite.full_name} onChange={(e) => setEdite((x) => ({ ...x, full_name: e.target.value }))} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold" aria-label="Nom complet" />
+                          <input value={edite.email} onChange={(e) => setEdite((x) => ({ ...x, email: e.target.value }))} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm flex-1 min-w-[180px]" aria-label="Adresse" />
                           <button type="button" onClick={async () => { if (await faire(`e-${c.id}`, () => comptesService.modifier(c.id, { full_name: edite.full_name, email: edite.email }), 'Compte mis à jour.')) setEdite(null); }}
                             className="p-2 rounded-lg bg-docuflow-secondary text-white" aria-label="Enregistrer"><Check size={15} /></button>
                           <button type="button" onClick={() => setEdite(null)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Annuler"><X size={15} /></button>
                         </div>
                       ) : (
                         <>
-                          <div className="font-black text-slate-900 flex items-center gap-2">
+                          <div className="font-bold text-slate-900 flex items-center gap-2">
                             {c.full_name}{moiMeme && <span className="text-xs font-bold text-slate-500">(vous)</span>}
                             <button type="button" onClick={() => setEdite({ id: c.id, full_name: c.full_name || '', email: c.email || '' })} className="p-1 rounded text-slate-400 hover:text-slate-700" aria-label={`Modifier le nom ou l'adresse de ${c.full_name}`}><Pencil size={13} /></button>
                           </div>
@@ -119,7 +119,7 @@ const ComptesAfgc = () => {
                     <label className="text-xs font-bold text-slate-600">Département
                       <select value={c.section || ''} disabled={Boolean(c.desactive_le) || Boolean(geste)}
                         onChange={(e) => faire(`s-${c.id}`, () => comptesService.modifier(c.id, { section: e.target.value }), 'Département changé.')}
-                        className="mt-0.5 block w-56 px-2.5 py-2 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800">
+                        className="mt-0.5 block w-56 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800">
                         <option value="">—</option>
                         {[...new Set([...sections, c.section].filter(Boolean))].map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
@@ -127,7 +127,7 @@ const ComptesAfgc = () => {
                     <label className="text-xs font-bold text-slate-600">Rôle
                       <select value={c.role} disabled={moiMeme || c.role === 'superadmin' || Boolean(c.desactive_le) || Boolean(geste)} title={ROLE_AIDE[c.role] || ''}
                         onChange={(e) => faire(`r-${c.id}`, () => comptesService.modifier(c.id, { role: e.target.value }), `${c.full_name} : ${libelleRole(e.target.value)}.`)}
-                        className="mt-0.5 block w-44 px-2.5 py-2 rounded-xl border-2 border-slate-200 bg-white text-sm font-semibold text-slate-800">
+                        className="mt-0.5 block w-44 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800">
                         {c.role === 'superadmin' && <option value="superadmin">Super administrateur</option>}
                         {(donnees.roles || []).map((r) => <option key={r.cle} value={r.cle}>{r.libelle}</option>)}
                       </select>
@@ -136,18 +136,18 @@ const ComptesAfgc = () => {
                       {!c.desactive_le && (
                         <button type="button" onClick={async () => { const r = await faire(`m-${c.id}`, () => comptesService.motDePasse(c.id)); if (r) setMdp({ nom: c.full_name, mot_de_passe: r.mot_de_passe }); }}
                           disabled={Boolean(geste) || c.role === 'superadmin'} title="Mot de passe oublié : en créer un provisoire"
-                          className="px-3 py-2 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1.5 disabled:opacity-40">
+                          className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1.5 disabled:opacity-40">
                           {geste === `m-${c.id}` ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />} Mot de passe
                         </button>
                       )}
                       {c.desactive_le ? (
                         <button type="button" onClick={() => faire(`a-${c.id}`, () => comptesService.reactiver(c.id), `${c.full_name} peut de nouveau se connecter.`)} disabled={Boolean(geste)}
-                          className="px-3 py-2 rounded-xl bg-green-50 border-2 border-green-200 text-sm font-bold text-green-800 inline-flex items-center gap-1.5">
+                          className="px-3 py-2 rounded-xl bg-green-50 border border-green-200 text-sm font-bold text-green-800 inline-flex items-center gap-1.5">
                           {geste === `a-${c.id}` ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />} Réactiver
                         </button>
                       ) : (
                         <button type="button" onClick={() => setConfirmer(c)} disabled={Boolean(geste) || moiMeme || c.role === 'superadmin'}
-                          className="px-3 py-2 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 disabled:opacity-40">
+                          className="px-3 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 disabled:opacity-40">
                           <UserX size={14} /> Désactiver
                         </button>
                       )}
@@ -169,8 +169,8 @@ const ComptesAfgc = () => {
       {/* Désactivation : confirmation, avec les dossiers encore chez l'agent. */}
       <Modal open={Boolean(confirmer)} onClose={() => setConfirmer(null)} panelClassName="w-full max-w-md mx-4">
         {confirmer && (
-          <div className="bg-white rounded-3xl shadow-2xl p-6">
-            <h3 className="text-lg font-black text-slate-900">Désactiver {confirmer.full_name} ?</h3>
+          <div className="bg-white rounded-xl shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-slate-900">Désactiver {confirmer.full_name} ?</h3>
             <p className="text-sm text-slate-700 mt-1">Il ne pourra plus se connecter. Ses demandes, prêts et traces restent. Vous pourrez le réactiver.</p>
             {confirmer.dossiers_chez_lui > 0 && (
               <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm font-bold text-amber-900 flex items-start gap-2">
@@ -191,13 +191,13 @@ const ComptesAfgc = () => {
       {/* Mot de passe provisoire : montré une fois. */}
       <Modal open={Boolean(mdp)} onClose={() => setMdp(null)} panelClassName="w-full max-w-md mx-4">
         {mdp && (
-          <div className="bg-white rounded-3xl shadow-2xl p-6">
-            <h3 className="text-lg font-black text-slate-900">Mot de passe provisoire de {mdp.nom}</h3>
+          <div className="bg-white rounded-xl shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-slate-900">Mot de passe provisoire de {mdp.nom}</h3>
             <p className="text-sm text-slate-700 mt-1">Remettez-le à l'agent : il ne sera plus affiché. Il pourra le changer dans son profil.</p>
             <div className="mt-4 flex items-center gap-2">
-              <code className="flex-1 text-center text-2xl font-black tracking-widest bg-slate-100 rounded-xl py-3 select-all">{mdp.mot_de_passe}</code>
+              <code className="flex-1 text-center text-2xl font-bold tracking-widest bg-slate-100 rounded-xl py-3 select-all">{mdp.mot_de_passe}</code>
               <button type="button" onClick={() => navigator.clipboard?.writeText(mdp.mot_de_passe).then(() => toast.success('Copié.')).catch(() => {})}
-                className="p-3 rounded-xl border-2 border-slate-200 text-slate-700" aria-label="Copier"><Copy size={18} /></button>
+                className="p-3 rounded-xl border border-slate-200 text-slate-700" aria-label="Copier"><Copy size={18} /></button>
             </div>
             <div className="flex justify-end mt-5"><button type="button" onClick={() => setMdp(null)} className="px-5 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold">C'est noté</button></div>
           </div>
@@ -213,7 +213,7 @@ const ComptesAfgc = () => {
 const AjoutAgent = ({ roles, sections, onClose, onFait }) => {
   const [f, setF] = useState({ full_name: '', username: '', email: '', section: '', role: 'demandeur' });
   const [envoi, setEnvoi] = useState(false);
-  const champ = 'mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-docuflow-secondary';
+  const champ = 'mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-docuflow-secondary';
   const envoyer = async (e) => {
     e.preventDefault();
     setEnvoi(true);
@@ -229,8 +229,8 @@ const AjoutAgent = ({ roles, sections, onClose, onFait }) => {
   };
   return (
     <Modal open onClose={envoi ? undefined : onClose} panelClassName="w-full max-w-lg mx-4">
-      <form onSubmit={envoyer} className="bg-white rounded-3xl shadow-2xl p-6 space-y-3">
-        <h3 className="text-lg font-black text-slate-900">Ajouter un agent</h3>
+      <form onSubmit={envoyer} className="bg-white rounded-xl shadow-2xl p-6 space-y-3">
+        <h3 className="text-lg font-bold text-slate-900">Ajouter un agent</h3>
         <label className="block text-sm font-bold text-slate-700">Nom complet<input required value={f.full_name} onChange={(e) => setF((x) => ({ ...x, full_name: e.target.value }))} className={champ} /></label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm font-bold text-slate-700">Identifiant<input required value={f.username} onChange={(e) => setF((x) => ({ ...x, username: e.target.value.trim() }))} placeholder="ex. n.zinsou" className={champ} /></label>

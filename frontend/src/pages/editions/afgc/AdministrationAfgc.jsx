@@ -20,11 +20,11 @@ const liste = (v) => {
 const vrai = (v) => v === true || v === 'true';
 
 const Carte = ({ icone: Icone, titre, aide, children, onEnregistrer, envoi, modifie }) => (
-  <section className="glass-card-premium rounded-3xl p-5 md:p-6 flex flex-col">
+  <section className="glass-card-premium rounded-xl p-5 md:p-6 flex flex-col">
     <div className="flex items-start gap-3">
       <span className="w-10 h-10 rounded-xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Icone size={20} /></span>
       <div className="min-w-0 flex-1">
-        <h2 className="text-base font-black text-slate-900">{titre}</h2>
+        <h2 className="text-base font-bold text-slate-900">{titre}</h2>
         {aide && <p className="text-sm text-slate-600">{aide}</p>}
       </div>
     </div>
@@ -61,8 +61,8 @@ const EditeurListe = ({ valeurs, onChange, exemple }) => {
       </ul>
       <div className="mt-2 flex gap-2">
         <input value={nouveau} onChange={(e) => setNouveau(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ajouter(); } }} placeholder={exemple}
-          className="flex-1 px-3 py-2 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-docuflow-secondary" />
-        <button type="button" onClick={ajouter} className="px-3 py-2 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1"><Plus size={14} /> Ajouter</button>
+          className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-docuflow-secondary" />
+        <button type="button" onClick={ajouter} className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1"><Plus size={14} /> Ajouter</button>
       </div>
     </div>
   );
@@ -133,18 +133,18 @@ const AdministrationAfgc = () => {
     try { await sectionService.deleteSection(s.id); chargerSections(); toast.success(`Département « ${s.name} » retiré.`); } catch (e) { toast.error(e.response?.data?.message || 'Retrait impossible : des agents y sont peut-être encore rattachés.'); }
   };
 
-  const champ = 'w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-semibold focus:outline-none focus:border-docuflow-secondary';
+  const champ = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:outline-none focus:border-docuflow-secondary';
   if (!v) return <div className="p-8"><Chargement /></div>;
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <EnTete titre="Réglages de l'AFGC" icone={Settings2} aide="L'essentiel de la configuration, en un endroit. Chaque carte s'enregistre séparément." />
 
       <div className="grid gap-3 sm:grid-cols-2 mb-5">
-        <Link to="/admin/comptes" className="glass-card-premium rounded-2xl px-5 py-4 flex items-center gap-3 hover:ring-2 hover:ring-green-200">
-          <Users size={20} className="text-docuflow-secondary" /><span className="font-black text-slate-900">Comptes des agents</span><span className="text-sm text-slate-600">rôles, départements, départs</span><ArrowRight size={16} className="ml-auto text-slate-400" />
+        <Link to="/admin/comptes" className="glass-card-premium rounded-lg px-5 py-4 flex items-center gap-3 hover:ring-2 hover:border-slate-400">
+          <Users size={20} className="text-docuflow-secondary" /><span className="font-bold text-slate-900">Comptes des agents</span><span className="text-sm text-slate-600">rôles, départements, départs</span><ArrowRight size={16} className="ml-auto text-slate-400" />
         </Link>
-        <Link to="/archives/entrees" className="glass-card-premium rounded-2xl px-5 py-4 flex items-center gap-3 hover:ring-2 hover:ring-green-200">
-          <Archive size={20} className="text-violet-600" /><span className="font-black text-slate-900">Armoires</span><span className="text-sm text-slate-600">Entrée des dossiers › Rangement</span><ArrowRight size={16} className="ml-auto text-slate-400" />
+        <Link to="/archives/entrees" className="glass-card-premium rounded-lg px-5 py-4 flex items-center gap-3 hover:ring-2 hover:border-slate-400">
+          <Archive size={20} className="text-slate-800" /><span className="font-bold text-slate-900">Armoires</span><span className="text-sm text-slate-600">Entrée des dossiers › Rangement</span><ArrowRight size={16} className="ml-auto text-slate-400" />
         </Link>
       </div>
 
@@ -171,7 +171,7 @@ const AdministrationAfgc = () => {
               <div className="mt-2 flex gap-2">
                 <input value={nouvelleSection} onChange={(e) => setNouvelleSection(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ajouterSection(); } }}
                   placeholder="ex. DSI — Systèmes d'information" className={champ} />
-                <button type="button" onClick={ajouterSection} className="px-3 py-2 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1"><Plus size={14} /> Ajouter</button>
+                <button type="button" onClick={ajouterSection} className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary inline-flex items-center gap-1"><Plus size={14} /> Ajouter</button>
               </div>
             </>
           )}

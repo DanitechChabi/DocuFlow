@@ -57,11 +57,11 @@ export const ModaleComplement = ({ dossier, onClose, onFait }) => {
   };
   return (
     <Modal open onClose={envoi ? undefined : onClose} panelClassName="w-full max-w-xl mx-4">
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
         <div className="flex items-start gap-3 px-6 py-5 bg-amber-50 border-b border-amber-200">
           <span className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><MessageSquareWarning size={20} /></span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black text-slate-900">Demander des compléments</h2>
+            <h2 className="text-lg font-bold text-slate-900">Demander des compléments</h2>
             <p className="text-sm font-semibold text-slate-700 line-clamp-2">{intitule(dossier)}</p>
             <p className="text-sm text-slate-600">{[references(dossier), dossier.requester_name && `pour ${dossier.requester_name}`].filter(Boolean).join(' · ')}</p>
           </div>
@@ -73,7 +73,7 @@ export const ModaleComplement = ({ dossier, onClose, onFait }) => {
             <div className="flex flex-wrap gap-2">
               {CHAMPS.map((c) => (
                 <button key={c.cle} type="button" onClick={() => basculer(c.cle)} aria-pressed={champs.has(c.cle)}
-                  className={`px-3 py-2 rounded-xl text-sm font-bold border-2 transition-colors ${champs.has(c.cle) ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-amber-400'}`}>
+                  className={`px-3 py-2 rounded-xl text-sm font-bold border transition-colors ${champs.has(c.cle) ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-amber-400'}`}>
                   {c.label}
                 </button>
               ))}
@@ -109,7 +109,7 @@ export const EchangeComplement = ({ d }) => {
     const champs = (d.complement_champs || []).map(libelle);
     return (
       <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-        <strong className="font-black">Renvoyée le {dateCourte(d.complement_demande_at)}</strong>
+        <strong className="font-bold">Renvoyée le {dateCourte(d.complement_demande_at)}</strong>
         {champs.length > 0 && <> · manque : <strong>{champs.join(', ')}</strong></>}
         {d.complement_message && <div className="italic">« {d.complement_message} »</div>}
       </div>
@@ -119,7 +119,7 @@ export const EchangeComplement = ({ d }) => {
     return (
       <div className="mt-2 rounded-xl border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 flex items-start gap-1.5">
         <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" />
-        <span><strong className="font-black">Complétée le {dateCourte(d.complement_fourni_at)}</strong>{d.complement_reponse && <> : « {d.complement_reponse} »</>}</span>
+        <span><strong className="font-bold">Complétée le {dateCourte(d.complement_fourni_at)}</strong>{d.complement_reponse && <> : « {d.complement_reponse} »</>}</span>
       </div>
     );
   }
@@ -150,17 +150,17 @@ export const CarteACompleter = ({ d, types = [], onFait, onAnnuler, annulation, 
     }
   };
   return (
-    <li className="resultat-lumiere ambre rounded-2xl border-2 border-amber-300 bg-white p-4 md:p-5" style={{ '--delai': `${delai}s` }}>
+    <li className="animate-fade-in rounded-lg border border-amber-300 bg-white p-4 md:p-5" style={{ '--delai': `${delai}s` }}>
       <div className="flex items-start gap-3">
-        <span className="lumiere-pastille w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><MessageSquareWarning size={20} /></span>
+        <span className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><MessageSquareWarning size={20} /></span>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-black uppercase tracking-wide text-amber-700">L'archive a besoin de précisions</div>
-          <div className="text-lg font-black text-slate-900 leading-tight">{intitule(d)}</div>
+          <div className="text-xs font-bold text-amber-700">L'archive a besoin de précisions</div>
+          <div className="text-lg font-bold text-slate-900 leading-tight">{intitule(d)}</div>
           <div className="text-sm text-slate-600">{[references(d), d.motif].filter(Boolean).join(' · ')}</div>
         </div>
       </div>
       <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-950">
-        {demandes.length > 0 && <div><strong className="font-black">Il manque :</strong> {demandes.map(libelle).join(', ')}</div>}
+        {demandes.length > 0 && <div><strong className="font-bold">Il manque :</strong> {demandes.map(libelle).join(', ')}</div>}
         {d.complement_message && <div className="mt-0.5 text-base font-semibold italic">« {d.complement_message} »</div>}
         <div className="mt-1 text-xs font-semibold text-amber-800">{d.complement_demande_par ? `${d.complement_demande_par}, ` : ''}le {dateCourte(d.complement_demande_at)}</div>
       </div>
@@ -174,13 +174,13 @@ export const CarteACompleter = ({ d, types = [], onFait, onAnnuler, annulation, 
               {c.label}{requis ? ' *' : ''}
               {cle === 'type_document' && types.length ? (
                 <select value={valeurs[cle]} onChange={(e) => setValeurs((v) => ({ ...v, [cle]: e.target.value }))}
-                  className={`mt-1 w-full px-3 py-2.5 rounded-xl border-2 bg-white text-sm text-slate-800 ${manque ? 'border-red-300' : 'border-slate-200'}`}>
+                  className={`mt-1 w-full px-3 py-2.5 rounded-xl border bg-white text-sm text-slate-800 ${manque ? 'border-red-300' : 'border-slate-200'}`}>
                   <option value="">—</option>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               ) : (
                 <input value={valeurs[cle]} onChange={(e) => setValeurs((v) => ({ ...v, [cle]: e.target.value }))} placeholder={c.exemple}
                   inputMode={cle === 'annee' || cle === 'montant' ? 'numeric' : undefined} maxLength={cle === 'annee' ? 4 : 255}
-                  className={`mt-1 w-full px-3 py-2.5 rounded-xl border-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 ${manque ? 'border-red-300 bg-red-50/40' : 'border-slate-200'}`} />
+                  className={`mt-1 w-full px-3 py-2.5 rounded-xl border text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-500 ${manque ? 'border-red-300 bg-red-50/40' : 'border-slate-200'}`} />
               )}
             </label>
           );
@@ -189,11 +189,11 @@ export const CarteACompleter = ({ d, types = [], onFait, onAnnuler, annulation, 
       <label className={`block mt-3 text-sm font-bold ${demandes.includes('description') && !reponse.trim() ? 'text-red-700' : 'text-slate-700'}`}>
         Un mot pour l'archive{demandes.includes('description') ? ' *' : ' (facultatif)'}
         <textarea value={reponse} onChange={(e) => setReponse(e.target.value)} rows={2} maxLength={1000} placeholder="ex. C'est la caution de bonne exécution de mars."
-          className="mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-amber-500" />
+          className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-amber-500" />
       </label>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={renvoyer} disabled={envoi}
-          className="px-5 py-3 rounded-xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60 shadow-md shadow-green-200">
+          className="px-5 py-3 rounded-xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60">
           {envoi ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />} Renvoyer à l'archive
         </button>
         {onAnnuler && (
@@ -210,7 +210,7 @@ export const CarteACompleter = ({ d, types = [], onFait, onAnnuler, annulation, 
 /** Bouton de l'archive : ouvre la modale. */
 export const BoutonComplement = ({ onClick, desactive }) => (
   <button type="button" onClick={onClick} disabled={desactive} title="Renvoyer au demandeur : il manque des informations"
-    className="px-3 py-2 rounded-xl border-2 border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold inline-flex items-center gap-1.5 hover:bg-amber-100 disabled:opacity-60">
+    className="px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-sm font-bold inline-flex items-center gap-1.5 hover:bg-amber-100 disabled:opacity-60">
     <Reply size={14} /> Compléments
   </button>
 );
@@ -218,10 +218,10 @@ export const BoutonComplement = ({ onClick, desactive }) => (
 /** Bandeau d'alerte (accueil, page de demande) : des demandes attendent les compléments du demandeur. */
 export const AlerteACompleter = ({ nombre, className = '' }) => (nombre > 0 ? (
   <Link to="/demandes/mes-demandes"
-    className={`resultat-lumiere ambre flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 px-5 py-4 hover:bg-amber-100 transition-colors ${className}`}>
-    <span className="lumiere-pastille w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><MessageSquareWarning size={20} /></span>
+    className={`animate-fade-in flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-5 py-4 hover:bg-amber-100 transition-colors ${className}`}>
+    <span className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><MessageSquareWarning size={20} /></span>
     <span className="min-w-0 flex-1">
-      <span className="block text-base font-black text-amber-950">
+      <span className="block text-base font-bold text-amber-950">
         {nombre} demande{nombre > 1 ? 's' : ''} à compléter
       </span>
       <span className="block text-sm font-semibold text-amber-900/80">L'archive a besoin de précisions pour retrouver {nombre > 1 ? 'ces dossiers' : 'ce dossier'}.</span>

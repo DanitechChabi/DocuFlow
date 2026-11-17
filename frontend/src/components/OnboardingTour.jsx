@@ -402,7 +402,7 @@ const OnboardingTour = ({ steps = [], actif = false, onFermer }) => {
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-docuflow-secondary to-blue-500 rounded-full transition-all duration-300 ease-[var(--df-ease)]"
+                  className="h-full bg-docuflow-secondary rounded-full transition-all duration-300 ease-[var(--df-ease)]"
                   style={{ width: `${progress}%` }}
                 />
               </div>

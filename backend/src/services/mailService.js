@@ -267,7 +267,7 @@ const TEMPLATES = {
   request_created: (r, branding) => ({
     subject: `Accusé de réception — demande ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
-      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Demande bien reçue ✅</h1>
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Demande bien reçue</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
         Bonjour,<br />
         Votre demande a bien été enregistrée et est <b>en attente</b> de traitement par nos services.
@@ -298,7 +298,7 @@ const TEMPLATES = {
   delivered: (r, branding) => ({
     subject: `Votre document est disponible — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
-      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Votre document a été livré 🎉</h1>
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Votre document a été livré</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
         Bonjour,<br />
         Le document demandé est désormais <b>livré</b> et disponible dans votre espace.
@@ -351,7 +351,7 @@ const TEMPLATES = {
   loan_returned: (r, branding, extra = {}) => ({
     subject: `Retour enregistré — ${sanitizeHeader(libelleDemande(r))}`,
     html: layout(`
-      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour du dossier enregistré ✅</h1>
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour du dossier enregistré</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
         Bonjour,<br />
         Le retour du dossier aux archives a été enregistré${extra.par ? ` par <b>${escapeHtml(extra.par)}</b>` : ''}.
@@ -413,7 +413,7 @@ const TEMPLATES = {
   liste_retournee: (l, branding, extra = {}) => ({
     subject: `Retour enregistré — ${sanitizeHeader(l.libelle)} (${pluriel((l.dossiers || []).length, 'dossier')})`,
     html: layout(`
-      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour des dossiers enregistré ✅</h1>
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Retour des dossiers enregistré</h1>
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
         Bonjour,<br />
         Le retour aux archives de ${pluriel((l.dossiers || []).length, 'dossier')} de la liste « <b>${escapeHtml(l.libelle)}</b> »

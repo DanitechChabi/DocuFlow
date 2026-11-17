@@ -11,7 +11,7 @@ export const Pastille = ({ ton = 'gris', children, className = '' }) => (
 
 export const Chargement = () => (
   <div className="py-8 text-center">
-    <div className="w-6 h-6 border-2 border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto" />
+    <div className="w-6 h-6 border border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto" />
   </div>
 );
 
@@ -19,12 +19,12 @@ export const Chargement = () => (
 export const EnTete = ({ titre, aide, icone: Icone, children }) => (
   <div className="flex flex-wrap items-start gap-4 mb-6 animate-fade-in-up">
     {Icone && (
-      <div className="w-12 h-12 rounded-2xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0">
+      <div className="w-12 h-12 rounded-lg bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0">
         <Icone size={22} />
       </div>
     )}
     <div className="min-w-0 flex-1">
-      <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{titre}</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{titre}</h1>
       {aide && <p className="text-sm text-slate-500 mt-1">{aide}</p>}
     </div>
     {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}

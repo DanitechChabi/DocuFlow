@@ -95,13 +95,13 @@ const Armoires3D = ({ armoires, cible = null, onFermerCible }) => {
   const choisie = armoires.find((a) => a.id === ouverte);
   const lieu = [...new Set(armoires.map((a) => a.lieu).filter(Boolean))].join(' · ');
   return (
-    <div className="rounded-3xl overflow-hidden border-2 border-slate-200 bg-gradient-to-b from-slate-100 to-slate-200 mb-4">
+    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100 mb-4">
       <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
-        <MapPin size={16} className="text-violet-600" />
-        <span className="text-sm font-black text-slate-800">{lieu || 'Couloir des archives'}</span>
+        <MapPin size={16} className="text-slate-800" />
+        <span className="text-sm font-bold text-slate-800">{lieu || 'Couloir des archives'}</span>
         <span className="text-sm font-semibold text-slate-600">— cliquez une armoire pour l'ouvrir</span>
         {cible && (
-          <span className="ml-auto inline-flex items-center gap-2 rounded-xl bg-green-600 text-white px-3 py-1.5 text-sm font-black">
+          <span className="ml-auto inline-flex items-center gap-2 rounded-xl bg-green-600 text-white px-3 py-1.5 text-sm font-bold">
             Dossier recherché : {cible.nom}{cible.semaine ? `, classeur du ${court(cible.semaine)}` : ''}
             <button type="button" onClick={onFermerCible} className="p-0.5 rounded hover:bg-white/20" aria-label="Fermer"><X size={14} /></button>
           </span>
@@ -124,8 +124,8 @@ const Armoires3D = ({ armoires, cible = null, onFermerCible }) => {
       {choisie && (
         <div className="bg-white border-t-2 border-slate-200 px-5 py-4 animate-fade-in-up">
           <div className="flex items-center gap-2">
-            <Archive size={18} className="text-violet-600" />
-            <span className="text-base font-black text-slate-900">{choisie.nom}</span>
+            <Archive size={18} className="text-slate-800" />
+            <span className="text-base font-bold text-slate-900">{choisie.nom}</span>
             {choisie.lieu && <span className="text-sm font-semibold text-slate-600">· {choisie.lieu}</span>}
             <span className="ml-auto text-sm font-bold text-slate-600">{semainesDe(choisie).length} semaine{semainesDe(choisie).length > 1 ? 's' : ''}</span>
           </div>

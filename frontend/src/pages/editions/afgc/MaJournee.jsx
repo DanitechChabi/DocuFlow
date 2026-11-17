@@ -16,17 +16,13 @@ import { etatDemande } from './vocabulaire';
 
 const Tache = ({ to, icone: Icone, nombre, titre, detail, ton }) => {
   const tons = {
-    vert: 'border-green-200 hover:border-green-400 text-green-700',
-    bleu: 'border-blue-200 hover:border-blue-400 text-blue-700',
-    ambre: 'border-amber-200 hover:border-amber-400 text-amber-700',
-    rouge: 'border-red-200 hover:border-red-400 text-red-700',
-    gris: 'border-slate-200 hover:border-slate-400 text-slate-600',
+    vert: 'text-[#2C9C0A]', bleu: 'text-slate-600', ambre: 'text-amber-600', rouge: 'text-red-600', gris: 'text-slate-500',
   };
   return (
-    <Link to={to} className={`group rounded-2xl border-2 bg-white px-4 py-3 transition-colors ${tons[ton] || tons.gris}`}>
-      <div className="flex items-center gap-2 text-sm font-bold"><Icone size={16} /> {titre}<ArrowRight size={14} className="ml-auto opacity-40 group-hover:opacity-100" /></div>
-      <div className="text-3xl font-black text-slate-900 mt-1">{nombre}</div>
-      {detail && <div className="text-xs font-semibold text-slate-600">{detail}</div>}
+    <Link to={to} className="group rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-400">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Icone size={16} className={tons[ton] || tons.gris} /> {titre}<ArrowRight size={14} className="ml-auto opacity-40 group-hover:opacity-100" /></div>
+      <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{nombre}</div>
+      {detail && <div className="text-xs text-slate-500">{detail}</div>}
     </Link>
   );
 };
@@ -56,8 +52,8 @@ const MaJournee = ({ demandes, enRetard, admin, configure }) => {
   const premiere = res?.r?.entrees?.[0];
 
   return (
-    <section className="glass-card-premium rounded-3xl p-5 md:p-6 mb-6 animate-fade-in-up">
-      <h2 className="text-lg font-black text-slate-900 mb-3">Ma journée</h2>
+    <section className="glass-card-premium rounded-xl p-5 md:p-6 mb-6 animate-fade-in-up">
+      <h2 className="text-lg font-bold text-slate-900 mb-3">Ma journée</h2>
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <Tache to="/demandes/a-traiter" icone={Send} ton="vert" nombre={demandes === null ? '…' : aTransmettre.length} titre="À transmettre"
           detail={parMfiles ? `dont ${parMfiles} par M-Files` : 'demandes en attente'} />
@@ -70,9 +66,9 @@ const MaJournee = ({ demandes, enRetard, admin, configure }) => {
         <div className="relative flex-1 min-w-[240px]">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Où est ce dossier ? Nom de l'entreprise ou n° d'acte (2025/2479)"
-            className="w-full pl-11 pr-3 py-3 rounded-2xl border-2 border-slate-200 text-base font-semibold focus:outline-none focus:border-docuflow-secondary" />
+            className="w-full pl-11 pr-3 py-3 rounded-lg border border-slate-200 text-base font-semibold focus:outline-none focus:border-docuflow-secondary" />
         </div>
-        <button type="submit" disabled={cours || q.trim().length < 2} className="px-5 py-3 rounded-2xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-50">
+        <button type="submit" disabled={cours || q.trim().length < 2} className="px-5 py-3 rounded-lg bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-50">
           {cours ? <Loader2 size={17} className="animate-spin" /> : <Search size={17} />} Chercher
         </button>
       </form>
@@ -82,9 +78,9 @@ const MaJournee = ({ demandes, enRetard, admin, configure }) => {
           {premiere && (
             <div className="mt-2 flex flex-wrap gap-2">
               {mf.annees.includes(Number(premiere.date_point.slice(0, 4))) && (
-                <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border-2 border-blue-200 px-3 py-1.5 text-sm font-black text-blue-900"><Database size={14} /> Numérisé dans M-Files</span>
+                <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-800"><Database size={14} /> Numérisé dans M-Files</span>
               )}
-              <button type="button" onClick={() => navigate('/archives/entrees')} className="px-3 py-1.5 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary">Entrée des dossiers ›</button>
+              <button type="button" onClick={() => navigate('/archives/entrees')} className="px-3 py-1.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-docuflow-secondary">Entrée des dossiers ›</button>
             </div>
           )}
         </div>

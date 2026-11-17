@@ -40,11 +40,11 @@ const semaineCourte = (s) => {
 };
 
 const Tuile = ({ icone: Icone, titre, valeur, detail, ton = 'neutre' }) => (
-  <div className={`rounded-2xl border-2 p-4 bg-white ${ton === 'alerte' ? 'border-red-200' : 'border-slate-200'}`}>
+  <div className={`rounded-lg border p-4 bg-white ${ton === 'alerte' ? 'border-red-200' : 'border-slate-200'}`}>
     <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
       <Icone size={16} className={ton === 'alerte' ? 'text-red-600' : 'text-slate-500'} /> {titre}
     </div>
-    <div className={`mt-1 text-3xl font-black tracking-tight ${ton === 'alerte' ? 'text-red-700' : 'text-slate-900'}`}>{valeur}</div>
+    <div className={`mt-1 text-3xl font-bold tracking-tight ${ton === 'alerte' ? 'text-red-700' : 'text-slate-900'}`}>{valeur}</div>
     {detail && <div className="mt-0.5 text-sm font-semibold text-slate-600">{detail}</div>}
   </div>
 );
@@ -53,8 +53,8 @@ const Tuile = ({ icone: Icone, titre, valeur, detail, ton = 'neutre' }) => (
 const Barres = ({ titre, sousTitre, donnees, couleur = '#16a34a', vide = 'Rien sur la période.' }) => {
   const max = Math.max(1, ...donnees.map((d) => d.n));
   return (
-    <section className="glass-card-premium rounded-3xl p-5 md:p-6 break-inside-avoid">
-      <h2 className="text-base font-black text-slate-900">{titre}</h2>
+    <section className="glass-card-premium rounded-xl p-5 md:p-6 break-inside-avoid">
+      <h2 className="text-base font-bold text-slate-900">{titre}</h2>
       {sousTitre && <p className="text-sm text-slate-600 mb-3">{sousTitre}</p>}
       {donnees.length ? (
         <ul className="space-y-2.5 mt-3">
@@ -64,7 +64,7 @@ const Barres = ({ titre, sousTitre, donnees, couleur = '#16a34a', vide = 'Rien s
               <span className="h-3.5 rounded-r bg-slate-100 overflow-hidden">
                 <span className="block h-full rounded-r" style={{ width: `${(d.n / max) * 100}%`, background: couleur, minWidth: d.n ? 4 : 0 }} />
               </span>
-              <span className="text-sm font-black text-slate-900 text-right tabular-nums">{nombre(d.n)}</span>
+              <span className="text-sm font-bold text-slate-900 text-right tabular-nums">{nombre(d.n)}</span>
             </li>
           ))}
         </ul>
@@ -79,9 +79,9 @@ const Colonnes = ({ titre, sousTitre, donnees, couleur = '#16a34a' }) => {
   const max = Math.max(1, ...donnees.map((d) => d.n));
   const pas = Math.max(1, Math.ceil(donnees.length / 8));
   return (
-    <section className="glass-card-premium rounded-3xl p-5 md:p-6 break-inside-avoid">
+    <section className="glass-card-premium rounded-xl p-5 md:p-6 break-inside-avoid">
       <div className="flex items-baseline gap-3">
-        <h2 className="text-base font-black text-slate-900">{titre}</h2>
+        <h2 className="text-base font-bold text-slate-900">{titre}</h2>
         <span className="ml-auto text-sm font-bold text-slate-700 tabular-nums min-h-[1.25rem]">
           {survol !== null && donnees[survol] ? `semaine du ${semaineCourte(donnees[survol].semaine)} : ${nombre(donnees[survol].n)}` : ''}
         </span>
@@ -128,10 +128,10 @@ const Contenu = ({ t }) => {
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <Colonnes titre="Demandes par semaine" sousTitre="Semaines de production, du vendredi au jeudi." donnees={t.demandes_par_semaine} />
-        <Colonnes titre="Dossiers entrés par semaine" sousTitre="D'après les points des dossiers retirés." donnees={t.entrees_par_semaine} couleur="#7c3aed" />
+        <Colonnes titre="Dossiers entrés par semaine" sousTitre="D'après les points des dossiers retirés." donnees={t.entrees_par_semaine} couleur="#475569" />
       </div>
-      <section className="glass-card-premium rounded-3xl p-5 md:p-6 break-inside-avoid">
-        <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+      <section className="glass-card-premium rounded-xl p-5 md:p-6 break-inside-avoid">
+        <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
           <AlertTriangle size={17} className={t.retards.length ? 'text-red-600' : 'text-slate-400'} /> Dossiers en retard
           <span className="text-slate-500 font-bold">({t.retards.length})</span>
         </h2>
@@ -150,7 +150,7 @@ const Contenu = ({ t }) => {
                     <td className="py-2 pr-3 text-slate-700">{r.departement}</td>
                     <td className="py-2 pr-3 text-slate-700">{dateCourte(r.sorti_le)}</td>
                     <td className="py-2 pr-3 text-slate-700">{dateCourte(r.retour_prevu)}</td>
-                    <td className="py-2 text-right"><span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 px-2.5 py-0.5 font-black"><AlertTriangle size={12} /> {r.jours_retard} j</span></td>
+                    <td className="py-2 text-right"><span className="inline-flex items-center gap-1 rounded-full bg-red-50 text-red-700 px-2.5 py-0.5 font-bold"><AlertTriangle size={12} /> {r.jours_retard} j</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -160,7 +160,7 @@ const Contenu = ({ t }) => {
       </section>
       {t.armoires.length > 0 && (
         <Barres titre="Dossiers par armoire" sousTitre="Contenu de chaque armoire, d'après le plan de rangement (toutes périodes)."
-          donnees={t.armoires.map((a) => ({ nom: a.nom, n: a.n }))} couleur="#7c3aed" />
+          donnees={t.armoires.map((a) => ({ nom: a.nom, n: a.n }))} couleur="#475569" />
       )}
     </div>
   );
@@ -211,7 +211,7 @@ const TableauBordAfgc = () => {
       </EnTete>
 
       <div className="flex flex-wrap items-end gap-2 mb-5">
-        <div className="inline-flex flex-wrap p-1 rounded-2xl bg-slate-100">
+        <div className="inline-flex flex-wrap p-1 rounded-lg bg-slate-100">
           {PERIODES.map(([cle, libelle, calc]) => (
             <button key={cle} type="button" onClick={() => { setChoix(cle); setBornes(calc()); }}
               className={`px-3.5 py-2 rounded-xl text-sm font-bold ${choix === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>{libelle}</button>

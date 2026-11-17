@@ -186,7 +186,7 @@ const TraitementAfgc = () => {
       <EnTete titre="À traiter" icone={ClipboardList} aide="Transmettez un dossier d'un clic ; à son retour, un clic sur « Retourné »." />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="inline-flex p-1 rounded-2xl bg-slate-100">
+        <div className="inline-flex p-1 rounded-lg bg-slate-100">
           {[['demandes', 'Demandes', FileSearch, aTransmettre.length], ['listes', 'Listes', ListChecks, listesOuvertes.length]].map(([cle, label, Icone, n]) => (
             <button key={cle} type="button" onClick={() => setOnglet(cle)}
               className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 transition-colors ${onglet === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -205,7 +205,7 @@ const TraitementAfgc = () => {
       {onglet === 'demandes' ? (
         demandes === null ? <Chargement /> : (<>
           {/* On appelle encore l'archive, on lui écrit : la demande s'inscrit quand même au registre. */}
-          <section className="glass-card-premium rounded-3xl p-5 md:p-6 mb-6">
+          <section className="glass-card-premium rounded-xl p-5 md:p-6 mb-6">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
               <h2 className="font-bold text-slate-900">Demande reçue par</h2>
               <div className="inline-flex p-1 rounded-xl bg-slate-100" role="radiogroup" aria-label="Demande reçue par">
@@ -258,7 +258,7 @@ const TraitementAfgc = () => {
             />
           </section>
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+            <section className="glass-card-premium rounded-xl p-5 md:p-6">
               <h2 className="font-bold text-slate-900 mb-2">À transmettre <span className="text-slate-400 font-semibold">({aTransmettre.length})</span></h2>
               {aTransmettre.length ? (
                 <ul className="divide-y divide-slate-100">
@@ -269,7 +269,7 @@ const TraitementAfgc = () => {
                       <span className="text-xs text-slate-400">demandé le {dateCourte(d.created_at)}</span>
                       <BoutonComplement onClick={() => setARenvoyer(d)} desactive={Boolean(geste)} />
                       <button type="button" onClick={() => transmettre(d)} disabled={Boolean(geste)}
-                        className={`px-3.5 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${estNumerise(d, presences[d.id], mf.annees) ? 'border-2 border-slate-200 text-slate-600 hover:border-docuflow-secondary' : 'bg-docuflow-secondary text-white'}`}
+                        className={`px-3.5 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${estNumerise(d, presences[d.id], mf.annees) ? 'border border-slate-200 text-slate-600 hover:border-docuflow-secondary' : 'bg-docuflow-secondary text-white'}`}
                         title={estNumerise(d, presences[d.id], mf.annees) ? 'Sortir quand même le papier' : undefined}>
                         {geste === `t-${d.id}` ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Transmettre
                       </button>
@@ -278,7 +278,7 @@ const TraitementAfgc = () => {
                 </ul>
               ) : <p className="text-sm text-slate-400 py-2">Aucune demande en attente.</p>}
             </section>
-            <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+            <section className="glass-card-premium rounded-xl p-5 md:p-6">
               <h2 className="font-bold text-slate-900 mb-2">Transmis <span className="text-slate-400 font-semibold">({sortis.length})</span></h2>
               {sortis.length ? (
                 <ul className="divide-y divide-slate-100">
@@ -300,7 +300,7 @@ const TraitementAfgc = () => {
             </section>
           </div>
           {enAttenteComplements.length > 0 && (
-            <section className="glass-card-premium rounded-3xl p-5 md:p-6 mt-6 border-2 border-amber-200">
+            <section className="glass-card-premium rounded-xl p-5 md:p-6 mt-6 border border-amber-200">
               <h2 className="font-bold text-slate-900 mb-1">Attendent des compléments <span className="text-amber-600 font-semibold">({enAttenteComplements.length})</span></h2>
               <p className="text-sm text-slate-600 mb-2">Renvoyées à leur auteur ; elles reviennent dans « À transmettre » dès qu'il les a complétées.</p>
               <ul className="divide-y divide-slate-100">
@@ -313,10 +313,10 @@ const TraitementAfgc = () => {
         listes === null ? <Chargement /> : listesVues.length ? (
           <div className="space-y-3">
             {listesVues.map((l) => (
-              <div key={l.id} className="glass-card-premium rounded-3xl overflow-hidden">
+              <div key={l.id} className="glass-card-premium rounded-xl overflow-hidden">
                 <button type="button" onClick={() => ouvrir(l.id)} className="w-full text-left p-5 flex flex-wrap items-center gap-4 hover:bg-slate-50/60 transition-colors">
                   <div className="min-w-0 flex-1 basis-60">
-                    <div className="font-black text-slate-900">{l.libelle} <span className="text-slate-400 font-semibold">· {l.total} dossier{l.total > 1 ? 's' : ''}</span></div>
+                    <div className="font-bold text-slate-900">{l.libelle} <span className="text-slate-400 font-semibold">· {l.total} dossier{l.total > 1 ? 's' : ''}</span></div>
                     <div className="text-xs text-slate-400">{l.cadre} · pour {l.demandeur_name || '—'} · déposée le {dateCourte(l.created_at)}</div>
                     <div className="mt-2 max-w-md"><Avancement total={l.total} transmis={l.transmis} retournes={l.retournes} /></div>
                   </div>
@@ -384,7 +384,7 @@ const TraitementAfgc = () => {
               </div>
             ))}
           </div>
-        ) : <div className="glass-card-premium rounded-3xl p-8 text-center text-sm text-slate-500">Aucune liste.</div>
+        ) : <div className="glass-card-premium rounded-xl p-8 text-center text-sm text-slate-500">Aucune liste.</div>
       )}
       {aRenvoyer && (
         <ModaleComplement dossier={aRenvoyer} onClose={() => setARenvoyer(null)}

@@ -42,23 +42,17 @@ const joursDeRetard = (date) => {
 const CarteAction = ({ to, icone: Icone, titre, texte, principale = false, children }) => (
   <Link
     to={to}
-    className={`group relative overflow-hidden rounded-3xl p-7 flex flex-col transition-all animate-fade-in-up ${
-      principale
-        ? 'bg-docuflow-secondary text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-        : 'glass-card-premium hover:shadow-elevated hover:-translate-y-0.5'
+    className={`group relative rounded-lg border bg-white p-6 flex flex-col transition-colors hover:border-slate-400 ${
+      principale ? 'border-slate-200 border-t-4 border-t-[#2C9C0A]' : 'border-slate-200'
     }`}
   >
-    <div className="flex items-start justify-between mb-6">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
-        principale ? 'bg-white/15 text-white' : 'bg-green-50 text-docuflow-secondary'
-      }`}>
-        <Icone size={26} />
-      </div>
-      <ArrowRight size={18} className={`transition-transform group-hover:translate-x-1 ${principale ? 'text-white/80' : 'text-slate-300'}`} />
+    <div className="flex items-center gap-2.5 mb-2">
+      <Icone size={20} className={principale ? 'text-[#2C9C0A]' : 'text-slate-500'} />
+      <h2 className="text-lg font-semibold text-slate-900">{titre}</h2>
+      <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-slate-700" />
     </div>
-    <h2 className={`text-xl font-black mb-1.5 ${principale ? 'text-white' : 'text-slate-900'}`}>{titre}</h2>
-    <p className={`text-sm leading-relaxed ${principale ? 'text-white/85' : 'text-slate-500'}`}>{texte}</p>
-    {children && <div className="flex flex-wrap items-center gap-2 mt-5">{children}</div>}
+    <p className="text-sm leading-relaxed text-slate-600">{texte}</p>
+    {children && <div className="flex flex-wrap items-center gap-2 mt-4">{children}</div>}
   </Link>
 );
 
@@ -141,10 +135,10 @@ const AccueilAfgc = () => {
 
   return (
     <div className="relative p-4 md:p-8 max-w-6xl mx-auto">
-      <div className="flex items-center gap-4 md:gap-5 mb-8 animate-fade-in-up">
+      <div className="flex items-center gap-4 md:gap-5 mb-8">
         <img src={edition?.embleme} alt="" className="w-14 h-14 md:w-16 md:h-16 object-contain flex-shrink-0" />
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Bonjour, {prenom}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Bonjour, {prenom}</h1>
           <p className="text-sm md:text-base text-slate-500">
             {traite ? 'Archives de l\'AFGC : les demandes à traiter et les dossiers sortis.' : 'Archives de l\'AFGC'}
           </p>
@@ -159,17 +153,17 @@ const AccueilAfgc = () => {
       {!traite && <AlerteACompleter nombre={(mesDemandes || []).filter((d) => d.statut === 'a completer').length} className="mb-6" />}
 
       {aInstaller && (
-        <section className="rounded-3xl border-2 border-dashed border-green-200 bg-green-50/70 p-5 md:p-6 mb-6 flex flex-wrap items-center gap-4 animate-fade-in-up">
-          <div className="w-12 h-12 rounded-2xl bg-white text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Settings2 size={22} /></div>
+        <section className="rounded-xl border border-dashed border-green-200 bg-green-50/70 p-5 md:p-6 mb-6 flex flex-wrap items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-white text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Settings2 size={22} /></div>
           <div className="min-w-0 flex-1 basis-72">
-            <h2 className="font-black text-slate-900">Installer la configuration de l'AFGC</h2>
+            <h2 className="font-bold text-slate-900">Installer la configuration de l'AFGC</h2>
             <p className="text-sm text-slate-600">
               Les {config.attendus.motifs} motifs de demande, les {config.attendus.types} typologies de dossiers et les {config.attendus.departements} départements, en un clic.
               Ce que vous avez déjà ajouté est gardé, et tout reste modifiable dans Réglages.
             </p>
           </div>
           <button type="button" onClick={installer} disabled={installation}
-            className="px-5 py-3 rounded-2xl bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60">
+            className="px-5 py-3 rounded-lg bg-docuflow-secondary text-white font-bold inline-flex items-center gap-2 disabled:opacity-60">
             {installation ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Installer
           </button>
         </section>
@@ -182,12 +176,12 @@ const AccueilAfgc = () => {
             <CarteAction to="/demandes/a-traiter" icone={ClipboardList} titre="À traiter" principale
               texte="Les demandes et les listes reçues : transmettre le dossier, puis noter son retour.">
               {aTraiter !== null && (
-                <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold">
+                <span className="text-sm font-semibold text-slate-800">
                   {aTraiter === 0 ? 'Aucune demande' : `${aTraiter} demande${aTraiter > 1 ? 's' : ''}`}
                 </span>
               )}
               {listesOuvertes > 0 && (
-                <span className="px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold inline-flex items-center gap-1.5">
+                <span className="text-sm font-semibold text-slate-800 inline-flex items-center gap-1.5">
                   <ListChecks size={13} /> {listesOuvertes} liste{listesOuvertes > 1 ? 's' : ''}
                 </span>
               )}
@@ -197,18 +191,18 @@ const AccueilAfgc = () => {
               {sorties !== null && <Pastille ton="vert">{sorties.length} transmis</Pastille>}
               {enRetard.length > 0 && <Pastille ton="rouge"><AlertTriangle size={13} /> {enRetard.length} en retard</Pastille>}
             </CarteAction>
-            <div className="glass-card-premium rounded-3xl p-7 animate-fade-in-up">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-6">
-                <BookOpen size={26} />
+            <div className="rounded-lg border border-slate-200 bg-white p-6">
+              <div className="flex items-center gap-2.5 mb-2">
+                <BookOpen size={20} className="text-slate-500" />
+                <h2 className="text-lg font-semibold text-slate-900">Registres</h2>
               </div>
-              <h2 className="text-xl font-black text-slate-900 mb-3">Registres</h2>
               <div className="space-y-1">
                 {[
                   { to: '/demandes/prets', label: 'Sorties et retours', icone: BookOpenCheck, visible: true },
                   { to: '/courrier/registre', label: 'Courrier arrivée et départ', icone: Mail, visible: can('mail.register') },
                   { to: '/documents/magasins', label: 'Inventaire des boîtes', icone: Warehouse, visible: can('documents.view') },
                 ].filter((r) => r.visible).map((r) => (
-                  <Link key={r.to} to={r.to} className="flex items-center gap-3 px-3 py-2 -mx-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-docuflow-secondary transition-colors">
+                  <Link key={r.to} to={r.to} className="flex items-center gap-3 px-3 py-2 -mx-3 rounded-md text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                     <r.icone size={16} className="text-slate-400" /> {r.label}
                     <ArrowRight size={14} className="ml-auto text-slate-300" />
                   </Link>
@@ -217,7 +211,7 @@ const AccueilAfgc = () => {
             </div>
           </div>
 
-          <section className="glass-card-premium rounded-3xl p-6 mt-8 animate-fade-in-up">
+          <section className="glass-card-premium rounded-xl p-6 mt-8">
             <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
               <AlertTriangle size={16} className="text-red-500" /> Dossiers à récupérer
             </h3>
@@ -241,24 +235,24 @@ const AccueilAfgc = () => {
       ) : (
         <>
           {/* La demande, là où l'on arrive : on tape, Entrée. */}
-          <section className="glass-card-premium rounded-3xl p-5 md:p-7 animate-fade-in-up">
-            <h2 className="text-lg md:text-xl font-black text-slate-900 mb-4">Quel dossier vous faut-il ?</h2>
+          <section className="glass-card-premium rounded-xl p-5 md:p-7">
+            <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-4">Quel dossier vous faut-il ?</h2>
             <BoiteDemande grande autoFocus onEnvoye={charger} />
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2 mt-5">
-            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-2xl p-5 flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all group animate-fade-in-up">
-              <div className="w-12 h-12 rounded-2xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><FileSearch size={22} /></div>
+            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-lg p-5 flex items-center gap-4 hover:border-slate-400 transition-colors group">
+              <div className="text-docuflow-secondary flex-shrink-0"><FileSearch size={22} /></div>
               <div className="min-w-0">
-                <div className="font-black text-slate-900">Mes dossiers</div>
+                <div className="font-bold text-slate-900">Mes dossiers</div>
                 <div className="text-sm text-slate-500">{mesDemandes === null ? '…' : `${enCours.length} en cours`}</div>
               </div>
               <ArrowRight size={18} className="ml-auto text-slate-300 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-2xl p-5 flex items-center gap-4 hover:shadow-elevated hover:-translate-y-0.5 transition-all group animate-fade-in-up">
-              <div className="w-12 h-12 rounded-2xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><Undo2 size={22} /></div>
+            <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-lg p-5 flex items-center gap-4 hover:border-slate-400 transition-colors group">
+              <div className="text-docuflow-secondary flex-shrink-0"><Undo2 size={22} /></div>
               <div className="min-w-0">
-                <div className="font-black text-slate-900">À retourner</div>
+                <div className="font-bold text-slate-900">À retourner</div>
                 <div className="text-sm text-slate-500">
                   {mesDemandes === null ? '…' : `${transmis.length} dossier${transmis.length > 1 ? 's' : ''} chez vous`}
                   {enRetardAgent > 0 && <span className="ml-2 font-bold text-red-600">· {enRetardAgent} en retard</span>}
@@ -268,7 +262,7 @@ const AccueilAfgc = () => {
             </Link>
           </div>
 
-          <section className="glass-card-premium rounded-3xl p-6 mt-5 animate-fade-in-up">
+          <section className="glass-card-premium rounded-xl p-6 mt-5">
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h3 className="font-bold text-slate-900 flex items-center gap-2 flex-1">
                 <FileSearch size={16} className="text-docuflow-secondary" /> Mes demandes en cours

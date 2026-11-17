@@ -211,7 +211,7 @@ const Topbar = () => {
           <div
             className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${
               hasCustomLogo
-                ? 'rounded-md bg-gradient-to-br from-docuflow-secondary to-blue-600 overflow-hidden'
+                ? 'rounded-md bg-docuflow-secondary overflow-hidden'
                 : ''
             }`}
           >
@@ -272,7 +272,7 @@ const Topbar = () => {
               className="flex items-center gap-1.5 p-1 rounded-md transition-colors hover:opacity-80"
               aria-label="Menu utilisateur"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-docuflow-secondary to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-docuflow-secondary flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
                 {initial}
               </div>
               <ChevronDown size={14} className="hidden sm:block" style={{ color: tMuted }} />

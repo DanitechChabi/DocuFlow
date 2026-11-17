@@ -113,26 +113,26 @@ export const ModaleEtiquettes = ({ dossiers, titre, onClose, onImprimer }) => {
   const n = dossiers.length;
   return (
     <Modal open onClose={onClose} panelClassName="w-full max-w-lg mx-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-6">
+      <div className="bg-white rounded-xl shadow-2xl p-6">
         <div className="flex items-start gap-3">
-          <span className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0"><Tag size={20} /></span>
+          <span className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center flex-shrink-0"><Tag size={20} /></span>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-black text-slate-900">Imprimer {n > 1 ? `${n} étiquettes` : 'l\'étiquette'}</h3>
+            <h3 className="text-lg font-bold text-slate-900">Imprimer {n > 1 ? `${n} étiquettes` : 'l\'étiquette'}</h3>
             {titre && <p className="text-sm font-semibold text-slate-600">{titre}</p>}
           </div>
           <button type="button" onClick={onClose} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
         <div className="mt-4 space-y-2">
           {Object.entries(FORMATS).map(([cle, f]) => (
-            <label key={cle} className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer ${format === cle ? 'border-violet-500 bg-violet-50' : 'border-slate-200'}`}>
-              <input type="radio" name="format" checked={format === cle} onChange={() => choisir(cle)} className="accent-violet-600" />
+            <label key={cle} className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer ${format === cle ? 'border-slate-300 bg-slate-50' : 'border-slate-200'}`}>
+              <input type="radio" name="format" checked={format === cle} onChange={() => choisir(cle)} className="accent-slate-800" />
               <span className="text-sm font-bold text-slate-800">{f.libelle}</span>
             </label>
           ))}
         </div>
         {dossiers[0] && (
           <div className="mt-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1.5">Aperçu</div>
+            <div className="text-xs font-bold text-slate-500 mb-1.5">Aperçu</div>
             <div className="inline-block border border-dashed border-slate-300 rounded-lg bg-white">
               <Etiquette d={dossiers[0]} format={format} />
             </div>
@@ -142,7 +142,7 @@ export const ModaleEtiquettes = ({ dossiers, titre, onClose, onImprimer }) => {
         <div className="flex justify-end gap-2 mt-5">
           <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Annuler</button>
           <button type="button" onClick={() => onImprimer(format)} disabled={!n}
-            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-50">
+            className="px-5 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-50">
             <Printer size={16} /> Imprimer
           </button>
         </div>
