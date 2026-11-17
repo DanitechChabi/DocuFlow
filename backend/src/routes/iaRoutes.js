@@ -25,4 +25,24 @@ router.post('/lire-demande', requireAnyPermission(['requests.create', 'requests.
   }
 });
 
+// DocuBot (AFGC) : questions en langage courant sur les archives, selon les droits.
+const docubot = require('../services/docubotService');
+router.get('/docubot', async (req, res) => {
+  try {
+    const droits = await docubot.droitsDe(req.user);
+    res.json({ suggestions: docubot.suggestionsAccueil(droits), archive: droits.archive });
+  } catch (err) {
+    res.status(500).json({ message: 'DocuBot indisponible.' });
+  }
+});
+router.post('/docubot', async (req, res) => {
+  try {
+    const contexte = req.body?.contexte && typeof req.body.contexte === 'object' ? { entreprise: String(req.body.contexte.entreprise || '').slice(0, 200) || null } : {};
+    res.json(await docubot.repondre(req.user, req.body?.question, contexte));
+  } catch (err) {
+    console.error('[docubot]', err.message);
+    res.status(500).json({ message: 'DocuBot n\'a pas pu répondre.' });
+  }
+});
+
 module.exports = router;

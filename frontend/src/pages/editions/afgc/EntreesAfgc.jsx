@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { PackageOpen, Upload, CalendarDays, Search, Printer, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, X, ArrowRight, Trash2, Archive, Pencil, Plus, Tag } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { lireClasseur } from '../../../utils/classeur';
@@ -547,6 +548,27 @@ const EntreesAfgc = () => {
     setLettreVisee(d.lettre);
     setOnglet('semaines');
   };
+
+  // Arrivée depuis DocuBot : « ?q=Credo BTP » lance la recherche, « ?semaine=2025-10-03 » ouvre la semaine.
+  const [adresse, setAdresse] = useSearchParams();
+  useEffect(() => {
+    const q = adresse.get('q');
+    const sem = adresse.get('semaine');
+    if (!q && !sem) return;
+    if (q) {
+      const c = { q, type: '', agent: '', du: '', au: '' };
+      setCritere(c);
+      setOnglet('recherche');
+      setCherche(true);
+      entreeService.rechercher(c).then((r) => { setResultats(r); setTour((t) => t + 1); })
+        .catch((err) => toast.error(err.response?.data?.message || 'Recherche impossible.')).finally(() => setCherche(false));
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(sem)) {
+      setAnnee(Number(sem.slice(0, 4)));
+      setChoisie(sem);
+      setOnglet('semaines');
+    }
+    setAdresse({}, { replace: true });
+  }, [adresse, setAdresse]);
 
   const annees = filtres.annees.length ? filtres.annees : [new Date().getFullYear()];
 

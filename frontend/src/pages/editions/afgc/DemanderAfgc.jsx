@@ -99,7 +99,7 @@ const DemanderAfgc = () => {
       <AlerteACompleter nombre={aCompleter} className="mb-5" />
 
       <div className="glass-card-premium rounded-xl p-5 md:p-6 animate-fade-in-up">
-        <BoiteDemande grande autoFocus onEnvoye={chargerRecents} />
+        <BoiteDemande key={params.get('q') || ''} grande autoFocus onEnvoye={chargerRecents} valeurInitiale={params.get('q') || ''} />
       </div>
 
       {recents.length > 0 && (

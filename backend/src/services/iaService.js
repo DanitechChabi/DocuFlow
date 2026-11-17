@@ -244,7 +244,7 @@ async function typologieDe(texte, types, { attendre = true } = {}) {
 
 /** À défaut du modèle : le nom qui suit « société », « entreprise », « Ets »… */
 function entrepriseNommee(texte) {
-  const m = /(?:^|\s)(?:la\s+|l')?(?:soci[ée]t[ée]|entreprise|[ée]ts\.?|[ée]tablissements?|cabinet|groupe|agence)\s+(.+?)(?=\s*(?:[,;:!?]|\.(?:\s|$)|$|\s(?:du|des|de\s+l'|pour|acte|actes|n°|en\s+date|afin|svp|merci|s'il)\b))/i.exec(String(texte || ''));
+  const m = /(?:^|\s)(?:la\s+|l')?(?:soci[ée]t[ée]|entreprise|[ée]ts\.?|[ée]tablissements?|cabinet|groupe|agence)\s+(.+?)(?=\s*(?:[,;:!?]|\.(?:\s|$)|$|\s(?:(?:du|des|le)\s+\d|pour|acte|actes|n°|en\s+date|afin|svp|merci|s'il|qui|que|est|a\s)))/i.exec(String(texte || ''));
   const nom = m ? m[1].trim() : '';
   return nom.length >= 2 && nom.split(/\s+/).length <= 8 ? nom : null;
 }

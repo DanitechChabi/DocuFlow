@@ -66,6 +66,8 @@ const maintenant = () => {
 };
 
 const BoiteDemande = ({
+  // Saisie de départ (« Demander ce dossier » depuis DocuBot).
+  valeurInitiale = '',
   grande = false,
   autoFocus = false,
   onEnvoye,
@@ -91,7 +93,7 @@ const BoiteDemande = ({
   // dans la saisie tant que l'agent ne l'a pas choisi lui-même.
   const [types, setTypes] = useState([]);
   const [typeManuel, setTypeManuel] = useState(undefined);
-  const [saisie, setSaisie] = useState('');
+  const [saisie, setSaisie] = useState(valeurInitiale);
   const [suggestions, setSuggestions] = useState([]);
   const [recherche, setRecherche] = useState(false);
   const [envoi, setEnvoi] = useState(null);
