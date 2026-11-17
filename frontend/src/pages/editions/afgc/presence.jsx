@@ -99,13 +99,15 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
         {douteux ? <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> : <Archive size={15} className="mt-0.5 flex-shrink-0 text-[#2C9C0A]" />}
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="text-sm leading-snug">
-            {douteux
+            {e.approche
+              ? <><strong className="font-bold">Nom proche, à vérifier</strong> : « <strong>{e.denomination}</strong> »{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''}</>
+              : douteux
               ? <><strong className="font-bold">À vérifier</strong> : acte {e.num_actes} entré au nom de « <strong>{e.denomination}</strong> »</>
               : <><strong className="font-bold">Aux archives</strong>{archiviste || total > 1 ? <span className="font-semibold"> : {e.denomination}{archiviste && e.num_actes ? `, acte ${e.num_actes}` : ''}</span> : null}</>}
           </div>
           <Detail e={e} archiviste={archiviste} />
           {total > 1 && (
-            <button type="button" onClick={() => setOuvert((v) => !v)} className="text-sm font-semibold text-slate-600 underline decoration-dotted inline-flex items-center gap-1">
+            <button type="button" onClick={() => setOuvert((v) => !v)} className="ml-2 text-sm font-semibold text-slate-600 underline decoration-dotted inline-flex items-center gap-1">
               {total - 1} autre{total > 2 ? 's' : ''} entrée{total > 2 ? 's' : ''} <ChevronDown size={13} className={ouvert ? 'rotate-180' : ''} />
             </button>
           )}
@@ -115,7 +117,7 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
         <ul className="mt-2 ml-9 space-y-2 text-sm text-slate-800 animate-fade-in-up">
           {autres.map((x) => (
             <li key={`${x.date_point}-${x.num_actes}-${x.denomination}`}>
-              <div className="font-semibold">{x.denomination}{x.num_actes ? `, acte ${x.num_actes}` : ''}{!x.nom_concorde && <span className="text-amber-700"> (autre nom)</span>}</div>
+              <div className="font-semibold">{x.denomination}{x.num_actes ? `, acte ${x.num_actes}` : ''}{!x.nom_concorde && <span className="text-amber-700"> ({x.approche ? 'nom proche' : 'autre nom'})</span>}</div>
               <Detail e={x} archiviste={archiviste} />
             </li>
           ))}

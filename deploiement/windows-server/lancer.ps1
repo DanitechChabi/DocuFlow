@@ -10,6 +10,9 @@ $ErrorActionPreference = 'Continue'
 
 $conf = Lire-Configuration (Join-Path $Dossier 'config\docuflow.env')
 foreach ($cle in $conf.Keys) { [Environment]::SetEnvironmentVariable($cle, $conf[$cle], 'Process') }
+# Aide automatique : modèles livrés dans <Dossier>\modeles, sans téléchargement (réseau interne).
+if (-not $conf['IA_MODELES_DIR']) { $env:IA_MODELES_DIR = Join-Path $Dossier 'modeles' }
+if (-not $conf['IA_TELECHARGER']) { $env:IA_TELECHARGER = 'non' }
 
 $backend = Join-Path $Dossier 'app\backend'
 $journaux = Join-Path $Dossier 'journaux'

@@ -28,6 +28,12 @@ Copy-Item (Join-Path $Dossier 'app') $ancienne -Recurse
 & robocopy (Join-Path $paquet 'app') (Join-Path $Dossier 'app') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { Echec "copie impossible (robocopy $LASTEXITCODE). L'ancienne version est dans $ancienne." }
 & robocopy $PSScriptRoot (Join-Path $Dossier 'scripts') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+# Modèles de l'aide automatique (livrés avec le paquet, hors du dossier app).
+$modelesPaquet = Join-Path $paquet 'modeles'
+if (Test-Path $modelesPaquet) {
+  & robocopy $modelesPaquet (Join-Path $Dossier 'modeles') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+  if ($LASTEXITCODE -ge 8) { Ecrire "Modèles d'aide automatique non copiés (robocopy $LASTEXITCODE) : l'application fonctionnera sans." 'Yellow' }
+}
 
 Etape 'Redémarrage'
 Demarrer-Application

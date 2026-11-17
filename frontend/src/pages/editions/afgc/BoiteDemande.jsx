@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Search, Send, Loader2, ChevronDown, Check, Undo2, ClipboardPaste, X, Plus } from 'lucide-react';
+import { Search, Send, Loader2, ChevronDown, Check, Undo2, ClipboardPaste, X, Plus, Sparkles } from 'lucide-react';
 import { requestService } from '../../../services/requestService';
 import { listeService } from '../../../services/listeService';
 import { authService } from '../../../services/authService';
@@ -100,6 +100,9 @@ const BoiteDemande = ({
   const [aCompleter, setACompleter] = useState([]);
   const [colles, setColles] = useState(null);
   const [envoyee, setEnvoyee] = useState(null);
+  // Une phrase (« le dossier de bonne exécution de la société X, acte 2024/12 ») :
+  // le serveur en lit l'entreprise, l'acte et la typologie probable.
+  const [lecture, setLecture] = useState(null);
   const champ = useRef(null);
   const minuteurAnnuler = useRef(null);
 
@@ -140,6 +143,28 @@ const BoiteDemande = ({
     }, 250);
     return () => clearTimeout(minuteur);
   }, [qNet]);
+
+  useEffect(() => {
+    const texte = saisie.trim();
+    if (colles || texte.split(/\s+/).length < 4) { setLecture(null); return undefined; }
+    let annule = false;
+    const minuteur = setTimeout(() => {
+      listeService.lireDemande(texte)
+        .then((r) => { if (!annule) setLecture(r && (r.entreprise || r.typologie || r.acte) ? { ...r, texte } : null); })
+        .catch(() => { if (!annule) setLecture(null); });
+    }, 700);
+    return () => { annule = true; clearTimeout(minuteur); };
+  }, [saisie, colles]);
+
+  // Reprend ce qui a été lu : la saisie devient « entreprise acte », la typologie est choisie.
+  const utiliserLecture = () => {
+    if (!lecture) return;
+    // Sans entreprise lue, la saisie reste telle quelle : seule la typologie est reprise.
+    if (lecture.entreprise) setSaisie([lecture.entreprise, lecture.acte || (lecture.annee ? String(lecture.annee) : null)].filter(Boolean).join(' '));
+    if (lecture.typologie) setTypeManuel(lecture.typologie.value);
+    setLecture(null);
+    champ.current?.focus();
+  };
 
   useEffect(() => {
     const vide = { nom_entreprise: '', num_dossier: '', num_acte: '', annee: '', banque: '', montant: '' };
@@ -356,6 +381,25 @@ const BoiteDemande = ({
         {cumuler && <span className="inline-flex items-center gap-1 text-slate-400"><Plus size={12} /> un dossier, Entrée, le suivant… ou collez-les d'un coup</span>}
         {pied}
       </div>
+
+      {lecture && lecture.texte === saisie.trim() && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-l-4 border-slate-400 bg-slate-50 rounded-r-md px-3 py-2 text-sm text-slate-700">
+          <Sparkles size={15} className="text-slate-500 flex-shrink-0" />
+          <span className="min-w-0 flex-1">
+            Compris :{' '}
+            {[
+              lecture.entreprise && <>entreprise <strong className="text-slate-900">{lecture.entreprise}</strong></>,
+              lecture.acte && <>acte <strong className="text-slate-900">{lecture.acte}</strong></>,
+              !lecture.acte && lecture.annee && <>année <strong className="text-slate-900">{lecture.annee}</strong></>,
+              lecture.typologie && <>typologie <strong className="text-slate-900">{lecture.typologie.label}</strong>{lecture.typologie.source === 'modele' ? ' (probable)' : ''}</>,
+            ].filter(Boolean).map((x, i) => <React.Fragment key={i}>{i > 0 && ', '}{x}</React.Fragment>)}
+          </span>
+          <button type="button" onClick={utiliserLecture}
+            className="px-3 py-1.5 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-800 hover:border-slate-500">
+            Utiliser
+          </button>
+        </div>
+      )}
 
       {(!colles || cumuler) && q.length >= 2 && <Presence resultat={presence} archiviste={!retenir} className="mt-3" />}
 

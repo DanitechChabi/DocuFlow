@@ -22,3 +22,6 @@ listeService.demandeurs = async () => (await api.get('/requests/demandeurs')).da
 listeService.pourAgent = async (corps) => (await api.post('/requests/pour-agent', corps)).data;
 // L'archive précise la typologie d'une demande arrivée sans elle.
 listeService.typologie = async (id, typeDocument) => (await api.patch(`/requests/${id}/typologie`, { type_document: typeDocument })).data;
+// Aide automatique (055) : lecture d'une demande écrite en phrase, sur le serveur.
+listeService.lireDemande = async (texte) => (await api.post('/ia/lire-demande', { texte })).data;
+listeService.etatIa = async () => (await api.get('/ia/etat')).data;

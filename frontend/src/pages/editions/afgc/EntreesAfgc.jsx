@@ -713,6 +713,11 @@ const EntreesAfgc = () => {
               <p className="text-sm font-semibold text-slate-600 mb-2">
                 {resultats.length >= 300 ? 'Les 300 plus récents' : `${resultats.length} dossier${resultats.length > 1 ? 's' : ''} trouvé${resultats.length > 1 ? 's' : ''}`}
               </p>
+              {resultats[0]?.approche && (
+                <p className="mb-2 border-l-4 border-amber-500 bg-amber-50/70 rounded-r-md px-3 py-2 text-sm text-amber-900">
+                  Aucun nom écrit exactement ainsi. Voici les noms <strong>proches</strong> : vérifiez qu'il s'agit bien de la même entreprise.
+                </p>
+              )}
               <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
                 {resultats.map((d, i) => (
                   <li key={d.id} className="animate-fade-in px-4 py-3.5 md:px-5"
