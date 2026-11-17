@@ -68,8 +68,9 @@ function fauxVecteurs(textes) {
   ia._substituer('entites', null);
   ia._substituer('typologie', null);
   const sans = await ia.lireDemande(phrase, types);
-  ok(sans.entreprise === 'Agro Fictive' && sans.typologie?.value === 'CBE' && sans.acte === null, 'sans modèle : les règles seules');
+  ok(sans.entreprise === 'Agro Fictive du Zou' && sans.typologie?.value === 'CBE' && sans.acte === null, 'sans modèle : les règles seules');
   ok(ia.entrepriseNommee("le dossier de l'avance de démarrage de la société Credo B.T.P du 12 mars 2025") === 'Credo B.T.P', 'entreprise après « société », sans modèle');
+  ok(ia.entrepriseNommee('qui a le dossier société fictive des travaux') === 'fictive des travaux', '« des » dans le nom : gardé');
   ok(ia.entrepriseNommee('le dossier des Ets Kpadonou et Fils, acte 12') === 'Kpadonou et Fils' && ia.entrepriseNommee('le dossier de caution') === null, 'après « Ets » ; rien sans mot d\'entreprise');
   const np0 = require('./services/nomsProchesService');
   ok(np0.mots('credo b t p').join() === 'credo,btp', 'lettres isolées rejointes : « b t p » → « btp »');

@@ -1,0 +1,208 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { X, Send, RotateCcw, ArrowRight, MessageSquareText } from 'lucide-react';
+import api from '../services/api';
+
+// ============================================================================
+// DocuBot, édition AFGC : l'assistant des archives.
+//
+// Les questions partent au serveur (POST /api/ia/docubot), qui répond avec
+// les données de l'organisation et selon les droits de la personne : où est
+// un dossier, qui l'a, l'état de mes demandes, les retards, les chiffres, et
+// l'aide « comment faire ». La conversation reste le temps de la session
+// (sessionStorage) ; « ce dont on parlait » (l'entreprise) suit, pour
+// enchaîner « et qui l'a ? ».
+// ============================================================================
+
+const CLE = 'afgc.docubot';
+const lire = () => {
+  try { return JSON.parse(sessionStorage.getItem(CLE)) || null; } catch { return null; }
+};
+const ecrire = (v) => {
+  try { sessionStorage.setItem(CLE, JSON.stringify(v)); } catch { /* sans stockage : la conversation vit en mémoire */ }
+};
+
+/** **gras**, retours à la ligne et puces, sans jamais construire de HTML. */
+const Texte = ({ texte, className = '' }) => (
+  <div className={`text-sm leading-relaxed text-slate-800 ${className}`}>
+    {String(texte ?? '').split('\n').map((ligne, i) => (
+      <p key={i} className={ligne.startsWith('• ') ? 'pl-3 -indent-3' : i ? 'mt-1' : ''}>
+        {ligne.split(/(\*\*[^*]+\*\*)/g).map((m, j) => (
+          m.length > 4 && m.startsWith('**') && m.endsWith('**')
+            ? <strong key={j} className="font-semibold text-slate-950">{m.slice(2, -2)}</strong>
+            : <React.Fragment key={j}>{m}</React.Fragment>
+        ))}
+      </p>
+    ))}
+  </div>
+);
+
+const TONS = {
+  vert: 'border-l-[#2C9C0A]', ambre: 'border-l-amber-500', rouge: 'border-l-red-500', bleu: 'border-l-slate-500', gris: 'border-l-slate-300',
+};
+
+const Fiche = ({ e }) => (
+  <div className={`rounded-md border border-slate-200 border-l-4 ${TONS[e.ton] || TONS.gris} bg-white px-3 py-2`}>
+    <div className="text-sm font-semibold text-slate-900">{e.titre}</div>
+    {e.lignes?.map((l, i) => <Texte key={i} texte={l} className="text-[13px] text-slate-600" />)}
+    {e.note && <p className="mt-1 text-xs text-amber-800">{e.note}</p>}
+  </div>
+);
+
+const DocuBotAfgc = () => {
+  const navigate = useNavigate();
+  const sauve = lire();
+  const [ouvert, setOuvert] = useState(false);
+  const [messages, setMessages] = useState(sauve?.messages || []);
+  const [contexte, setContexte] = useState(sauve?.contexte || {});
+  const [accueil, setAccueil] = useState(null);
+  const [saisie, setSaisie] = useState('');
+  const [attente, setAttente] = useState(false);
+  const fin = useRef(null);
+  const champ = useRef(null);
+
+  useEffect(() => { ecrire({ messages: messages.slice(-40), contexte }); }, [messages, contexte]);
+  useEffect(() => { fin.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, attente, ouvert]);
+  useEffect(() => { if (ouvert) champ.current?.focus(); }, [ouvert]);
+
+  // Les suggestions d'accueil dépendent du rôle : chargées à la première ouverture.
+  useEffect(() => {
+    if (!ouvert || accueil) return;
+    api.get('/ia/docubot').then((r) => setAccueil(r.data)).catch(() => setAccueil({ suggestions: [] }));
+  }, [ouvert, accueil]);
+
+  useEffect(() => {
+    if (!ouvert) return undefined;
+    const surTouche = (e) => { if (e.key === 'Escape') setOuvert(false); };
+    window.addEventListener('keydown', surTouche);
+    return () => window.removeEventListener('keydown', surTouche);
+  }, [ouvert]);
+
+  // Ouvrir DocuBot depuis ailleurs (raccourci, lien) : window.dispatchEvent(new CustomEvent('afgc:docubot', { detail: 'question' })).
+  const envoyer = useCallback(async (texte) => {
+    const q = String(texte ?? '').trim();
+    if (!q || attente) return;
+    setMessages((m) => [...m, { de: 'moi', texte: q }]);
+    setSaisie('');
+    setAttente(true);
+    try {
+      const { data } = await api.post('/ia/docubot', { question: q, contexte });
+      setMessages((m) => [...m, { de: 'bot', ...data }]);
+      if (data.contexte) setContexte((c) => ({ ...c, ...data.contexte }));
+    } catch (err) {
+      setMessages((m) => [...m, {
+        de: 'bot',
+        texte: err?.response?.status === 401 ? 'Votre session a expiré : reconnectez-vous.' : 'Je n\'ai pas pu répondre. Réessayez dans un instant.',
+      }]);
+    } finally {
+      setAttente(false);
+    }
+  }, [attente, contexte]);
+
+  useEffect(() => {
+    const surDemande = (e) => { setOuvert(true); if (typeof e.detail === 'string' && e.detail) envoyer(e.detail); };
+    window.addEventListener('afgc:docubot', surDemande);
+    return () => window.removeEventListener('afgc:docubot', surDemande);
+  }, [envoyer]);
+
+  const agir = (a) => {
+    if (a.type === 'demander') navigate(`/demandes/nouvelle?q=${encodeURIComponent(a.saisie || '')}`);
+    else if (a.vers) navigate(a.vers);
+    setOuvert(false);
+  };
+
+  const recommencer = () => { setMessages([]); setContexte({}); champ.current?.focus(); };
+  const derniere = messages[messages.length - 1];
+
+  return (
+    <>
+      {!ouvert && (
+        <button type="button" onClick={() => setOuvert(true)}
+          className="fixed bottom-[68px] right-3 sm:bottom-[80px] sm:right-5 z-30 h-11 sm:h-12 pl-3.5 pr-4 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-900 inline-flex items-center gap-2 text-sm font-semibold"
+          aria-label="Ouvrir DocuBot, l'assistant des archives" title="DocuBot : posez une question sur les dossiers">
+          <MessageSquareText size={18} /> <span className="hidden sm:inline">DocuBot</span>
+        </button>
+      )}
+
+      {ouvert && (
+        <section role="dialog" aria-label="DocuBot, assistant des archives"
+          className="fixed z-40 inset-x-2 bottom-2 top-16 sm:inset-auto sm:right-5 sm:bottom-5 sm:w-[400px] sm:h-[600px] sm:max-h-[calc(100vh-6rem)] flex flex-col rounded-lg border border-slate-200 bg-slate-50 shadow-xl animate-fade-in">
+          <header className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white rounded-t-lg">
+            <span className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center flex-shrink-0"><MessageSquareText size={16} /></span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-slate-900 leading-tight">DocuBot</h2>
+              <p className="text-xs text-slate-500 leading-tight">Assistant des archives de l'AFGC</p>
+            </div>
+            {messages.length > 0 && (
+              <button type="button" onClick={recommencer} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Nouvelle conversation" aria-label="Nouvelle conversation"><RotateCcw size={16} /></button>
+            )}
+            <button type="button" onClick={() => setOuvert(false)} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Fermer (Échap)" aria-label="Fermer"><X size={18} /></button>
+          </header>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
+            {messages.length === 0 && (
+              <div>
+                <Texte texte={'Bonjour ! Je réponds sur les **dossiers** et les **demandes** : où se trouve un dossier, qui l\'a, où en est une demande, ce qui est en retard… et comment faire dans l\'application.'} />
+                <p className="mt-2 text-xs text-slate-500">Écrivez comme vous parlez, par exemple « où est le dossier Credo BTP ? ».</p>
+              </div>
+            )}
+            {messages.map((m, i) => (m.de === 'moi' ? (
+              <div key={i} className="flex justify-end">
+                <p className="max-w-[85%] rounded-lg rounded-br-sm bg-slate-800 text-white text-sm px-3 py-2 whitespace-pre-wrap break-words">{m.texte}</p>
+              </div>
+            ) : (
+              <div key={i} className="space-y-2">
+                <Texte texte={m.texte} />
+                {m.elements?.length > 0 && <div className="space-y-1.5">{m.elements.map((e, j) => <Fiche key={j} e={e} />)}</div>}
+                {m.actions?.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {m.actions.map((a, j) => (
+                      <button key={j} type="button" onClick={() => agir(a)}
+                        className={`px-3 py-1.5 rounded-md text-sm font-semibold inline-flex items-center gap-1.5 ${a.type === 'demander' ? 'bg-[#2C9C0A] text-white hover:opacity-90' : 'border border-slate-300 bg-white text-slate-800 hover:border-slate-500'}`}>
+                        {a.libelle} <ArrowRight size={14} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )))}
+            {attente && (
+              <div className="flex items-center gap-1 text-slate-400" aria-label="DocuBot écrit">
+                {[0, 1, 2].map((k) => <span key={k} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" style={{ animationDelay: `${k * 0.15}s` }} />)}
+              </div>
+            )}
+            {!attente && (() => {
+              const proposees = derniere?.de === 'bot' && derniere.suggestions?.length ? derniere.suggestions : messages.length === 0 ? accueil?.suggestions || [] : [];
+              return proposees.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {proposees.map((s) => (
+                    <button key={s} type="button" onClick={() => envoyer(s)}
+                      className="px-2.5 py-1 rounded-full border border-slate-300 bg-white text-xs text-slate-700 hover:border-slate-500 hover:text-slate-900">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+            <div ref={fin} />
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); envoyer(saisie); }} className="flex items-end gap-2 p-3 border-t border-slate-200 bg-white rounded-b-lg">
+            <textarea ref={champ} value={saisie} rows={1} maxLength={500}
+              onChange={(e) => setSaisie(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer(saisie); } }}
+              placeholder="Votre question…"
+              className="flex-1 resize-none max-h-28 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-500"
+              aria-label="Votre question à DocuBot" />
+            <button type="submit" disabled={!saisie.trim() || attente}
+              className="h-9 w-9 rounded-md bg-slate-800 text-white flex items-center justify-center disabled:opacity-40 hover:bg-slate-900" aria-label="Envoyer">
+              <Send size={16} />
+            </button>
+          </form>
+        </section>
+      )}
+    </>
+  );
+};
+
+export default DocuBotAfgc;

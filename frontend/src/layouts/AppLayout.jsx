@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, MessageCircle, Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import DocumentChatbot from '../components/DocumentChatbot';
+import DocuBotAfgc from '../components/DocuBotAfgc';
 import GlobalSearch from '../components/GlobalSearch';
 import ContextualTooltips from '../components/ContextualTooltips';
 import VisiteGuidee from '../components/onboarding/VisiteGuidee';
@@ -150,8 +151,9 @@ const AppLayout = () => {
         </main>
       </div>
 
-      {/* L'assistant parle des documents de la GED : rien pour qui n'y a pas accès. */}
-      {!modeDemande && <DocumentChatbot />}
+      {/* AFGC : DocuBot répond sur les dossiers et les demandes, pour tous.
+          Ailleurs, l'assistant parle des documents de la GED : rien pour qui n'y a pas accès. */}
+      {edition?.id === 'afgc' ? (charge && <DocuBotAfgc />) : !modeDemande && <DocumentChatbot />}
       {modeDemande ? <Suspense fallback={null}><DemandeRapide /></Suspense> : <GlobalSearch />}
       <VisiteGuidee onOccupe={setVisiteOccupe} />
       <ContextualTooltips enabled={!visiteOccupe && !modeDemande} />
