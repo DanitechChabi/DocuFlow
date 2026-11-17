@@ -5,6 +5,10 @@ import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete } from './elements';
 import { intitule, references, dateCourte } from './vocabulaire';
 import { codeDe } from './etiquettes';
+import { edition } from '../../../editions';
+
+// Sans étiquettes (édition), la douchette travaille au n° d'acte.
+const ETIQUETTES = edition?.etiquettes !== false;
 
 // ============================================================================
 // Douchette : sorties et retours en scannant l'étiquette du dossier (053).
@@ -96,14 +100,16 @@ const DouchetteAfgc = () => {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       <EnTete titre="Douchette" icone={ScanBarcode}
-        aide="Scannez l'étiquette d'un dossier : l'application propose la sortie ou le retour. Entrée confirme ; le scan suivant enchaîne." />
+        aide={ETIQUETTES
+          ? 'Scannez l\'étiquette d\'un dossier : l\'application propose la sortie ou le retour. Entrée confirme ; le scan suivant enchaîne.'
+          : 'Tapez le n° d\'acte d\'un dossier : l\'application propose la sortie ou le retour. Entrée confirme.'} />
 
       <form onSubmit={valider} className="glass-card-premium rounded-3xl p-5 md:p-6">
-        <label className="block text-sm font-bold text-slate-700 mb-2" htmlFor="scan">Étiquette ou n° d'acte</label>
+        <label className="block text-sm font-bold text-slate-700 mb-2" htmlFor="scan">{ETIQUETTES ? 'Étiquette ou n° d\'acte' : 'N° d\'acte'}</label>
         <div className="relative">
           <ScanBarcode size={26} className="absolute left-5 top-1/2 -translate-y-1/2 text-violet-500" />
           <input id="scan" ref={champ} value={saisie} onChange={(e) => setSaisie(e.target.value)} autoComplete="off" spellCheck={false}
-            placeholder={principal ? (principal.type === 'retour' ? 'Entrée : noter le retour — ou scannez le suivant' : 'Entrée : transmettre — ou scannez le suivant') : 'Scannez une étiquette (D0001234) ou tapez un n° d\'acte'}
+            placeholder={principal ? (principal.type === 'retour' ? `Entrée : noter le retour — ou ${ETIQUETTES ? 'scannez' : 'tapez'} le suivant` : `Entrée : transmettre — ou ${ETIQUETTES ? 'scannez' : 'tapez'} le suivant`) : (ETIQUETTES ? 'Scannez une étiquette (D0001234) ou tapez un n° d\'acte' : 'N° d\'acte (ex. 2479 ou 2025/2479)')}
             className="w-full pl-16 pr-12 py-5 rounded-2xl border-2 border-violet-200 bg-white text-xl font-black tracking-wide text-slate-900 placeholder:text-slate-400 placeholder:font-semibold placeholder:text-base focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100" />
           {cours && <Loader2 size={20} className="absolute right-5 top-1/2 -translate-y-1/2 animate-spin text-violet-500" />}
         </div>
@@ -145,7 +151,7 @@ const DouchetteAfgc = () => {
                 {[dossier.num_actes && `Acte ${dossier.num_actes}`, dossier.type_garantie, `semaine du ${jour(dossier.semaine)}`, `point du ${jour(dossier.date_point)}`].filter(Boolean).join(' · ')}
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-bold text-slate-700"><Tag size={13} /> {dossier.code || codeDe(dossier.id)}</span>
+                {ETIQUETTES && <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-bold text-slate-700"><Tag size={13} /> {dossier.code || codeDe(dossier.id)}</span>}
                 {dossier.armoire && <span className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 py-1 text-sm font-black text-white"><Archive size={13} /> {dossier.armoire}</span>}
               </div>
             </div>
