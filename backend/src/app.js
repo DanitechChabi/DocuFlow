@@ -155,6 +155,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 // Entrée des dossiers aux archives (049) : points journaliers, semaines de production, recherche.
 app.use('/api/entrees', require('./routes/entreeRoutes'));
+app.use('/api/ia', require('./routes/iaRoutes'));
 app.use('/api/comptes', require('./routes/comptesRoutes'));
 app.use('/api/users', userRoutes);
 app.use('/api/sections', sectionRoutes);
@@ -376,6 +377,14 @@ const server = ecouter(app, () => {
     // Alertes des recherches enregistrées et rappels d'échéances (035).
     require('./services/rechercheService').demarrerAlertes();
     require('./services/echeanceService').demarrerEcheances();
+    // Aide automatique (055) : les modèles tenus en mémoire, puis l'index des
+    // noms d'entreprise. Un peu après le démarrage, pour ne pas le ralentir.
+    setTimeout(() => {
+      const ia = require('./services/iaService');
+      const actifs = ia.modelesActifs();
+      console.log(`[ia] modèles retenus : ${actifs.length ? actifs.join(', ') : 'aucun'} (mémoire ${ia.memoireMo()} Mo)`);
+      ia.prechauffer().then(() => require('./services/nomsProchesService').demarrer());
+    }, 15000).unref();
   });
   migrer
     .then(() => tenantProvisioningService.syncSettingDefinitions())

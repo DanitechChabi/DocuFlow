@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings2, ListChecks, Tags, Building2, CalendarDays, UserPlus, Mail, Database, Clock, Archive, Users, Plus, X, ArrowUp, ArrowDown, Loader2, Save, ArrowRight } from 'lucide-react';
+import { Settings2, ListChecks, Tags, Building2, CalendarDays, UserPlus, Mail, Database, Clock, Archive, Users, Plus, X, ArrowUp, ArrowDown, Loader2, Save, ArrowRight, Sparkles } from 'lucide-react';
 import { settingsService } from '../../../services/settingsService';
 import { sectionService } from '../../../services/sectionService';
+import { listeService } from '../../../services/listeService';
 import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, Chargement } from './elements';
@@ -77,6 +78,53 @@ const Interrupteur = ({ coche, onChange, libelle, aide }) => (
     <span><span className="block text-sm font-bold text-slate-800">{libelle}</span>{aide && <span className="block text-xs text-slate-600">{aide}</span>}</span>
   </label>
 );
+
+const LIBELLES_IA = {
+  recherche: ['Noms proches', '« Crédo B.T.P » retrouve « CREDO BTP SARL »'],
+  entites: ['Lecture des phrases', 'entreprise, acte et date dans une demande écrite'],
+  typologie: ['Typologie probable', 'proposée d\'après la phrase de la demande'],
+};
+const STATUTS_IA = {
+  pret: ['en service', 'text-green-700'],
+  chargement: ['démarrage…', 'text-slate-600'],
+  'en attente': ['en attente', 'text-slate-600'],
+  inactif: ['désactivé', 'text-slate-500'],
+  erreur: ['indisponible', 'text-red-600'],
+};
+
+/** Les modèles d'aide automatique qui tournent sur le serveur (lecture seule). */
+const AideAutomatique = () => {
+  const [etat, setEtat] = useState(null);
+  useEffect(() => { listeService.etatIa().then(setEtat).catch(() => setEtat({ modeles: [] })); }, []);
+  return (
+    <Carte icone={Sparkles} titre="Aide automatique" aide="Des modèles qui tournent sur le serveur lui-même : aucun texte ne sort de l'AFGC. Sans eux, l'application fonctionne comme avant.">
+      {etat === null ? <Chargement /> : (
+        <>
+          <ul className="divide-y divide-slate-100">
+            {etat.modeles.map((m) => {
+              const [titre, detail] = LIBELLES_IA[m.nom] || [m.nom, ''];
+              const [statut, couleur] = STATUTS_IA[m.statut] || [m.statut, 'text-slate-600'];
+              return (
+                <li key={m.nom} className="py-2 flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-800">{titre}</div>
+                    <div className="text-xs text-slate-500">{detail}</div>
+                  </div>
+                  <span className={`text-sm font-semibold ${couleur}`}>{statut}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {etat.modeles.some((m) => m.statut === 'inactif') && (
+            <p className="mt-2 text-xs text-slate-500">
+              Un modèle désactivé l'est faute de mémoire sur ce serveur ({etat.memoire_mo} Mo), ou par le réglage IA_LOCALE de la configuration.
+            </p>
+          )}
+        </>
+      )}
+    </Carte>
+  );
+};
 
 const AdministrationAfgc = () => {
   useTitrePage('Réglages');
@@ -215,6 +263,7 @@ const AdministrationAfgc = () => {
             <Interrupteur coche={v.notify_on_status_change} onChange={change('notify_on_status_change')} libelle="Au demandeur, à chaque étape" aide="Transmis, retourné, compléments, retards, copie M-Files." />
           </div>
         </Carte>
+        <AideAutomatique />
       </div>
     </div>
   );

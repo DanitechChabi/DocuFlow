@@ -32,7 +32,7 @@ permissions:
 jobs:
   paquet:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +51,14 @@ jobs:
       - name: API (dépendances de production)
         working-directory: backend
         run: npm ci --omit=dev
+
+      - name: Aide automatique (modèles livrés, le serveur n'a pas Internet)
+        working-directory: backend
+        shell: pwsh
+        run: |
+          node scripts/telecharger-modeles.js ..\modeles
+          # Seuls les binaires Windows d'onnxruntime servent.
+          foreach ($os in 'linux', 'darwin') { Remove-Item "node_modules\onnxruntime-node\bin\napi-v3\$os" -Recurse -Force -ErrorAction SilentlyContinue }
 
       - name: Interface AFGC (même adresse que l'API)
         working-directory: frontend
@@ -74,6 +82,7 @@ jobs:
           Copy-Item frontend\dist\* "$r\app\frontend\" -Recurse
           Copy-Item deploiement\windows-server\*.ps1 "$r\scripts\"
           Copy-Item deploiement\windows-server\LISEZ-MOI.md "$r\"
+          Copy-Item modeles "$r\modeles" -Recurse
           Set-Content -Path "$r\VERSION.txt" -Value "DocuFlow AFGC serveur $env:VERSION — commit $env:GITHUB_SHA" -Encoding UTF8
           Compress-Archive -Path $r -DestinationPath "$nom.zip" -CompressionLevel Optimal
           "PAQUET=$nom.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const settingsService = require('./settingsService');
 const { ARMOIRE_SQL } = require('./rangementService');
+const nomsProches = require('./nomsProchesService');
 
 function erreur(statut, message) {
   const e = new Error(message);
@@ -141,6 +142,8 @@ async function importer(tenantId, user, { fichier, lignes } = {}) {
   if (r.rowCount) {
     await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
       [user.id, `A importé ${r.rowCount} dossier${r.rowCount > 1 ? 's' : ''} entré${r.rowCount > 1 ? 's' : ''}${nomFichier ? ` (« ${nomFichier} »)` : ''}`.slice(0, 500), tenantId]);
+    // Les nouveaux noms rejoignent l'index de la recherche approchée, en arrière-plan.
+    nomsProches.indexer(tenantId);
   }
   return { ajoutees: r.rowCount, deja: valeurs.length - r.rowCount, rejetees };
 }
@@ -193,6 +196,8 @@ async function rechercher(tenantId, { q, type, agent, du, au } = {}) {
   const params = [tenantId];
   const p = (v) => { params.push(v); return `$${params.length}`; };
   const saisie = texte(q, 100);
+  let condNom = null;
+  let nomCherche = null;
   if (saisie) {
     const acteAnnee = /^((?:19|20)\d{2})\s*\/\s*(\d+)$/.exec(saisie);
     if (acteAnnee) {
@@ -201,7 +206,9 @@ async function rechercher(tenantId, { q, type, agent, du, au } = {}) {
       // Un numéro : l'acte exact (« 1964 » ne ramène pas « 11964 »).
       conds.push(`${p(Number(saisie))} = ANY(actes)`);
     } else {
-      conds.push(`denomination ILIKE ${p(`%${saisie.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)}`);
+      condNom = `denomination ILIKE ${p(`%${saisie.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)}`;
+      conds.push(condNom);
+      nomCherche = saisie;
     }
   }
   if (texte(type, 100)) conds.push(`type_garantie = ${p(texte(type, 100))}`);
@@ -209,13 +216,24 @@ async function rechercher(tenantId, { q, type, agent, du, au } = {}) {
   if (jour(du)) conds.push(`date_point >= ${p(String(du).slice(0, 10))}::date`);
   if (jour(au)) conds.push(`date_point <= ${p(String(au).slice(0, 10))}::date`);
   if (conds.length === 1) throw erreur(400, 'Tapez un nom ou un n° d\'acte, ou choisissez un filtre.');
-  const r = await db.query(
+  const requete = (conditions, ordre = 'date_point DESC, num_ordre') => db.query(
     `SELECT d.id, to_char(d.date_point, 'YYYY-MM-DD') AS date_point, to_char(d.semaine, 'YYYY-MM-DD') AS semaine, d.rubrique, d.num_ordre,
             d.num_actes, d.denomination, d.lettre, d.type_garantie, d.montant, d.agent, ${ARMOIRE_SQL('d')} AS armoire
-       FROM dossiers_entres d WHERE ${conds.join(' AND ')}
-      ORDER BY date_point DESC, num_ordre LIMIT 300`,
+       FROM dossiers_entres d WHERE ${conditions.join(' AND ')}
+      ORDER BY ${ordre} LIMIT 300`,
     params
   );
+  const r = await requete(conds);
+  // Aucun nom écrit ainsi : les noms proches (« Crédo B.T.P » → « CREDO BTP SARL »), à vérifier.
+  if (!r.rows.length && nomCherche) {
+    const proches = await nomsProches.proches(tenantId, nomSimple(nomCherche));
+    if (proches.length) {
+      const pn = p(proches.map((x) => x.nom));
+      const conds2 = conds.map((c) => (c === condNom ? `(${condNom} OR ${NOM_SIMPLE} = ANY(${pn}::text[]))` : c));
+      const r2 = await requete(conds2, `array_position(${pn}::text[], ${NOM_SIMPLE}), date_point DESC, num_ordre`);
+      return r2.rows.map((x) => ({ ...x, approche: true }));
+    }
+  }
   return r.rows;
 }
 
@@ -235,16 +253,7 @@ async function filtres(tenantId) {
 // besoin pour aller le chercher ; le demandeur le voit en demandant.
 // ---------------------------------------------------------------------------
 
-// Même expression que l'index de la migration 050.
-const NOM_SIMPLE = "trim(regexp_replace(translate(lower(denomination), 'àáâäãéèêëíîïóôöõúùûüçñ', 'aaaaaeeeeiiioooouuuucn'), '[^a-z0-9]+', ' ', 'g'))";
-const FORMES = new Set(['sarl', 'sa', 'sas', 'sasu', 'suarl', 'sarlu', 'ets', 'etablissement', 'etablissements', 'ste', 'societe', 'sci', 'gie', 'scs', 'snc', 'ong', 'cie']);
-
-/** Nom simplifié comme en base, sans forme juridique : « Ets Agro-Fictive SARL » → « agro fictive ». */
-function nomSimple(nom) {
-  const s = String(nom ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const coeur = s.split(' ').filter((m) => m && !FORMES.has(m)).join(' ');
-  return coeur.length >= 2 ? coeur : s;
-}
+const { NOM_SIMPLE, nomSimple } = require('../helpers/nomEntreprise');
 
 /**
  * Le n° d'acte d'une demande : « 2026/58 » ou « CBE-2026-0058 » → 58 de
@@ -294,6 +303,27 @@ async function chercherEntrees(tenantId, { nom, numeros, annee }) {
     params
   );
   const avecNom = nom.length >= 2;
+  // Aucun nom ne ressemble par les lettres : les noms proches par le sens (055), à vérifier.
+  if (!r.rows.length && !numeros.length && nom.length >= 3) {
+    const proches = await nomsProches.proches(tenantId, nom);
+    if (proches.length) {
+      const pr = [tenantId, proches.map((x) => x.nom)];
+      const anneeCond = annee ? ` AND date_point BETWEEN $3::date AND $4::date` : '';
+      if (annee) pr.push(`${annee}-01-01`, `${annee + 1}-12-31`);
+      const r2 = await db.query(
+        `SELECT to_char(date_point, 'YYYY-MM-DD') AS date_point, to_char(semaine, 'YYYY-MM-DD') AS semaine,
+                to_char(semaine + 6, 'YYYY-MM-DD') AS au, rubrique, num_actes, denomination, lettre, type_garantie,
+                ${ARMOIRE_SQL('dossiers_entres')} AS armoire, count(*) OVER ()::int AS total
+           FROM dossiers_entres WHERE tenant_id = $1 AND ${NOM_SIMPLE} = ANY($2::text[])${anneeCond}
+          ORDER BY array_position($2::text[], ${NOM_SIMPLE}), date_point DESC LIMIT 5`,
+        pr
+      );
+      return {
+        total: r2.rows[0]?.total || 0,
+        entrees: r2.rows.map(({ total: _t, ...e }) => ({ ...e, nom_concorde: false, approche: true })),
+      };
+    }
+  }
   return {
     total: r.rows[0]?.total || 0,
     entrees: r.rows.map(({ score_nom: s, ordre_annee: _o, total: _t, ...e }) => ({ ...e, nom_concorde: !avecNom || s >= SEUIL_NOM })),
@@ -381,6 +411,7 @@ async function supprimerFichier(tenantId, user, { fichier, tous } = {}) {
   if (!r.rowCount) throw erreur(404, 'Aucune ligne de ce classeur n\'est enregistrée.');
   await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
     [user.id, `A supprimé ${libelle} de l'entrée des dossiers (${r.rowCount} ligne${r.rowCount > 1 ? 's' : ''})`.slice(0, 500), tenantId]);
+  nomsProches.indexer(tenantId);
   return { supprimees: r.rowCount };
 }
 

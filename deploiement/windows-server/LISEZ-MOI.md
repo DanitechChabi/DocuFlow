@@ -271,6 +271,26 @@ courriels à l'archive pour chaque demande), ou tous.
 
 ---
 
+## 8 bis. Aide automatique (IA locale)
+
+Le paquet contient trois modèles qui tournent sur le serveur lui-même, sans Internet. Aucun texte ne sort de l'AFGC :
+
+- **Noms proches** : « Crédo B.T.P » retrouve « CREDO BTP SARL ». La réponse est signalée « à vérifier ».
+- **Lecture des phrases** : dans une demande écrite en phrase, l'application repère l'entreprise, l'acte et la date.
+- **Typologie probable** : l'application propose la typologie d'après la phrase de la demande.
+
+Les modèles sont copiés dans `C:\DocuFlow\modeles` à l'installation et à chaque mise à jour.
+
+Les trois modèles demandent environ 2 Go de mémoire en plus de l'application. L'application ne charge que ceux qui tiennent dans la mémoire du serveur. Pour les choisir vous-même, ajoutez dans `C:\DocuFlow\config\docuflow.env` :
+
+```
+IA_LOCALE=oui                    # les trois
+IA_LOCALE=recherche,entites      # seulement ceux-là
+IA_LOCALE=non                    # aucun
+```
+
+Redémarrez ensuite le serveur avec `scripts\redemarrer.ps1`. Pour voir l'état des modèles, allez dans **Réglages**, carte « Aide automatique ». Sans ces modèles, l'application fonctionne comme avant.
+
 ## 9. Dépannage
 
 | Symptôme | Que faire |

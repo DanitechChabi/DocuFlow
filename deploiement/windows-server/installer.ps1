@@ -58,6 +58,12 @@ Arreter-Application
 if ($LASTEXITCODE -ge 8) { Echec "copie de l'application impossible (robocopy $LASTEXITCODE)." }
 & robocopy $PSScriptRoot (Join-Path $Dossier 'scripts') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { Echec "copie des scripts impossible (robocopy $LASTEXITCODE)." }
+# Modèles de l'aide automatique (livrés avec le paquet, hors du dossier app).
+$modelesPaquet = Join-Path $paquet 'modeles'
+if (Test-Path $modelesPaquet) {
+  & robocopy $modelesPaquet (Join-Path $Dossier 'modeles') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+  if ($LASTEXITCODE -ge 8) { Ecrire "Modèles d'aide automatique non copiés (robocopy $LASTEXITCODE) : l'application fonctionnera sans." 'Yellow' }
+}
 Ecrire 'Application copiée.' 'Green'
 
 $premiere = -not (Test-Path $fichierConf)
