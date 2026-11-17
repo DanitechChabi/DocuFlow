@@ -91,10 +91,10 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
 
   return (
     <Modal open={open} onClose={envoi ? undefined : onClose} panelClassName="w-full max-w-3xl mx-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
           <FileSpreadsheet size={20} className="text-docuflow-secondary" />
-          <h2 className="font-black text-slate-900 text-lg flex-1">Demander une liste (Excel)</h2>
+          <h2 className="font-bold text-slate-900 text-lg flex-1">Demander une liste (Excel)</h2>
           <button type="button" onClick={onClose} disabled={envoi} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
 
@@ -102,7 +102,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
           {resultats ? (
             <div className="space-y-3">
               {resultats.map((r) => (
-                <div key={r.libelle} className={`rounded-2xl p-4 ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
+                <div key={r.libelle} className={`rounded-lg p-4 ${r.ok ? 'bg-green-50' : 'bg-red-50'}`}>
                   <div className={`flex items-center gap-2 font-bold ${r.ok ? 'text-green-800' : 'text-red-700'}`}>
                     {r.ok ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                     {r.libelle} : {r.ok ? `${r.n} dossier${r.n > 1 ? 's' : ''} demandé${r.n > 1 ? 's' : ''}` : r.message}
@@ -126,7 +126,7 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
                 onClick={() => entree.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); lire(e.dataTransfer.files?.[0]); }}
-                className="w-full rounded-3xl border-2 border-dashed border-slate-200 hover:border-docuflow-secondary py-12 flex flex-col items-center gap-3 text-slate-500 transition-colors"
+                className="w-full rounded-xl border border-dashed border-slate-200 hover:border-docuflow-secondary py-12 flex flex-col items-center gap-3 text-slate-500 transition-colors"
               >
                 {lecture ? <Loader2 size={28} className="animate-spin text-docuflow-secondary" /> : <Upload size={28} className="text-docuflow-secondary" />}
                 <span className="font-bold text-slate-700">{lecture ? 'Lecture du classeur…' : 'Choisir le classeur'}</span>
@@ -137,11 +137,11 @@ const ImportListeAfgc = ({ open, onClose, cadres, cadreParDefaut, onEnvoye }) =>
           ) : (
             <>
               <div>
-                <div className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Motif de la demande</div>
+                <div className="text-xs font-bold text-slate-400 mb-2">Motif de la demande</div>
                 <ChoixCadre cadres={cadres} valeur={cadre} onChange={setCadre} />
               </div>
               {feuilles.map((f, i) => (
-                <div key={f.feuille.nom} className={`rounded-2xl border p-4 ${f.inclus ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
+                <div key={f.feuille.nom} className={`rounded-lg border p-4 ${f.inclus ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
                   <div className="flex flex-wrap items-center gap-3">
                     <input type="checkbox" checked={f.inclus} onChange={(e) => modifier(i, { inclus: e.target.checked })} className="w-4 h-4 accent-[var(--color-docuflow-secondary)]" aria-label={`Envoyer la feuille ${f.feuille.nom}`} />
                     <input value={f.libelle} onChange={(e) => modifier(i, { libelle: e.target.value })} maxLength={120}

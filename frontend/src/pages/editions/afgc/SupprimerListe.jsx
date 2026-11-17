@@ -31,15 +31,15 @@ const SupprimerListe = ({ liste, onFait }) => {
     <>
       <button type="button" onClick={() => setOuvert(true)} disabled={dehors > 0}
         title={dehors ? `${dehors} dossier${dehors > 1 ? 's' : ''} encore sorti${dehors > 1 ? 's' : ''} : notez d'abord le retour` : 'Supprimer la liste et ses demandes'}
-        className="px-3.5 py-2 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+        className="px-3.5 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
         <Trash2 size={14} /> Supprimer la liste
       </button>
       <Modal open={ouvert} onClose={envoi ? undefined : () => setOuvert(false)} panelClassName="w-full max-w-md mx-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-6">
+        <div className="bg-white rounded-xl shadow-2xl p-6">
           <div className="flex items-start gap-3">
             <span className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0"><Trash2 size={20} /></span>
             <div className="min-w-0">
-              <h3 className="text-lg font-black text-slate-900">Supprimer cette liste ?</h3>
+              <h3 className="text-lg font-bold text-slate-900">Supprimer cette liste ?</h3>
               <p className="text-sm font-bold text-slate-800 break-all">{liste.libelle}{liste.fichier ? ` · ${liste.fichier}` : ''}</p>
               <p className="text-sm text-slate-700 mt-1">
                 {n > 1 ? `Ses ${n} demandes seront supprimées` : 'Sa demande sera supprimée'} : elles disparaîtront de « Mes dossiers » et de la file de l'archive.

@@ -220,7 +220,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                 <ArrowLeft size={20} />
               </button>
             )}
-            <div className="p-2 bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-xl shadow-sm">
+            <div className="p-2 bg-docuflow-secondary text-white rounded-xl shadow-sm">
               <MessageCircle size={20} />
             </div>
             <div>
@@ -347,7 +347,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                     <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
                       <div className={`max-w-[80%] p-3.5 rounded-2xl ${
                         isMine
-                          ? 'bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-br-md shadow-md'
+                          ? 'bg-docuflow-secondary text-white rounded-br-md shadow-md'
                           : 'bg-white border border-slate-100 text-slate-800 rounded-bl-md shadow-sm'
                       }`}>
                         {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
@@ -441,7 +441,7 @@ const MessagingPanel = ({ isOpen, onClose }) => {
                   <button
                     onClick={handleSend}
                     disabled={(!textInput.trim() && pendingFiles.length === 0) || sending || filesUploading}
-                    className="p-3.5 bg-gradient-to-br from-docuflow-secondary to-blue-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0"
+                    className="p-3.5 bg-docuflow-secondary text-white rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none flex-shrink-0"
                   >
                     <Send size={20} />
                   </button>

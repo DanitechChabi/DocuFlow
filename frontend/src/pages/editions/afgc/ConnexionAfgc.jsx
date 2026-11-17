@@ -45,8 +45,8 @@ const ConnexionAfgc = () => {
 
   return (
     <CadreConnexion>
-      <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/70 border border-slate-100 p-6 sm:p-9">
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Connexion</h1>
+      <div className="bg-white rounded-xl shadow-xl/70 border border-slate-100 p-6 sm:p-9">
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Connexion</h1>
         <p className="text-sm text-slate-500 mt-1">Accédez aux archives de l'AFGC.</p>
 
         {erreur && (
@@ -81,7 +81,7 @@ const ConnexionAfgc = () => {
 
         <div className="mt-7 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm text-slate-500">Première fois ici ?</span>
-          <Link to="/register" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-black transition-colors hover:bg-green-50"
+          <Link to="/register" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-colors hover:bg-green-50"
             style={{ borderColor: VERT, color: VERT }}>
             <UserPlus size={16} /> Créer mon compte
           </Link>

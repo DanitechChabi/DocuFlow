@@ -1224,7 +1224,7 @@ button:disabled, [disabled] { cursor: not-allowed; }
   transform-style: preserve-3d; outline: none;
   animation: a3d-arrivee .8s cubic-bezier(.2,.8,.2,1) var(--delai, 0s) both;
 }
-.a3d-socle:focus-visible .a3d-fronton { box-shadow: 0 0 0 3px #7c3aed; }
+.a3d-socle:focus-visible .a3d-fronton { box-shadow: 0 0 0 3px #2C9C0A; }
 .a3d { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateY(-16deg); transition: transform .8s cubic-bezier(.2,.8,.2,1); }
 .a3d-socle:hover .a3d { transform: rotateY(-9deg) translateZ(16px) translateY(-5px); }
 .a3d-ouverte .a3d, .a3d-ouverte:hover .a3d { transform: rotateY(0deg) translateZ(70px) translateY(-6px); }
@@ -1303,3 +1303,16 @@ button:disabled, [disabled] { cursor: not-allowed; }
 @keyframes a3d-classeur { from { opacity: 0; transform: translateZ(26px) translateY(-14px); } }
 @keyframes a3d-pouls { from { box-shadow: 0 0 8px 2px rgba(34,197,94,.6); } to { box-shadow: 0 0 20px 8px rgba(34,197,94,.95); } }
 @keyframes a3d-faisceau { from { opacity: .55; } to { opacity: 1; } }
+
+/* Édition AFGC : une interface de bureau sobre. Cartes plates, pas
+   d'ombre portée au survol, coins discrets. */
+[data-edition="afgc"] .glass-card,
+[data-edition="afgc"] .glass-card-premium {
+  border-radius: 8px;
+  box-shadow: none;
+}
+[data-edition="afgc"] .glass-card:hover,
+[data-edition="afgc"] .glass-card-premium:hover {
+  box-shadow: none;
+}
+[data-edition="afgc"] .resultat-lumiere::after { display: none; }

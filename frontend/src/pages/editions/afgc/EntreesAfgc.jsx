@@ -90,16 +90,16 @@ const ImportPoints = ({ open, onClose, onFini }) => {
 
   return (
     <Modal open={open} onClose={envoi !== null && !bilan ? undefined : onClose} panelClassName="w-full max-w-2xl mx-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
           <Upload size={20} className="text-docuflow-secondary" />
-          <h2 className="font-black text-slate-900 text-lg flex-1">Importer des points (Excel)</h2>
+          <h2 className="font-bold text-slate-900 text-lg flex-1">Importer des points (Excel)</h2>
           <button type="button" onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
         <div className="overflow-y-auto px-6 py-5 space-y-4">
           {bilan ? (
-            <div className="rounded-2xl bg-green-50 p-5 text-green-800">
-              <div className="font-black flex items-center gap-2"><CheckCircle2 size={18} /> {bilan.ajoutees.toLocaleString('fr-FR')} dossiers entrés</div>
+            <div className="rounded-lg bg-green-50 p-5 text-green-800">
+              <div className="font-bold flex items-center gap-2"><CheckCircle2 size={18} /> {bilan.ajoutees.toLocaleString('fr-FR')} dossiers entrés</div>
               <p className="text-sm mt-1">
                 {bilan.deja > 0 && `${bilan.deja.toLocaleString('fr-FR')} déjà présents, ignorés. `}
                 {bilan.rejetees > 0 && `${bilan.rejetees} lignes sans date, ni nom ni acte, écartées.`}
@@ -112,7 +112,7 @@ const ImportPoints = ({ open, onClose, onFini }) => {
                 répétés sont ignorés. Réimporter un classeur complété n'ajoute que ses nouvelles lignes.
               </p>
               <button type="button" onClick={() => entree.current?.click()}
-                className="w-full rounded-3xl border-2 border-dashed border-slate-200 hover:border-docuflow-secondary py-12 flex flex-col items-center gap-3 text-slate-500">
+                className="w-full rounded-xl border border-dashed border-slate-200 hover:border-docuflow-secondary py-12 flex flex-col items-center gap-3 text-slate-500">
                 {lecture ? <Loader2 size={28} className="animate-spin text-docuflow-secondary" /> : <Upload size={28} className="text-docuflow-secondary" />}
                 <span className="font-bold text-slate-700">{lecture ? 'Lecture des classeurs…' : 'Choisir les classeurs'}</span>
                 <span className="text-xs">Excel (.xlsx, .xls) — lus sur votre poste</span>
@@ -122,7 +122,7 @@ const ImportPoints = ({ open, onClose, onFini }) => {
           ) : (
             <ul className="space-y-2">
               {lus.map((f) => (
-                <li key={f.nom} className={`rounded-2xl p-4 ${f.erreur ? 'bg-red-50' : 'bg-slate-50'}`}>
+                <li key={f.nom} className={`rounded-lg p-4 ${f.erreur ? 'bg-red-50' : 'bg-slate-50'}`}>
                   <div className="font-bold text-slate-800 truncate">{f.nom}</div>
                   {f.erreur ? <div className="text-sm text-red-700 flex items-center gap-1.5"><AlertCircle size={14} /> {f.erreur}</div> : (
                     <div className="text-sm text-slate-500">
@@ -211,17 +211,17 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
   };
   if (liste === null) return <Chargement />;
   return (
-    <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+    <section className="glass-card-premium rounded-xl p-5 md:p-6">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-slate-900">Classeurs importés</h2>
+          <h2 className="text-lg font-bold text-slate-900">Classeurs importés</h2>
           <p className="text-sm font-semibold text-slate-600">
             {liste.length ? `${liste.length} classeur${liste.length > 1 ? 's' : ''} · ${total.toLocaleString('fr-FR')} dossiers entrés` : 'Aucun classeur importé.'}
           </p>
         </div>
         {liste.length > 1 && (
           <button type="button" onClick={() => setASupprimer({ tous: true, lignes: total })}
-            className="px-4 py-2.5 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
+            className="px-4 py-2.5 rounded-xl border border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
             <Trash2 size={15} /> Tout supprimer
           </button>
         )}
@@ -229,17 +229,17 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
       {liste.length ? (
         <ul className="space-y-2">
           {liste.map((f) => (
-            <li key={f.fichier ?? '—'} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <li key={f.fichier ?? '—'} className="rounded-lg border border-slate-200 bg-white px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="w-10 h-10 rounded-xl bg-green-50 text-docuflow-secondary flex items-center justify-center flex-shrink-0"><FileSpreadsheet size={20} /></span>
               <div className="min-w-0 flex-1 basis-60">
-                <div className="text-base font-black text-slate-900 break-all">{f.fichier || 'Sans nom de classeur'}</div>
+                <div className="text-base font-bold text-slate-900 break-all">{f.fichier || 'Sans nom de classeur'}</div>
                 <div className="text-sm font-semibold text-slate-700">
                   {f.lignes.toLocaleString('fr-FR')} dossier{f.lignes > 1 ? 's' : ''} · du {dateCourte(f.du)} au {dateCourte(f.au)}
                 </div>
                 <div className="text-sm text-slate-600">Importé le {dateCourte(f.importe_le)}{f.importe_par ? ` par ${f.importe_par}` : ''}</div>
               </div>
               <button type="button" onClick={() => setASupprimer(f)}
-                className="px-3.5 py-2 rounded-xl border-2 border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
+                className="px-3.5 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-700 hover:bg-red-50 inline-flex items-center gap-1.5">
                 <Trash2 size={15} /> Supprimer
               </button>
             </li>
@@ -253,11 +253,11 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
 
       <Modal open={Boolean(aSupprimer)} onClose={fermer} panelClassName="w-full max-w-md mx-4">
         {aSupprimer && (
-          <div className="bg-white rounded-3xl shadow-2xl p-6">
+          <div className="bg-white rounded-xl shadow-2xl p-6">
             <div className="flex items-start gap-3">
               <span className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0"><Trash2 size={20} /></span>
               <div className="min-w-0">
-                <h3 className="text-lg font-black text-slate-900">
+                <h3 className="text-lg font-bold text-slate-900">
                   {aSupprimer.tous ? 'Supprimer tous les classeurs ?' : 'Supprimer ce classeur ?'}
                 </h3>
                 {!aSupprimer.tous && <p className="text-sm font-bold text-slate-800 break-all">{aSupprimer.fichier || 'Sans nom de classeur'}</p>}
@@ -273,7 +273,7 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
               <label className="block mt-4 text-sm font-bold text-slate-700">
                 Tapez SUPPRIMER pour confirmer
                 <input value={saisie} onChange={(e) => setSaisie(e.target.value)} autoFocus
-                  className="mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm focus:outline-none focus:border-red-400" />
+                  className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-red-400" />
               </label>
             )}
             <div className="flex justify-end gap-2 mt-5">
@@ -355,7 +355,7 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
       toast.error(err.response?.data?.message || 'Suppression impossible.');
     } finally { setEnvoi(false); }
   };
-  const champ = 'mt-1 w-full px-3 py-2.5 rounded-xl border-2 border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-violet-500 bg-white';
+  const champ = 'mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-slate-300 bg-white';
   const choixLettre = (cle, vide) => (
     <select value={form[cle]} onChange={(e) => setForm((f) => ({ ...f, [cle]: e.target.value }))} className={champ}>
       <option value="">{vide}</option>
@@ -364,15 +364,15 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
   );
   if (armoires === null) return <Chargement />;
   return (
-    <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+    <section className="glass-card-premium rounded-xl p-5 md:p-6">
       <div className="flex flex-wrap items-start gap-3 mb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-slate-900">Plan de rangement</h2>
+          <h2 className="text-lg font-bold text-slate-900">Plan de rangement</h2>
           <p className="text-sm font-semibold text-slate-600">
             Chaque armoire va d'une semaine et d'une lettre à une autre. Les dossiers y sont situés d'eux-mêmes : semaines, recherche et demandes affichent leur armoire.
           </p>
         </div>
-        <button type="button" onClick={() => ouvrir(null)} className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 shadow-md shadow-violet-200">
+        <button type="button" onClick={() => ouvrir(null)} className="px-4 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-2">
           <Plus size={16} /> Ajouter une armoire
         </button>
       </div>
@@ -380,38 +380,38 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
       {armoires.length > 0 && <Armoires3D armoires={armoires} cible={cible} onFermerCible={onFermerCible} />}
 
       {plan.manquants > 0 && (
-        <div className="resultat-lumiere mb-4 rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4 flex flex-wrap items-center gap-3">
-          <span className="lumiere-pastille w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
+        <div className="animate-fade-in mb-4 rounded-lg border border-slate-300 bg-slate-50 px-5 py-4 flex flex-wrap items-center gap-3">
+          <span className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
           <div className="min-w-0 flex-1">
-            <div className="text-base font-black text-violet-950">Plan du couloir des toilettes : {plan.manquants} armoire{plan.manquants > 1 ? 's' : ''} à installer</div>
-            <div className="text-sm font-semibold text-violet-900/80">
+            <div className="text-base font-bold text-slate-900">Plan du couloir des toilettes : {plan.manquants} armoire{plan.manquants > 1 ? 's' : ''} à installer</div>
+            <div className="text-sm font-semibold text-slate-600">
               {plan.plan.map((a) => a.nom).join(', ')} — semaines de 2025, telles que relevées à l'archive. Tout reste modifiable.
             </div>
           </div>
-          <button type="button" onClick={installer} disabled={envoi} className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
+          <button type="button" onClick={installer} disabled={envoi} className="px-4 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
             {envoi ? <Loader2 size={15} className="animate-spin" /> : <Archive size={15} />} Installer le plan
           </button>
         </div>
       )}
 
       {edite && (
-        <form onSubmit={enregistrer} className="mb-4 rounded-2xl border-2 border-violet-200 bg-violet-50/50 p-4 grid gap-3 md:grid-cols-2 animate-fade-in-up">
+        <form onSubmit={enregistrer} className="mb-4 rounded-lg border border-slate-300 bg-slate-50 p-4 grid gap-3 md:grid-cols-2 animate-fade-in-up">
           <label className="text-sm font-bold text-slate-700">Nom<input value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} maxLength={60} placeholder="Armoire 3" className={champ} /></label>
           <label className="text-sm font-bold text-slate-700">Lieu<input value={form.lieu} onChange={(e) => setForm((f) => ({ ...f, lieu: e.target.value }))} maxLength={120} placeholder="Couloir des toilettes" className={champ} /></label>
           <fieldset className="rounded-xl bg-white border border-slate-200 p-3">
-            <legend className="px-1 text-sm font-black text-slate-800">Commence à</legend>
+            <legend className="px-1 text-sm font-bold text-slate-800">Commence à</legend>
             <label className="text-sm font-bold text-slate-700">Un jour de la semaine<input type="date" value={form.debut_semaine} onChange={(e) => setForm((f) => ({ ...f, debut_semaine: e.target.value }))} className={champ} /></label>
             <label className="block mt-2 text-sm font-bold text-slate-700">Lettre{choixLettre('debut_lettre', 'Début de la semaine')}</label>
           </fieldset>
           <fieldset className="rounded-xl bg-white border border-slate-200 p-3">
-            <legend className="px-1 text-sm font-black text-slate-800">Finit à</legend>
+            <legend className="px-1 text-sm font-bold text-slate-800">Finit à</legend>
             <label className="text-sm font-bold text-slate-700">Un jour de la semaine<input type="date" value={form.fin_semaine} onChange={(e) => setForm((f) => ({ ...f, fin_semaine: e.target.value }))} className={champ} /></label>
             <label className="block mt-2 text-sm font-bold text-slate-700">Lettre{choixLettre('fin_lettre', 'Fin de la semaine')}</label>
           </fieldset>
           <p className="md:col-span-2 text-sm text-slate-600">N'importe quel jour suffit : la semaine de production (vendredi → jeudi) est retrouvée. Une lettre partagée entre deux armoires (« S », puis « S' ») se met dans les deux.</p>
           <div className="md:col-span-2 flex justify-end gap-2">
             <button type="button" onClick={() => setEdite(null)} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Annuler</button>
-            <button type="submit" disabled={envoi} className="px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
+            <button type="submit" disabled={envoi} className="px-5 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60">
               {envoi ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Enregistrer
             </button>
           </div>
@@ -424,11 +424,11 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
             const de = borne(a.debut_semaine, a.debut_lettre, true);
             const a2 = borne(a.fin_semaine, a.fin_lettre, false);
             return (
-              <li key={a.id} className="rounded-2xl border-2 border-violet-200 bg-white p-4">
+              <li key={a.id} className="rounded-lg border border-slate-300 bg-white p-4">
                 <div className="flex items-start gap-3">
-                  <span className="w-11 h-11 rounded-xl bg-violet-600 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
+                  <span className="w-11 h-11 rounded-xl bg-slate-800 text-white flex items-center justify-center flex-shrink-0"><Archive size={20} /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-lg font-black text-slate-900 leading-tight">{a.nom}</div>
+                    <div className="text-lg font-bold text-slate-900 leading-tight">{a.nom}</div>
                     {a.lieu && <div className="text-sm font-semibold text-slate-600">{a.lieu}</div>}
                   </div>
                   <button type="button" onClick={() => ouvrir(a)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" aria-label={`Modifier ${a.nom}`}><Pencil size={16} /></button>
@@ -436,13 +436,13 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
                 </div>
                 <div className="mt-3 grid gap-2 text-sm">
                   <div className="rounded-xl bg-green-50 border border-green-200 px-3 py-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-green-700">De</span>
-                    <div className="font-black text-green-950">{de.libelle}</div>
+                    <span className="text-[11px] font-bold text-green-700">De</span>
+                    <div className="font-bold text-green-950">{de.libelle}</div>
                     <div className="font-bold text-green-800">{de.lettre}</div>
                   </div>
                   <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700">À</span>
-                    <div className="font-black text-amber-950">{a2.libelle}</div>
+                    <span className="text-[11px] font-bold text-amber-700">À</span>
+                    <div className="font-bold text-amber-950">{a2.libelle}</div>
                     <div className="font-bold text-amber-800">{a2.lettre}</div>
                   </div>
                 </div>
@@ -454,8 +454,8 @@ const PlanRangement = ({ onChange, cible, onFermerCible }) => {
 
       <Modal open={Boolean(aSupprimer)} onClose={envoi ? undefined : () => setASupprimer(null)} panelClassName="w-full max-w-md mx-4">
         {aSupprimer && (
-          <div className="bg-white rounded-3xl shadow-2xl p-6">
-            <h3 className="text-lg font-black text-slate-900">Retirer {aSupprimer.nom} du plan ?</h3>
+          <div className="bg-white rounded-xl shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-slate-900">Retirer {aSupprimer.nom} du plan ?</h3>
             <p className="text-sm text-slate-700 mt-1">Les dossiers ne sont pas touchés : ils n'afficheront simplement plus cette armoire.</p>
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setASupprimer(null)} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">Garder</button>
@@ -560,7 +560,7 @@ const EntreesAfgc = () => {
         </button>
       </EnTete>
 
-      <div className="inline-flex p-1 rounded-2xl bg-slate-100 mb-5">
+      <div className="inline-flex p-1 rounded-lg bg-slate-100 mb-5">
         {[['semaines', 'Par semaine', CalendarDays], ['recherche', 'Rechercher', Search], ['rangement', 'Rangement', Archive], ['classeurs', 'Classeurs importés', FileSpreadsheet]].map(([cle, label, Icone]) => (
           <button key={cle} type="button" onClick={() => setOnglet(cle)}
             className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 ${onglet === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -571,7 +571,7 @@ const EntreesAfgc = () => {
 
       {onglet === 'semaines' ? (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-          <aside className="glass-card-premium rounded-3xl p-4 h-fit lg:sticky lg:top-4">
+          <aside className="glass-card-premium rounded-xl p-4 h-fit lg:sticky lg:top-4">
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-3">
               Année
               <select value={annee} onChange={(e) => setAnnee(Number(e.target.value))} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-700">
@@ -599,12 +599,12 @@ const EntreesAfgc = () => {
             )}
           </aside>
 
-          <section className="glass-card-premium rounded-3xl p-5 md:p-6 min-w-0">
+          <section className="glass-card-premium rounded-xl p-5 md:p-6 min-w-0">
             {!choisie ? <p className="text-sm text-slate-600">Choisissez une semaine.</p> : !detail ? <Chargement /> : (
               <>
                 <div className="flex flex-wrap items-start gap-3 mb-4">
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-lg font-black text-slate-900">{libelleSemaine(detail)}</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{libelleSemaine(detail)}</h2>
                     <p className="text-sm font-semibold text-slate-700">
                       {detail.dossiers.length} dossiers à classer
                       {semaineInfo && ` · jours de production : ${semaineInfo.jours_ouvres.map(jourLong).join(', ')}`}
@@ -615,7 +615,7 @@ const EntreesAfgc = () => {
                     <Printer size={15} /> Bordereau de classement
                   </button>
                   {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(detail.dossiers), titre: libelleSemaine(detail) })}
-                    className="px-3.5 py-2 rounded-xl border-2 border-violet-200 bg-violet-50 text-sm font-bold text-violet-800 inline-flex items-center gap-1.5 hover:border-violet-400">
+                    className="px-3.5 py-2 rounded-xl border border-slate-300 bg-slate-50 text-sm font-bold text-slate-800 inline-flex items-center gap-1.5 hover:border-slate-500">
                     <Tag size={15} /> Étiquettes
                   </button>}
                   <button type="button" onClick={exporter} className="px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center gap-1.5 hover:border-docuflow-secondary">
@@ -626,7 +626,7 @@ const EntreesAfgc = () => {
                 <div className="flex flex-wrap gap-1.5 mb-4 sticky top-0 bg-white/90 backdrop-blur py-2 z-10">
                   {groupes.map(([l, ds]) => (
                     <button key={l} type="button" onClick={() => setLettreVisee(l)}
-                      className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-sm font-black border ${lettreVisee === l ? 'bg-docuflow-secondary text-white border-docuflow-secondary' : 'bg-white text-slate-700 border-slate-200 hover:border-docuflow-secondary'}`}>
+                      className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-sm font-bold border ${lettreVisee === l ? 'bg-docuflow-secondary text-white border-docuflow-secondary' : 'bg-white text-slate-700 border-slate-200 hover:border-docuflow-secondary'}`}>
                       {l} <span className={`text-[11px] font-bold ${lettreVisee === l ? 'text-white/80' : 'text-slate-400'}`}>{ds.length}</span>
                     </button>
                   ))}
@@ -635,23 +635,23 @@ const EntreesAfgc = () => {
                   {groupes.map(([l, ds]) => (
                     // La lettre visée (depuis une recherche) s'allume.
                     <div key={lettreVisee === l ? `${l}-vise` : l} id={`lettre-${l}`}
-                      className={`scroll-mt-32 ${lettreVisee === l ? 'resultat-lumiere rounded-2xl p-2 -m-2 bg-green-50/60' : ''}`}>
+                      className={`scroll-mt-32 ${lettreVisee === l ? 'animate-fade-in rounded-lg p-2 -m-2 bg-green-50/60' : ''}`}>
                       <h3 className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className={`min-w-[2.25rem] h-9 px-2 rounded-xl flex items-center justify-center text-lg font-black ${l === 'Sans nom' ? 'bg-slate-200 text-slate-700 text-sm' : 'bg-docuflow-secondary text-white'}`}>{l === 'Sans nom' ? '?' : l}</span>
-                        <span className="text-base font-black text-slate-800">{l === 'Sans nom' ? 'Sans nom' : `Lettre ${l}`}</span>
+                        <span className={`min-w-[2.25rem] h-9 px-2 rounded-xl flex items-center justify-center text-lg font-bold ${l === 'Sans nom' ? 'bg-slate-200 text-slate-700 text-sm' : 'bg-docuflow-secondary text-white'}`}>{l === 'Sans nom' ? '?' : l}</span>
+                        <span className="text-base font-bold text-slate-800">{l === 'Sans nom' ? 'Sans nom' : `Lettre ${l}`}</span>
                         <span className="text-sm font-bold text-slate-600">· {ds.length} dossier{ds.length > 1 ? 's' : ''}</span>
                         {armoiresDe(ds) ? (
                           <button type="button" onClick={() => voirArmoire(armoiresCourtes(ds), detail.semaine)} title="Voir l'armoire en 3D"
-                            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-1.5 text-sm font-black shadow-sm shadow-violet-200 hover:bg-violet-700">
+                            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-slate-800 text-white px-3 py-1.5 text-sm font-bold hover:bg-slate-900">
                             <Archive size={14} /> {armoiresCourtes(ds)}
                           </button>
                         ) : <span className="ml-auto text-xs font-bold text-slate-500">armoire non renseignée</span>}
                         {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: avecSemaine(ds), titre: `${libelleSemaine(detail)} — ${l === 'Sans nom' ? 'sans nom' : `lettre ${l}`}` })}
-                          className="p-2 rounded-lg text-violet-700 hover:bg-violet-50" title={`Étiquettes de la lettre ${l}`} aria-label={`Étiquettes de la lettre ${l}`}>
+                          className="p-2 rounded-lg text-slate-800 hover:bg-slate-50" title={`Étiquettes de la lettre ${l}`} aria-label={`Étiquettes de la lettre ${l}`}>
                           <Tag size={16} />
                         </button>}
                       </h3>
-                      <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+                      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
                         {ds.map((d) => (
                           <li key={d.id} className="px-3.5 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
                             <span className="font-bold text-slate-900 min-w-0 flex-1 basis-60">{d.denomination || '—'}</span>
@@ -675,7 +675,7 @@ const EntreesAfgc = () => {
       ) : onglet === 'classeurs' ? (
         <ClasseursImportes onImporter={() => setImportOuvert(true)} onChange={() => { chargerFiltres(); chargerSemaines(); setResultats(null); setChoisie(null); }} />
       ) : (
-        <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+        <section className="glass-card-premium rounded-xl p-5 md:p-6">
           <form onSubmit={rechercher} className="flex flex-wrap items-end gap-3 mb-5">
             <label className="flex-1 min-w-[240px] text-sm font-bold text-slate-700">
               Nom ou n° d'acte
@@ -704,57 +704,47 @@ const EntreesAfgc = () => {
           {resultats === null ? (
             <p className="text-base text-slate-600">Un nom (« CREDO BTP »), un n° d'acte (« 1964 » le trouve aussi dans « 1963-1964-1965 ») ou « 2026/58 ».</p>
           ) : !resultats.length ? (
-            <div key={`vide-${tour}`} className="animate-fade-in-up rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
-              <div className="text-lg font-black text-slate-700">Aucun dossier ne correspond.</div>
+            <div key={`vide-${tour}`} className="animate-fade-in-up rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
+              <div className="text-lg font-bold text-slate-700">Aucun dossier ne correspond.</div>
               <div className="text-sm text-slate-600 mt-1">Essayez une partie du nom, ou le n° d'acte seul.</div>
             </div>
           ) : (
             <div key={`res-${tour}`}>
-              <p className="text-base font-bold text-slate-700 mb-3 animate-fade-in-up">
+              <p className="text-sm font-semibold text-slate-600 mb-2">
                 {resultats.length >= 300 ? 'Les 300 plus récents' : `${resultats.length} dossier${resultats.length > 1 ? 's' : ''} trouvé${resultats.length > 1 ? 's' : ''}`}
               </p>
-              <ul className="space-y-3">
+              <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
                 {resultats.map((d, i) => (
-                  <li key={d.id} className="resultat-lumiere rounded-2xl border-2 border-green-200 bg-white p-4 md:p-5"
-                    style={{ '--delai': `${Math.min(i, 8) * 0.09}s` }}>
+                  <li key={d.id} className="animate-fade-in px-4 py-3.5 md:px-5"
+                    style={{ '--delai': `${Math.min(i, 8) * 0.05}s` }}>
                     <div className="flex flex-wrap items-start gap-4">
-                      {/* La lettre de classement, comme l'onglet d'un classeur. */}
-                      <div className="lumiere-pastille w-14 h-14 rounded-2xl bg-docuflow-secondary text-white flex flex-col items-center justify-center flex-shrink-0 shadow-lg shadow-green-200">
-                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">lettre</span>
-                        <span className="text-2xl font-black leading-none">{d.lettre || '—'}</span>
-                      </div>
                       <div className="min-w-0 flex-1 basis-60">
-                        <div className="text-lg md:text-xl font-black text-slate-900 leading-tight">{d.denomination || '—'}</div>
-                        <div className="mt-1 text-sm font-semibold text-slate-700">
+                        <div className="text-base md:text-lg font-semibold text-slate-900 leading-tight">{d.denomination || '—'}</div>
+                        <div className="mt-0.5 text-sm text-slate-500">
                           {[d.num_actes && `Acte ${d.num_actes}`, d.type_garantie, d.agent && `agent ${d.agent}`, montantLisible(d.montant)].filter(Boolean).join(' · ')}
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <span className="inline-flex items-baseline gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-green-700">Semaine</span>
-                            <span className="text-base font-black text-green-900">{jourLong(d.semaine)} → {jourLong(d.au || finSemaine(d.semaine))} {d.semaine.slice(0, 4)}</span>
-                          </span>
-                          <span className="inline-flex items-baseline gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Point du</span>
-                            <span className="text-base font-black text-amber-900">{jourLong(d.date_point)} {d.date_point.slice(0, 4)}</span>
-                          </span>
-                          {d.armoire ? (
+                        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-sm">
+                          <dt className="text-slate-500">Semaine</dt>
+                          <dd className="font-semibold text-slate-900">{jourLong(d.semaine)} au {jourLong(d.au || finSemaine(d.semaine))} {d.semaine.slice(0, 4)}</dd>
+                          <dt className="text-slate-500">Point du</dt>
+                          <dd className="font-semibold text-slate-900">{jourLong(d.date_point)} {d.date_point.slice(0, 4)}</dd>
+                          <dt className="text-slate-500">Lettre</dt>
+                          <dd className="font-semibold text-slate-900">{d.lettre || 'non renseignée'}</dd>
+                          <dt className="text-slate-500">Armoire</dt>
+                          <dd>{d.armoire ? (
                             <button type="button" onClick={() => voirArmoire(d.armoire, d.semaine)} title="Voir l'armoire en 3D"
-                              className="inline-flex items-baseline gap-2 rounded-xl bg-violet-600 border border-violet-600 px-3 py-2 shadow-md shadow-violet-200 hover:bg-violet-700">
-                              <span className="text-[11px] font-bold uppercase tracking-wide text-violet-100">Armoire</span>
-                              <span className="text-base font-black text-white">{d.armoire}</span>
-                              <span className="text-[11px] font-bold text-violet-100">voir ›</span>
+                              className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-700">
+                              {d.armoire}
                             </button>
-                          ) : (
-                            <span className="inline-flex items-center rounded-xl bg-slate-100 border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">Armoire non renseignée</span>
-                          )}
-                        </div>
+                          ) : <span className="text-slate-500">non renseignée</span>}</dd>
+                        </dl>
                       </div>
                       {ETIQUETTES && <button type="button" onClick={() => setEtiquettes({ dossiers: [d], titre: d.denomination })}
-                        className="self-center p-2.5 rounded-xl border-2 border-violet-200 text-violet-700 hover:bg-violet-50" title="Imprimer l'étiquette" aria-label="Imprimer l'étiquette">
+                        className="self-center p-2.5 rounded-xl border border-slate-300 text-slate-800 hover:bg-slate-50" title="Imprimer l'étiquette" aria-label="Imprimer l'étiquette">
                         <Tag size={17} />
                       </button>}
                       <button type="button" onClick={() => ouvrirSemaine(d)}
-                        className="self-center px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold inline-flex items-center gap-1.5 hover:opacity-90 shadow-md shadow-green-200">
+                        className="self-center px-3 py-2 rounded-md border border-slate-300 text-slate-800 text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-slate-50">
                         Ouvrir la semaine <ArrowRight size={15} />
                       </button>
                     </div>

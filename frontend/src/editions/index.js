@@ -117,3 +117,6 @@ const EDITIONS = {
 
 /** Édition active, ou null pour la plateforme DocuFlow générale. */
 export const edition = EDITIONS[import.meta.env.VITE_EDITION] || null;
+
+// Marque la page pour les styles propres à l'édition (index.css).
+if (edition && typeof document !== 'undefined') document.documentElement.dataset.edition = edition.id;

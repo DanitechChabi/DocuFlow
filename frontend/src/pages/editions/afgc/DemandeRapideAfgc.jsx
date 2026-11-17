@@ -33,10 +33,10 @@ const DemandeRapideAfgc = () => {
 
   return (
     <Modal open={ouvert} onClose={() => setOuvert(false)} panelClassName="w-full max-w-2xl mx-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-5 md:p-6">
+      <div className="bg-white rounded-xl shadow-2xl p-5 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <PlusCircle size={20} className="text-docuflow-secondary" />
-          <h2 className="font-black text-slate-900 text-lg flex-1">Demander un dossier</h2>
+          <h2 className="font-bold text-slate-900 text-lg flex-1">Demander un dossier</h2>
           <button type="button" onClick={() => setOuvert(false)} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Fermer"><X size={18} /></button>
         </div>
         <BoiteDemande autoFocus onEnvoye={() => window.dispatchEvent(new CustomEvent('afgc:demande-envoyee'))} />

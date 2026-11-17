@@ -824,7 +824,7 @@ const SuperAdminPage = () => {
                 {filteredUsers.map((u, idx) => (
                   <div key={u.id} className="bg-white rounded-2xl p-5 border border-slate-100 hover:shadow-lg hover:border-blue-200/50 transition-all duration-300 group animate-fade-in-up" style={{ animationDelay: `${idx * 30}ms` }}>
                     <div className="flex items-start gap-4 mb-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0 ${u.role === 'superadmin' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-docuflow-secondary to-blue-600'}`}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0 ${u.role === 'superadmin' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-docuflow-secondary'}`}>
                         {u.role === 'superadmin' ? <Crown size={20} /> : (u.full_name?.charAt(0)?.toUpperCase() || '?')}
                       </div>
                       <div className="flex-1 min-w-0">

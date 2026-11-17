@@ -164,9 +164,9 @@ const SortiesAfgc = () => {
         </button>
       </EnTete>
 
-      <div className="glass-card-premium rounded-3xl p-5 space-y-4 mb-6">
+      <div className="glass-card-premium rounded-xl p-5 space-y-4 mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex p-1 rounded-2xl bg-slate-100">
+          <div className="inline-flex p-1 rounded-lg bg-slate-100">
             {ETATS.map(([cle, label]) => (
               <button key={cle || 'tous'} type="button" onClick={() => changer('etat', cle)}
                 className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-colors ${filtres.etat === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -202,7 +202,7 @@ const SortiesAfgc = () => {
       </div>
 
       {sorties === null ? <Chargement /> : (
-        <div className="glass-card-premium rounded-3xl overflow-hidden">
+        <div className="glass-card-premium rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 text-sm font-bold text-slate-500">
             {sorties.length} sortie{sorties.length > 1 ? 's' : ''}
             {sorties.length === 1000 && ' (les 1 000 plus récentes)'}
@@ -211,14 +211,14 @@ const SortiesAfgc = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400">
-                    <th className="px-5 py-2.5 font-black">Dossier</th>
-                    <th className="px-3 py-2.5 font-black">Motif</th>
-                    <th className="px-3 py-2.5 font-black">Transmis à</th>
-                    <th className="px-3 py-2.5 font-black">Le</th>
-                    <th className="px-3 py-2.5 font-black">Retour prévu</th>
-                    <th className="px-3 py-2.5 font-black">Retourné le</th>
-                    <th className="px-5 py-2.5 font-black">État</th>
+                  <tr className="text-left text-[11px] text-slate-400">
+                    <th className="px-5 py-2.5 font-bold">Dossier</th>
+                    <th className="px-3 py-2.5 font-bold">Motif</th>
+                    <th className="px-3 py-2.5 font-bold">Transmis à</th>
+                    <th className="px-3 py-2.5 font-bold">Le</th>
+                    <th className="px-3 py-2.5 font-bold">Retour prévu</th>
+                    <th className="px-3 py-2.5 font-bold">Retourné le</th>
+                    <th className="px-5 py-2.5 font-bold">État</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

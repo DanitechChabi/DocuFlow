@@ -98,12 +98,12 @@ const DemanderAfgc = () => {
 
       <AlerteACompleter nombre={aCompleter} className="mb-5" />
 
-      <div className="glass-card-premium rounded-3xl p-5 md:p-6 animate-fade-in-up">
+      <div className="glass-card-premium rounded-xl p-5 md:p-6 animate-fade-in-up">
         <BoiteDemande grande autoFocus onEnvoye={chargerRecents} />
       </div>
 
       {recents.length > 0 && (
-        <section className="glass-card-premium rounded-3xl p-5 md:p-6 mt-6 animate-fade-in-up">
+        <section className="glass-card-premium rounded-xl p-5 md:p-6 mt-6 animate-fade-in-up">
           <h2 className="font-bold text-slate-900 flex items-center gap-2 mb-3"><RotateCcw size={16} className="text-docuflow-secondary" /> Vos derniers dossiers</h2>
           <ul className="divide-y divide-slate-100">
             {recents.map((d) => {

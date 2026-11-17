@@ -30,14 +30,14 @@ const CadreConnexion = ({ children, enHaut = false }) => (
 
       <div className="relative flex items-center gap-3">
         <img src={edition?.logoConnexion || '/editions/afgc/embleme-blanc.png'} alt="" className="w-11 h-11 object-contain" />
-        <div className="text-[11px] sm:text-xs font-black uppercase tracking-[0.14em] leading-snug text-white/90">
+        <div className="text-[11px] sm:text-xs font-bold leading-snug text-white/90">
           L'Africaine des Garanties<br />et du Cautionnement
         </div>
       </div>
 
       <div className="relative mt-5 sm:mt-8 lg:mt-auto lg:mb-auto">
-        <div className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: JAUNE }}>Archives</div>
-        <h2 className="mt-2 text-[1.75rem] sm:text-4xl lg:text-5xl font-black uppercase leading-[1.05] tracking-tight text-white">
+        <div className="text-xs font-bold" style={{ color: JAUNE }}>Archives</div>
+        <h2 className="mt-2 text-[1.75rem] sm:text-4xl lg:text-5xl font-bold uppercase leading-[1.05] tracking-tight text-white">
           Vos dossiers,<br /><span style={{ color: JAUNE }}>en un clic.</span>
         </h2>
         <ul className="hidden sm:block mt-8 space-y-4 max-w-sm">

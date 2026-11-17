@@ -302,7 +302,7 @@ const BoiteDemande = ({
             disabled={desactive}
             placeholder={colles && !cumuler ? `${colles.length} dossiers collés — prêts à partir`
               : cumuler && colles ? 'Dossier suivant… (Entrée pour l\'ajouter)' : 'Entreprise, n° de dossier ou n° d\'acte'}
-            className={`w-full rounded-2xl border border-slate-200 bg-white font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-docuflow-secondary focus:ring-4 focus:ring-green-100 disabled:bg-slate-50 ${
+            className={`w-full rounded-lg border border-slate-200 bg-white font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-docuflow-secondary disabled:bg-slate-50 ${
               grande ? 'pl-14 pr-12 py-5 text-lg md:text-xl' : 'pl-11 pr-11 py-3.5 text-base'}`}
             aria-label="Dossier à demander"
           />
@@ -310,12 +310,12 @@ const BoiteDemande = ({
         </div>
         {cumuler ? (
           <button type="submit" disabled={desactive || Boolean(envoi) || q.length < 2}
-            className="rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 px-5 py-3 hover:border-docuflow-secondary hover:text-docuflow-secondary">
+            className="rounded-lg border border-slate-200 bg-white text-slate-700 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 px-5 py-3 hover:border-docuflow-secondary hover:text-docuflow-secondary">
             <Plus size={18} /> Ajouter
           </button>
         ) : (
           <button type="submit" disabled={desactive || Boolean(envoi) || (!colles && q.length < 2)}
-            className={`rounded-2xl bg-docuflow-secondary text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity ${grande ? 'px-7 py-4 text-lg' : 'px-5 py-3'}`}>
+            className={`rounded-lg bg-docuflow-secondary text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity ${grande ? 'px-7 py-4 text-lg' : 'px-5 py-3'}`}>
             {envoi === 'libre' || envoi === 'colles' || envoi === 'exacte' ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             {colles ? `${libelleBouton} les ${colles.length}` : libelleBouton}
           </button>
@@ -360,7 +360,7 @@ const BoiteDemande = ({
       {(!colles || cumuler) && q.length >= 2 && <Presence resultat={presence} archiviste={!retenir} className="mt-3" />}
 
       {envoyee && (
-        <div className="mt-3 flex items-center gap-3 rounded-2xl bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold animate-fade-in-up" role="status">
+        <div className="mt-3 flex items-center gap-3 rounded-lg bg-green-50 text-green-800 px-4 py-3 text-sm font-semibold animate-fade-in-up" role="status">
           <Check size={18} className="flex-shrink-0" />
           <span className="flex-1 min-w-0">{envoyee.message}</span>
           {envoyee.annulable && (
@@ -373,7 +373,7 @@ const BoiteDemande = ({
       )}
 
       {colles && (
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-3 mb-2">
             <span className="font-bold text-slate-800 flex-1">
               {colles.length} dossier{colles.length > 1 ? 's' : ''} {cumuler ? 'à enregistrer' : 'collés'}
@@ -396,7 +396,7 @@ const BoiteDemande = ({
           </ul>
           {cumuler && (
             <button type="button" onClick={demanderColles} disabled={desactive || Boolean(envoi)}
-              className="mt-3 w-full sm:w-auto px-5 py-3 rounded-2xl bg-docuflow-secondary text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50">
+              className="mt-3 w-full sm:w-auto px-5 py-3 rounded-lg bg-docuflow-secondary text-white font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50">
               {envoi === 'colles' ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               {libelleBouton} {colles.length > 1 ? `les ${colles.length} dossiers` : 'le dossier'}
             </button>

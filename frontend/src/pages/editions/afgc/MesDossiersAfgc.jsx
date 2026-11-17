@@ -100,7 +100,7 @@ const MesDossiersAfgc = () => {
       </EnTete>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="inline-flex p-1 rounded-2xl bg-slate-100">
+        <div className="inline-flex p-1 rounded-lg bg-slate-100">
           {[['dossiers', 'Dossiers', FileSearch], ['listes', 'Listes', ListChecks]].map(([cle, label, Icone]) => (
             <button key={cle} type="button" onClick={() => setOnglet(cle)}
               className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 transition-colors ${onglet === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -121,8 +121,8 @@ const MesDossiersAfgc = () => {
         demandes === null ? <Chargement /> : (
           <div className="space-y-6">
             {aCompleter.length > 0 && (
-              <section className="rounded-3xl p-5 md:p-6 bg-amber-50/70 border-2 border-amber-300">
-                <h2 className="text-lg font-black text-amber-900 mb-1">À compléter <span className="text-amber-600">({aCompleter.length})</span></h2>
+              <section className="rounded-xl p-5 md:p-6 bg-amber-50/70 border border-amber-300">
+                <h2 className="text-lg font-bold text-amber-900 mb-1">À compléter <span className="text-amber-600">({aCompleter.length})</span></h2>
                 <p className="text-sm font-semibold text-amber-900/80 mb-4">L'archive ne peut pas retrouver ces dossiers : complétez-les puis renvoyez-les.</p>
                 <ul className="space-y-4">
                   {aCompleter.map((d, i) => (
@@ -132,7 +132,7 @@ const MesDossiersAfgc = () => {
                 </ul>
               </section>
             )}
-            <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+            <section className="glass-card-premium rounded-xl p-5 md:p-6">
               <h2 className="font-bold text-slate-900 mb-2">En cours <span className="text-slate-400 font-semibold">({enCours.length})</span></h2>
               {enCours.length ? (
                 <ul className="divide-y divide-slate-100">
@@ -156,7 +156,7 @@ const MesDossiersAfgc = () => {
               ) : <p className="text-sm text-slate-400 py-2">Aucun dossier en cours.</p>}
             </section>
             {terminees.length > 0 && (
-              <section className="glass-card-premium rounded-3xl p-5 md:p-6">
+              <section className="glass-card-premium rounded-xl p-5 md:p-6">
                 <h2 className="font-bold text-slate-900 mb-2">Terminés <span className="text-slate-400 font-semibold">({terminees.length})</span></h2>
                 <ul className="divide-y divide-slate-100">
                   {terminees.slice(0, 50).map((d) => <LigneDossier key={d.id} d={d} etat={etatDemande(d)} />)}
@@ -169,10 +169,10 @@ const MesDossiersAfgc = () => {
         listes === null ? <Chargement /> : listesVues.length ? (
           <div className="space-y-3">
             {listesVues.map((l) => (
-              <div key={l.id} className="glass-card-premium rounded-3xl overflow-hidden">
+              <div key={l.id} className="glass-card-premium rounded-xl overflow-hidden">
                 <button type="button" onClick={() => ouvrir(l.id)} className="w-full text-left p-5 flex flex-wrap items-center gap-4 hover:bg-slate-50/60 transition-colors">
                   <div className="min-w-0 flex-1 basis-60">
-                    <div className="font-black text-slate-900">{l.libelle}</div>
+                    <div className="font-bold text-slate-900">{l.libelle}</div>
                     <div className="text-xs text-slate-400">{l.cadre} · déposée le {dateCourte(l.created_at)}{l.fichier ? ` · ${l.fichier}` : ''}</div>
                     <div className="mt-2 max-w-md"><Avancement total={l.total} transmis={l.transmis} retournes={l.retournes} /></div>
                   </div>
@@ -209,7 +209,7 @@ const MesDossiersAfgc = () => {
             ))}
           </div>
         ) : (
-          <div className="glass-card-premium rounded-3xl p-8 text-center text-sm text-slate-500">
+          <div className="glass-card-premium rounded-xl p-8 text-center text-sm text-slate-500">
             Aucune liste. Pour demander d'un coup les dossiers d'un classeur Excel, utilisez « Demander une liste (Excel) » depuis{' '}
             <Link to="/demandes/nouvelle" className="font-bold text-docuflow-secondary hover:underline">Demander un dossier</Link>.
           </div>

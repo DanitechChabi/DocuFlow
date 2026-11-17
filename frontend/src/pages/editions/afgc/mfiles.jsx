@@ -59,20 +59,20 @@ export const ServirMfiles = ({ d, url, onFait, compact = false }) => {
     } finally { setEnvoi(false); }
   };
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${compact ? '' : 'rounded-xl border-2 border-blue-200 bg-blue-50 px-3 py-2'}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${compact ? '' : 'rounded-xl border border-slate-300 bg-slate-50 px-3 py-2'}`}>
       {!compact && (
-        <span className="inline-flex items-center gap-1.5 text-sm font-black text-blue-900">
-          <Database size={15} /> Numérisé dans M-Files <span className="font-semibold text-blue-800">— envoyez la copie, le papier ne sort pas</span>
+        <span className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
+          <Database size={15} /> Numérisé dans M-Files <span className="font-semibold text-slate-800">· envoyez la copie, le papier ne sort pas</span>
         </span>
       )}
       <span className="ml-auto flex gap-2">
         {url && (
-          <a href={url} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border-2 border-blue-200 bg-white text-sm font-bold text-blue-800 inline-flex items-center gap-1.5 hover:border-blue-400">
+          <a href={url} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-800 inline-flex items-center gap-1.5 hover:border-slate-500">
             <ExternalLink size={14} /> Ouvrir M-Files
           </a>
         )}
         <button type="button" onClick={servir} disabled={envoi}
-          className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 shadow-sm shadow-blue-200">
+          className="px-3.5 py-2 rounded-xl bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60">
           {envoi ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Servi par M-Files
         </button>
       </span>

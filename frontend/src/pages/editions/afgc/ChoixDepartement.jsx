@@ -43,14 +43,14 @@ function Surligne({ texte, q }) {
   return (
     <>
       {texte.slice(0, i)}
-      <mark className="bg-transparent font-black" style={{ color: VERT }}>{texte.slice(i, i + n.length)}</mark>
+      <mark className="bg-transparent font-bold" style={{ color: VERT }}>{texte.slice(i, i + n.length)}</mark>
       {texte.slice(i + n.length)}
     </>
   );
 }
 
 export const Sigle = ({ sigle, petit = false, rebond = false }) => (
-  <span className={`${petit ? 'h-9 min-w-[2.25rem] text-[10px]' : 'h-11 min-w-[2.75rem] text-[11px]'} px-1.5 rounded-xl flex items-center justify-center font-black flex-shrink-0 tracking-tight ${rebond ? 'animate-pop-in' : ''}`}
+  <span className={`${petit ? 'h-9 min-w-[2.25rem] text-[10px]' : 'h-11 min-w-[2.75rem] text-[11px]'} px-1.5 rounded-xl flex items-center justify-center font-bold flex-shrink-0 tracking-tight ${rebond ? 'animate-pop-in' : ''}`}
     style={{ background: `${VERT}14`, color: VERT }}>
     {sigle || <Building2 size={petit ? 15 : 18} />}
   </span>
@@ -146,8 +146,8 @@ const ChoixDepartement = ({ departements, creation, valeur, onChange }) => {
         aria-label={choisi ? `Département : ${valeur.name}. Changer` : 'Choisir votre département'}
         onClick={() => setOuvert((o) => !o)}
         onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setOuvert(true); } }}
-        className={`group w-full flex items-center gap-3 rounded-2xl border bg-white px-3.5 py-3 text-left transition-[border-color,box-shadow,transform] duration-200 active:scale-[0.995] ${
-          ouvert ? 'border-[#2C9C0A] ring-4 ring-green-100 shadow-lg shadow-green-900/5' : 'border-slate-200 hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/60'}`}>
+        className={`group w-full flex items-center gap-3 rounded-lg border bg-white px-3.5 py-3 text-left transition-[border-color,box-shadow,transform] duration-200 active:scale-[0.995] ${
+          ouvert ? 'border-[#2C9C0A]' : 'border-slate-200 hover:border-slate-400'}`}>
         {choisi
           ? <Sigle key={valeur.name} sigle={choisi.sigle} rebond />
           : <span className="h-11 w-11 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0 transition-colors group-hover:text-slate-500"><Building2 size={18} /></span>}
@@ -169,7 +169,7 @@ const ChoixDepartement = ({ departements, creation, valeur, onChange }) => {
       </button>
 
       {monte && (
-        <div ref={panneau} className={`absolute z-30 left-0 right-0 mt-2 origin-top rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-400/25 overflow-hidden transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
+        <div ref={panneau} className={`absolute z-30 left-0 right-0 mt-2 origin-top rounded-lg border border-slate-200 bg-white shadow-2xl shadow-slate-400/25 overflow-hidden transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.2,0,0,1)] ${
           visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-[0.97]'}`}>
           <div className="p-2 border-b border-slate-100">
             <div className="relative">
