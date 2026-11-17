@@ -138,6 +138,8 @@ const CATALOG = [
     description: 'Choix proposés dans le champ « Type de document » du formulaire de demande.',
     type: 'json', editor: 'optionlist',
     default: '[{"value":"Statuts","label":"Statuts"},{"value":"PV d\'Assemblée","label":"PV d\'Assemblée"},{"value":"Bilan Financier","label":"Bilan Financier"},{"value":"Registre de Commerce","label":"Registre de Commerce"},{"value":"Contrat","label":"Contrat"},{"value":"Autre","label":"Autre"}]' },
+  { key: 'mfiles_annees', group: 'requests', label: 'Années numérisées dans M-Files', description: 'Années dont les dossiers sont numérisés et indexés dans M-Files, séparées par des virgules (ex. « 2025 »). Pour ces dossiers, l\'archive envoie la copie au lieu de sortir le papier.', type: 'string', default: null },
+  { key: 'mfiles_url', group: 'requests', label: 'Adresse de M-Files Web', description: 'Facultatif : l\'adresse de M-Files Web, pour l\'ouvrir d\'un clic depuis une demande (ex. https://mfiles.exemple.bj).', type: 'string', default: null },
   { key: 'jours_feries', group: 'requests', label: 'Jours fériés',
     description: "Jours sans production aux archives : dates fixes (MM-JJ) ou datées (AAAA-MM-JJ), séparées par des virgules. Lundi de Pâques, Ascension et lundi de Pentecôte sont comptés d'office ; ajoutez Tabaski, Ramadan, Maouloud… à leur date.",
     type: 'string', default: '01-01, 01-10, 05-01, 08-01, 08-15, 10-26, 11-01, 12-25' },

@@ -59,6 +59,7 @@ const EVENT_SETTING = {
   liste_transmise: 'notify_on_status_change',
   liste_retournee: 'notify_on_status_change',
   complement_demande: 'notify_on_status_change',
+  servi_mfiles: 'notify_on_status_change',
   complement_fourni: 'notify_archive_on_request',
   status_update: 'notify_on_status_change',
   delivered: 'notify_on_status_change',
@@ -420,6 +421,22 @@ const TEMPLATES = {
         conservez-le comme preuve de restitution.
       </p>
       ${dossiersBlock(l.dossiers)}
+    `, branding),
+  }),
+
+  // Dossier numérisé : copie envoyée depuis M-Files. `extra` : { note, par }
+  servi_mfiles: (r, branding, extra = {}) => ({
+    subject: `Copie envoyée depuis M-Files — ${sanitizeHeader(libelleDemande(r))}`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Votre dossier vous a été envoyé en copie numérique</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 8px;">
+        Bonjour,<br />
+        Ce dossier est numérisé : ${extra.par ? `<b>${escapeHtml(extra.par)}</b> vous` : 'l\'archive vous'} en a envoyé la copie depuis M-Files.
+        Le dossier papier reste aux archives.
+      </p>
+      ${extra.note ? `<div style="margin:12px 0;padding:12px 16px;border-left:4px solid #2563eb;background:#eff6ff;border-radius:8px;font-size:14px;color:#1e3a8a;">${escapeHtml(extra.note)}</div>` : ''}
+      ${requestBlock(r)}
+      ${ctaButton('Voir mes dossiers', lien(branding, '/demandes/mes-demandes'))}
     `, branding),
   }),
 

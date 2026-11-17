@@ -6,6 +6,7 @@ import { EnTete } from './elements';
 import { intitule, references, dateCourte } from './vocabulaire';
 import { codeDe } from './etiquettes';
 import { edition } from '../../../editions';
+import { useMfiles, ServirMfiles } from './mfiles';
 
 // Sans étiquettes (édition), la douchette travaille au n° d'acte.
 const ETIQUETTES = edition?.etiquettes !== false;
@@ -46,6 +47,7 @@ const DouchetteAfgc = () => {
   const [geste, setGeste] = useState(null);
   const [journal, setJournal] = useState([]);
   const champ = useRef(null);
+  const mf = useMfiles();
 
   const focus = () => setTimeout(() => champ.current?.focus(), 0);
   useEffect(() => { focus(); }, []);
@@ -182,6 +184,18 @@ const DouchetteAfgc = () => {
             </div>
           )}
 
+          {lecture.sorties.length === 0 && lecture.demandes.length > 0 && mf.annees.includes(Number(dossier.date_point.slice(0, 4))) && (
+            <div className="mt-5 space-y-2">
+              <div className="text-sm font-black uppercase tracking-wide text-blue-700">Numérisé dans M-Files — envoyez la copie, le papier ne sort pas</div>
+              {lecture.demandes.map((d) => (
+                <div key={`mf-${d.id}`} className="rounded-2xl border-2 border-blue-200 bg-blue-50 px-4 py-3 flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1 font-black text-slate-900">pour {d.requester_name}{d.section ? ` (${d.section})` : ''}</div>
+                  <ServirMfiles d={d} url={mf.url} compact onFait={() => { setJournal((j) => [{ cle: `${Date.now()}`, type: 'mfiles', dossier, demande: d, heure: new Date() }, ...j].slice(0, 30)); setLecture(null); focus(); }} />
+                </div>
+              ))}
+            </div>
+          )}
+
           {lecture.sorties.length === 0 && (lecture.demandes.length ? (
             <div className="mt-5">
               <div className="text-sm font-black uppercase tracking-wide text-green-700 mb-2">Demandé — à transmettre</div>
@@ -219,7 +233,7 @@ const DouchetteAfgc = () => {
                 <CheckCircle2 size={18} className={g.type === 'sortie' ? 'text-green-600' : 'text-amber-600'} />
                 <span className="min-w-0 flex-1 text-sm">
                   <strong className="font-black text-slate-900">{g.dossier.denomination}</strong>
-                  <span className="text-slate-700"> — {g.type === 'sortie' ? `transmis à ${g.demande.requester_name}` : `retour de ${g.demande.requester_name}`}</span>
+                  <span className="text-slate-700"> — {g.type === 'sortie' ? `transmis à ${g.demande.requester_name}` : g.type === 'mfiles' ? `copie M-Files envoyée à ${g.demande.requester_name}` : `retour de ${g.demande.requester_name}`}</span>
                 </span>
                 <span className="text-xs font-bold text-slate-500">{g.heure.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
               </li>

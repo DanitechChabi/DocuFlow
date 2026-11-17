@@ -126,6 +126,8 @@ export const requestService = {
     return response.data;
   },
   // Compléments (051) : l'archive renvoie la demande, le demandeur la complète.
+  // Dossier numérisé : copie envoyée depuis M-Files, le papier ne sort pas.
+  serviMfiles: async (requestId, corps = {}) => (await api.post(`/requests/${requestId}/servi-mfiles`, corps)).data,
   demanderComplement: async (requestId, corps) => (await api.post(`/requests/${requestId}/complement`, corps)).data,
   completer: async (requestId, corps) => (await api.post(`/requests/${requestId}/completer`, corps)).data,
   getStats: async () => {

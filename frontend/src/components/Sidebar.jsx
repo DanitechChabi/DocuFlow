@@ -205,11 +205,14 @@ const Sidebar = ({ unreadCount = 0, drawerOuvert = false, onDrawerChange = () =>
     ? [
         // Site d'une édition dédiée (ex. AFGC) : un menu à plat, sans
         // changement de module. Chaque entrée garde la permission de sa route.
-        {
-          titre: null,
-          cle: 'edition',
-          items: edition.menu.map((m) => entree(m.to, m.label, <m.icone size={18} />, { permission: m.permission, end: m.end })),
-        },
+        // Rubriques de l'édition (« Au quotidien », « Les fonds »…), dans l'ordre du menu.
+        ...edition.menu.reduce((acc, m) => {
+          const titre = m.section || null;
+          let sec = acc.find((x) => x.titre === titre);
+          if (!sec) { sec = { titre, cle: `edition-${titre || 'accueil'}`, items: [] }; acc.push(sec); }
+          sec.items.push(entree(m.to, m.label, <m.icone size={18} />, { permission: m.permission, end: m.end }));
+          return acc;
+        }, []),
         sectionOutils,
       ]
     : dansUnModule
