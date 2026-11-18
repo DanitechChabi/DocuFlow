@@ -1,8 +1,9 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+import { pwa } from './pwa.config.js'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // Commit de l'interface, affiché dans « À propos » (Vercel fournit
   // VERCEL_GIT_COMMIT_SHA à la compilation).
   define: {
@@ -11,6 +12,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    pwa(loadEnv(mode, process.cwd(), 'VITE_').VITE_EDITION),
   ],
   server: {
     // Forcer l'écoute sur IPv4 (127.0.0.1) au lieu d'IPv6 (::1)
@@ -30,4 +32,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
