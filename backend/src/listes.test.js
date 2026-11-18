@@ -309,8 +309,8 @@ const appel = (handler, req) => new Promise((resolve) => {
       ok((await appel(garde, u('admin'))).code === 'next', `préréglages (${m}) : administrateur admis`);
     }
     const { EDITIONS } = require('./config/editions');
-    ok(EDITIONS.afgc.motifs.length === 15 && EDITIONS.afgc.types.length === 9 && EDITIONS.afgc.departements.length === 10,
-      'AFGC : 15 motifs, 9 types de dossier, 10 départements');
+    ok(EDITIONS.afgc.motifs.length === 18 && EDITIONS.afgc.types.length === 9 && EDITIONS.afgc.departements.length === 10,
+      'AFGC : 18 motifs, 9 types de dossier, 10 départements');
     const { fusionner, plat } = require('./services/editionService');
     ok(plat('Soldes créditeurs') === plat('Solde créditeur') && plat('Commissaire aux comptes') === plat('commissaire au compte'),
       'formes voisines reconnues (pluriel, accents, casse)');
@@ -339,8 +339,8 @@ const appel = (handler, req) => new Promise((resolve) => {
 
       await rejette(editionService.etat(t2, 'inconnue'), 400, 'état d\'une édition inconnue : 400');
       const avant = await editionService.etat(t2, 'afgc');
-      ok(!avant.appliquee && avant.manquants.motifs === 13 && avant.manquants.types === 9 && avant.manquants.departements === 10,
-        'avant : configuration à installer (13 motifs, 9 types, 10 départements manquants)');
+      ok(!avant.appliquee && avant.manquants.motifs === 16 && avant.manquants.types === 9 && avant.manquants.departements === 10,
+        'avant : configuration à installer (16 motifs, 9 types, 10 départements manquants)');
       await rejette(editionService.appliquer(t2, admin, 'inconnue'), 400, 'édition inconnue : 400');
       const r1 = await editionService.appliquer(t2, admin, 'afgc');
       ok(r1.departements_ajoutes === 10 && r1.sections_retirees === 1, 'première application : 10 départements créés, la section générique inutilisée retirée');
@@ -351,13 +351,13 @@ const appel = (handler, req) => new Promise((resolve) => {
       const motifs = valeurs(reglages.request_motifs);
       ok(motifs[0] === 'Consultation' && motifs.includes('Restitution de provision') && motifs.includes('Commission bancaire'), 'motifs de demande AFGC en place, dans leur ordre');
       ok(motifs.includes('Soldes créditeurs') && !motifs.includes('Solde créditeur'), 'la forme déjà en usage (« Soldes créditeurs ») est gardée, sans doublon');
-      ok(motifs.includes('Mission DAI') && !motifs.includes('Contentieux') && motifs.length === 16, 'motif propre gardé, motif générique retiré (16 motifs)');
+      ok(motifs.includes('Mission DAI') && !motifs.includes('Contentieux') && motifs.length === 19, 'motif propre gardé, motif générique retiré (19 motifs)');
       const types = valeurs(reglages.request_document_types);
       ok(types.length === 9 && types.includes('Bonne exécution (CBE)') && !types.includes('Statuts'), 'types de dossier AFGC à la place des types génériques');
       const apres = await editionService.etat(t2, 'afgc');
       ok(apres.appliquee && apres.manquants.motifs === 0 && apres.manquants.types === 0 && apres.manquants.departements === 0, 'après : rien ne manque, configuration marquée appliquée');
       const r2 = await editionService.appliquer(t2, admin, 'AFGC');
-      ok(r2.departements_ajoutes === 0 && r2.sections_retirees === 0 && r2.motifs === 16, 'deuxième application : rien en double');
+      ok(r2.departements_ajoutes === 0 && r2.sections_retirees === 0 && r2.motifs === 19, 'deuxième application : rien en double');
       ok(valeurs((await settingsService.getAll(t2)).request_motifs).join('|') === motifs.join('|'), 'deuxième application : motifs inchangés');
       ok((await db.query("SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1 AND action LIKE 'A appliqué la configuration%'", [t2])).rows[0].n === 2,
         'chaque application est inscrite au journal d\'audit');

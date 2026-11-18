@@ -18,6 +18,8 @@ const EDITIONS = {
       'Consultation', 'Prorogation', 'Actualisation', 'Renouvellement', 'Authentification', 'Remboursement',
       'Solde créditeur', 'Levée d\'engagement', 'Solde débiteur', 'Rectification', 'Appel à garantie',
       'Recouvrement', 'Restitution de provision', 'Commission bancaire', 'Commissaire aux comptes',
+      // Grille de transmission des archives : motifs du suivi, de la DAJ et du commercial.
+      'Point de provision', 'Mise en place', 'Suppression de co-signature',
     ],
     // Types de dossier ; le sigle entre parenthèses sert à les reconnaître
     // dans une saisie (« CBE Agro… », « CBE-2025-0147 »).

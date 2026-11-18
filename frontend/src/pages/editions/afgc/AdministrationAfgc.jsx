@@ -202,6 +202,8 @@ const AdministrationAfgc = () => {
       mfiles_url: s.mfiles_url || '',
       loan_default_days: String(s.loan_default_days || '7'),
       ollama_url: s.ollama_url || '',
+      // Grille de transmission : jours d'utilisation par motif (« indéterminée » possible).
+      motifs_durees: (() => { try { const x = typeof s.motifs_durees === 'string' ? JSON.parse(s.motifs_durees) : s.motifs_durees; return x && typeof x === 'object' ? x : {}; } catch { return {}; } })(),
       ollama_modele: s.ollama_modele || 'docubot-afgc',
     };
     setInitial(valeurs);
@@ -217,7 +219,8 @@ const AdministrationAfgc = () => {
     try {
       const corps = {};
       for (const c of cles) {
-        corps[c] = Array.isArray(v[c]) ? JSON.stringify(v[c].map((x) => ({ value: x, label: x }))) : v[c];
+        corps[c] = Array.isArray(v[c]) ? JSON.stringify(v[c].map((x) => ({ value: x, label: x })))
+          : (v[c] && typeof v[c] === 'object' ? JSON.stringify(v[c]) : v[c]);
       }
       await settingsService.updateSettings(corps);
       setInitial((o) => ({ ...o, ...Object.fromEntries(cles.map((c) => [c, v[c]])) }));
@@ -287,6 +290,27 @@ const AdministrationAfgc = () => {
             <label className="block mt-3 text-sm font-bold text-slate-700">Adresse de M-Files Web <span className="font-semibold text-slate-500">(facultatif)</span>
               <input value={v.mfiles_url} onChange={(e) => change('mfiles_url')(e.target.value)} placeholder="https://mfiles.afgcsa.com" className={`mt-1 ${champ}`} />
             </label>
+          </Carte>
+          <Carte icone={Clock} titre="Durée d'utilisation par motif" aide="Grille de transmission : la date de retour prévue suit le motif de la demande. Vide : durée de prêt par défaut."
+            onEnregistrer={enregistrer('grille', 'motifs_durees')} envoi={envoi === 'grille'} modifie={modifie('motifs_durees')}>
+            <ul className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {v.request_motifs.map((m) => {
+                const val = v.motifs_durees[m];
+                const indet = typeof val === 'string' && /ind/i.test(val);
+                const maj = (x) => change('motifs_durees')(Object.fromEntries(Object.entries({ ...v.motifs_durees, [m]: x }).filter(([, y]) => y !== '' && y !== null && y !== undefined)));
+                return (
+                  <li key={m} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1 min-w-0 truncate text-slate-800">{m}</span>
+                    <input type="number" min={1} max={3650} disabled={indet} value={indet ? '' : (val ?? '')} placeholder="défaut"
+                      onChange={(e) => maj(e.target.value === '' ? '' : Number(e.target.value))} className="w-20 px-2 py-1 rounded-md border border-slate-300 text-sm disabled:bg-slate-50" />
+                    <span className="text-xs text-slate-500 w-8">jours</span>
+                    <label className="inline-flex items-center gap-1 text-xs text-slate-600" title="Durée indéterminée : suivi sur un an">
+                      <input type="checkbox" checked={indet} onChange={(e) => maj(e.target.checked ? 'indéterminée' : '')} /> indét.
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
           </Carte>
           <Carte icone={Clock} titre="Durée de prêt" aide="Nombre de jours avant le retour prévu d'un dossier sorti."
             onEnregistrer={enregistrer('pret', 'loan_default_days')} envoi={envoi === 'pret'} modifie={modifie('loan_default_days')}>

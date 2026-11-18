@@ -347,12 +347,17 @@ async function presence(tenantId, demande = {}) {
   const anneeChamp = Number(String(demande.annee ?? '').trim());
   const annee = acte.annee || (Number.isInteger(anneeChamp) && anneeChamp >= 1950 && anneeChamp <= 2100 ? anneeChamp : null);
   if (!acte.numeros.length && nom.length < 3) return { recherche: false, total: 0, entrees: [] };
-  const parActe = await chercherEntrees(tenantId, { nom, numeros: acte.numeros, annee });
-  if (acte.numeros.length && nom.length >= 3 && !parActe.entrees.some((e) => e.nom_concorde)) {
+  let res = await chercherEntrees(tenantId, { nom, numeros: acte.numeros, annee });
+  if (acte.numeros.length && nom.length >= 3 && !res.entrees.some((e) => e.nom_concorde)) {
     const parNom = await chercherEntrees(tenantId, { nom, numeros: [], annee });
-    if (parNom.total) return { recherche: true, ...parNom };
+    if (parNom.total) res = parNom;
   }
-  return { recherche: true, ...parActe };
+  // Les points des dossiers retirés d'abord ; les dossiers en cartons (non
+  // retirés, ouvertures de compte) seulement en complément, et seulement ceux
+  // qui correspondent bien (057).
+  const cartons = await require('./cartonsService').trouver(tenantId, { nom, numeros: acte.numeros, annee })
+    .then((l) => l.filter((c) => c.nom_concorde).slice(0, 3)).catch(() => []);
+  return { recherche: true, ...res, cartons };
 }
 
 /** Présence de plusieurs dossiers d'un coup ({ cle, nom_entreprise, num_acte, annee }[]) → { cle: résultat }. */
