@@ -77,24 +77,24 @@ const Detail = ({ e, archiviste }) => (
  * à vérifier. Il s'allume à son arrivée (lumière, halo). `archiviste` ajoute
  * la lettre de classement et le n° d'acte tel qu'écrit.
  */
-// Un dossier en carton (057), en quelques mots : le fonds, l'année, et pour l'archive le carton.
+// Un dossier non retiré / annulé ou une ouverture de compte (057), en quelques mots : le fonds, l'année, et pour l'archive le carton.
 const enCarton = (c, archiviste) => [
   c.fonds === 'ouverture_compte' ? 'ouverture de compte' : (c.statut === 'annule' ? 'dossier annulé' : 'dossier non retiré / annulé'),
   c.fonds === 'ouverture_compte' ? (archiviste && c.matricule ? `n° ${c.matricule}` : null) : [c.typologie, c.annee].filter(Boolean).join(' '),
   archiviste && c.carton ? `carton ${c.carton}` : null,
 ].filter(Boolean).join(', ');
 
-/** Les dossiers en cartons : en complément des points, sur une ligne discrète. */
+/** Dossiers non retirés / annulés, ouvertures de compte : en complément des points, sur une ligne discrète. */
 const Cartons = ({ cartons, archiviste, seul }) => {
   if (!cartons?.length) return null;
   const liste = cartons.map((c) => `${archiviste ? `${c.denomination} — ` : ''}${enCarton(c, archiviste)}`);
   return seul ? (
     <div className="text-sm text-slate-700 space-y-0.5">
-      <div><strong className="font-bold text-slate-900">Aux archives, en carton</strong> : {cartons[0].denomination}</div>
+      <div><strong className="font-bold text-slate-900">Aux archives</strong> : {cartons[0].denomination}</div>
       <div>{enCarton(cartons[0], archiviste)}{cartons.length > 1 ? ` (+ ${cartons.length - 1})` : ''}</div>
     </div>
   ) : (
-    <div className="mt-1 text-xs text-slate-500">Aussi en carton : {liste.join(' ; ')}</div>
+    <div className="mt-1 text-xs text-slate-500">Aussi aux archives : {liste.join(' ; ')}</div>
   );
 };
 

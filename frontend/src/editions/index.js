@@ -1,5 +1,5 @@
 import {
-  GraduationCap, Boxes, BookMarked,
+  GraduationCap, ArchiveX, UserPlus, BookMarked,
   LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
 } from 'lucide-react';
 
@@ -58,7 +58,8 @@ const EDITIONS = {
       { section: 'Au quotidien', to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
       { section: 'Au quotidien', to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
       { section: 'Les fonds', to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
-      { section: 'Les fonds', to: '/archives/cartons', label: 'Dossiers en cartons', icone: Boxes, permission: 'requests.process' },
+      { section: 'Les fonds', to: '/archives/non-retires', label: 'Non retirés / annulés', icone: ArchiveX, permission: 'requests.process' },
+      { section: 'Les fonds', to: '/archives/ouvertures-compte', label: 'Ouvertures de compte', icone: UserPlus, permission: 'requests.process' },
       { section: 'Les fonds', to: '/archives/plan', label: 'Plan de classement', icone: BookMarked, permission: 'requests.process' },
       { section: 'Les fonds', to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
       { section: 'Les fonds', to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
@@ -104,6 +105,8 @@ const EDITIONS = {
       '/archives/douchette': () => import('../pages/editions/afgc/DouchetteAfgc'),
       '/archives/tableau-de-bord': () => import('../pages/editions/afgc/TableauBordAfgc'),
       '/archives/docubot': () => import('../pages/editions/afgc/DocubotApprendAfgc'),
+      '/archives/non-retires': () => import('../pages/editions/afgc/CartonsAfgc'),
+      '/archives/ouvertures-compte': () => import('../pages/editions/afgc/CartonsAfgc'),
       '/archives/cartons': () => import('../pages/editions/afgc/CartonsAfgc'),
       '/archives/plan': () => import('../pages/editions/afgc/PlanClassementAfgc'),
       '/admin/comptes': () => import('../pages/editions/afgc/ComptesAfgc'),

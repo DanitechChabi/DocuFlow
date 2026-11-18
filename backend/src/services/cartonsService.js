@@ -106,7 +106,7 @@ async function importer(tenantId, user, { fonds, fichier, lignes } = {}) {
   );
   if (r.rowCount) {
     await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
-      [user.id, `A importé ${r.rowCount} dossier${r.rowCount > 1 ? 's' : ''} en cartons (${FONDS[fonds]})${nomFichier ? ` — « ${nomFichier} »` : ''}`.slice(0, 500), tenantId]);
+      [user.id, `A importé ${r.rowCount} dossier${r.rowCount > 1 ? 's' : ''} (${FONDS[fonds]})${nomFichier ? ` — « ${nomFichier} »` : ''}`.slice(0, 500), tenantId]);
   }
   return { ajoutees: r.rowCount, deja: valeurs.length - r.rowCount, rejetees };
 }
@@ -206,7 +206,7 @@ async function supprimerFichier(tenantId, user, { fichier, fonds } = {}) {
     : await db.query('DELETE FROM dossiers_cartons WHERE tenant_id = $1 AND fonds = $2 AND fichier = $3', [tenantId, fonds, texte(fichier, 255)]);
   if (!r.rowCount) throw erreur(404, 'Aucune ligne de ce classeur n\'est enregistrée.');
   await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
-    [user.id, `A supprimé le classeur « ${fichier || 'sans nom'} » des dossiers en cartons (${r.rowCount} ligne${r.rowCount > 1 ? 's' : ''})`.slice(0, 500), tenantId]);
+    [user.id, `A supprimé le classeur « ${fichier || 'sans nom'} » (${FONDS[fonds]}, ${r.rowCount} ligne${r.rowCount > 1 ? 's' : ''})`.slice(0, 500), tenantId]);
   return { supprimees: r.rowCount };
 }
 
