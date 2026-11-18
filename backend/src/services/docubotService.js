@@ -535,11 +535,11 @@ async function repondreFiche(tenantId, cible, droits, connu) {
     lignes.push(`**${sorties[0]?.nom_entreprise || connu.demandes[0]?.nom_entreprise || libelle}**${droits.archive ? ' (pas d\'entrée enregistrée aux archives)' : ''} :`);
   }
   const chezMoi = sorties.some((x) => x.chez_id === droits.userId);
-  // Les dossiers en cartons (non retirés / annulés, ouvertures de compte) : en complément des points.
+  // Dossiers non retirés / annulés, ouvertures de compte : en complément des points.
   const cartons = p.cartons || [];
   if (cartons.length) {
     const quoi = (c) => (c.fonds === 'ouverture_compte' ? 'ouverture de compte' : c.statut === 'annule' ? 'dossier annulé' : 'dossier non retiré / annulé');
-    lignes.push(`${entrees.length ? 'Aussi en carton' : `**${cartons[0].denomination}** est aux archives, en carton`} : ${cartons.map((c) => [quoi(c), c.annee, droits.archive && c.carton && `carton **${c.carton}**`].filter(Boolean).join(', ')).join(' ; ')}.`);
+    lignes.push(`${entrees.length ? 'Aussi aux archives' : `**${cartons[0].denomination}** est aux archives`} : ${cartons.map((c) => [quoi(c), c.annee, droits.archive && c.carton && `carton **${c.carton}**`].filter(Boolean).join(', ')).join(' ; ')}.`);
     for (const c of cartons) {
       elements.push({
         titre: c.denomination || 'Dossier',

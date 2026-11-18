@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Boxes, Search, Upload, Loader2, Trash2, ArrowLeft } from 'lucide-react';
+import { ArchiveX, UserPlus, Search, Upload, Loader2, Trash2, ArrowLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
 import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
@@ -8,9 +9,10 @@ import { EnTete, Chargement } from './elements';
 import { lireCartons, FONDS } from './cartonsExcel';
 
 // ============================================================================
-// Dossiers en cartons (057) : dossiers non retirés / annulés et ouvertures de
-// compte, rangés par carton. Une recherche (nom, n° d'acte, matricule), la
-// liste des cartons de chaque fonds, l'import de leurs classeurs.
+// Deux fonds (057), une page chacun : les dossiers non retirés / annulés
+// (/archives/non-retires) et les ouvertures de compte
+// (/archives/ouvertures-compte). Une recherche (nom, n° d'acte, matricule),
+// les cartons du fonds, l'import de ses classeurs.
 // ============================================================================
 
 const PAR_ENVOI = 3000;
@@ -28,9 +30,17 @@ const Ligne = ({ d }) => (
   </li>
 );
 
+const PAGES = {
+  non_retires: { chemin: '/archives/non-retires', icone: ArchiveX, aide: "Les dossiers que les clients n'ont pas retirés, ou annulés, avec leur carton. Les points des dossiers retirés restent dans « Entrée des dossiers »." },
+  ouverture_compte: { chemin: '/archives/ouvertures-compte', icone: UserPlus, aide: "Les répertoires d'ouverture de compte : client, matricule ou n° de compte, et carton." },
+};
+
 const CartonsAfgc = () => {
-  useTitrePage('Dossiers en cartons');
-  const [fonds, setFonds] = useState('non_retires');
+  const { pathname } = useLocation();
+  const naviguer = useNavigate();
+  const fonds = pathname.startsWith(PAGES.ouverture_compte.chemin) ? 'ouverture_compte' : 'non_retires';
+  const page = PAGES[fonds];
+  useTitrePage(FONDS[fonds]);
   const [liste, setListe] = useState(null);
   const [q, setQ] = useState('');
   const [resultats, setResultats] = useState(null);
@@ -42,6 +52,7 @@ const CartonsAfgc = () => {
   useEffect(() => { api.get('/plan-classement').then((r) => setPlan(r.data)).catch(() => setPlan(null)); }, []);
   const rubrique = plan?.rubriques.find((r) => r.cote === plan.fonds?.[fonds]);
   const fichier = useRef(null);
+  useEffect(() => { setResultats(null); setQ(''); }, [fonds]);
 
   const charger = useCallback(() => {
     setListe(null);
@@ -83,8 +94,7 @@ const CartonsAfgc = () => {
       }
       toast.success(`${total.ajoutees} dossier${total.ajoutees > 1 ? 's' : ''} ajouté${total.ajoutees > 1 ? 's' : ''}${total.deja ? ` (${total.deja} déjà là)` : ''}.`);
       setImport(null);
-      setFonds(f);
-      charger();
+      if (f !== fonds) naviguer(PAGES[f].chemin); else charger();
     } catch (e) { toast.error(e.response?.data?.message || 'Import interrompu.'); setImport((x) => ({ ...x, envoi: null })); }
   };
 
@@ -99,8 +109,7 @@ const CartonsAfgc = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
-      <EnTete titre="Dossiers en cartons" icone={Boxes}
-        aide="Les dossiers non retirés ou annulés, et les répertoires d'ouverture de compte, rangés par carton. Les points des dossiers retirés restent dans « Entrée des dossiers ».">
+      <EnTete titre={FONDS[fonds]} icone={page.icone} aide={page.aide}>
         <button type="button" onClick={() => fichier.current?.click()}
           className="px-4 py-2.5 rounded-md bg-slate-800 text-white text-sm font-semibold inline-flex items-center gap-2">
           <Upload size={16} /> Importer un classeur
@@ -124,10 +133,10 @@ const CartonsAfgc = () => {
         </div>
       )}
 
-      <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) rechercher({ q: q.trim() }, `Résultats pour « ${q.trim()} »`); }} className="flex gap-2 mb-6">
+      <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) rechercher({ q: q.trim(), fonds }, `Résultats pour « ${q.trim()} »`); }} className="flex gap-2 mb-6">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom du client, n° d'acte ou matricule"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={fonds === 'ouverture_compte' ? 'Nom du client, matricule ou n° de compte' : "Nom du client ou n° d'acte"}
             className="w-full pl-10 pr-3 py-2.5 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-slate-500" />
         </div>
         <button type="submit" disabled={cherche} className="px-4 py-2.5 rounded-md bg-slate-800 text-white text-sm font-semibold inline-flex items-center gap-2">
@@ -142,18 +151,10 @@ const CartonsAfgc = () => {
             <h2 className="text-sm font-semibold text-slate-900">{titre} · {resultats.length}{resultats.length >= 300 ? ' (les 300 premiers)' : ''}</h2>
           </div>
           {resultats.length ? <ul className="divide-y divide-slate-100">{resultats.map((d) => <Ligne key={d.id} d={d} />)}</ul>
-            : <p className="px-4 py-6 text-sm text-slate-500">Aucun dossier en carton ne correspond.</p>}
+            : <p className="px-4 py-6 text-sm text-slate-500">Aucun dossier ne correspond.</p>}
         </section>
       ) : (
         <>
-          <div className="flex gap-1 mb-4 border-b border-slate-200">
-            {Object.entries(FONDS).map(([cle, libelle]) => (
-              <button key={cle} type="button" onClick={() => setFonds(cle)}
-                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px ${fonds === cle ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-                {libelle}{liste?.totaux?.[cle] ? ` (${liste.totaux[cle]})` : ''}
-              </button>
-            ))}
-          </div>
           {rubrique && (
             <p className="mb-3 text-xs text-slate-600">
               Plan de classement : <strong className="text-slate-800">{rubrique.cote} — {rubrique.intitule}</strong>
@@ -175,14 +176,14 @@ const CartonsAfgc = () => {
               ))}
             </div>
           )}
-          {classeurs.length > 0 && (
+          {classeurs.some((c) => c.fonds === fonds) && (
             <section className="mt-8">
               <h2 className="text-sm font-semibold text-slate-900 mb-2">Classeurs importés</h2>
               <ul className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
-                {classeurs.map((c) => (
+                {classeurs.filter((c) => c.fonds === fonds).map((c) => (
                   <li key={`${c.fonds}-${c.fichier}`} className="px-4 py-2 flex items-center gap-3 text-sm">
                     <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">{c.fichier || 'Sans nom'}</span>
-                    <span className="text-slate-500">{c.libelle_fonds} · {c.lignes} lignes · {c.cartons} cartons · {c.importe_le}</span>
+                    <span className="text-slate-500">{c.lignes} lignes · {c.cartons} cartons · {c.importe_le}</span>
                     <button type="button" onClick={() => supprimer(c)} className="p-1.5 rounded text-slate-500 hover:bg-red-50 hover:text-red-600" aria-label="Supprimer"><Trash2 size={15} /></button>
                   </li>
                 ))}
