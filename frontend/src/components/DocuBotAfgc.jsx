@@ -153,6 +153,7 @@ const DocuBotAfgc = () => {
             ) : (
               <div key={i} className="space-y-2">
                 <Texte texte={m.texte} />
+                {m.source === 'ollama' && <p className="text-[11px] text-slate-400">Rédigé par le modèle de langue de l'AFGC, à partir des procédures de l'archive.</p>}
                 {m.elements?.length > 0 && <div className="space-y-1.5">{m.elements.map((e, j) => <Fiche key={j} e={e} />)}</div>}
                 {m.actions?.length > 0 && (
                   <div className="flex flex-wrap gap-2">

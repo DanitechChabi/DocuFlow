@@ -25,3 +25,13 @@ listeService.typologie = async (id, typeDocument) => (await api.patch(`/requests
 // Aide automatique (055) : lecture d'une demande écrite en phrase, sur le serveur.
 listeService.lireDemande = async (texte) => (await api.post('/ia/lire-demande', { texte })).data;
 listeService.etatIa = async () => (await api.get('/ia/etat')).data;
+listeService.etatOllama = async () => (await api.get('/ia/ollama')).data;
+// Jeu d'entraînement de DocuBot (fichier .jsonl), téléchargé avec la session.
+listeService.telechargerJeuDocubot = async (type) => {
+  const r = await api.get(`/ia/jeu-docubot/${type}`, { responseType: 'blob' });
+  const lien = document.createElement('a');
+  lien.href = URL.createObjectURL(r.data);
+  lien.download = `jeu-docubot-${type}.jsonl`;
+  lien.click();
+  setTimeout(() => URL.revokeObjectURL(lien.href), 5000);
+};

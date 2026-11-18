@@ -13,6 +13,20 @@ router.get('/etat', requireAnyPermission(['settings.manage', 'requests.process']
   res.json(ia.etat());
 });
 
+// Ollama (modèle de langue de DocuBot) : joignable ? quel modèle ?
+router.get('/ollama', requireAnyPermission(['settings.manage']), async (req, res) => {
+  res.json(await require('../services/ollamaService').etat(req.user.tenant_id));
+});
+
+// Jeu d'entraînement de DocuBot (noms inventés), à téléverser dans le carnet Colab.
+router.get('/jeu-docubot/:type', requireAnyPermission(['settings.manage']), (req, res) => {
+  const type = req.params.type === 'test' ? 'test' : 'entrainement';
+  const { generer, enJsonl } = require('../services/jeuDocubotService');
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="jeu-docubot-${type}.jsonl"`);
+  res.send(enJsonl(generer()[type]));
+});
+
 // Lecture d'une demande écrite en phrase : entreprise, acte, année, typologie proposée.
 router.post('/lire-demande', requireAnyPermission(['requests.create', 'requests.process']), async (req, res) => {
   try {
