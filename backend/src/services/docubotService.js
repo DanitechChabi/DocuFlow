@@ -22,6 +22,8 @@ const roleService = require('./roleService');
 const entreeService = require('./entreeService');
 const settingsService = require('./settingsService');
 const { NOM_SIMPLE, nomSimple } = require('../helpers/nomEntreprise');
+const ollama = require('./ollamaService');
+const CONNAISSANCES = require('../config/connaissancesAfgc');
 
 const sansAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const plat = (s) => ` ${sansAccents(s).replace(/[^a-z0-9/]+/g, ' ').trim()} `;
@@ -134,7 +136,7 @@ function intention(question, { archive }) {
   if (a(s, /\bsemaine du\b/, /\bpoint du\b/, /\bentres? le\b/, /\bentrees? du\b/) && dateDans(question)) return 'semaine';
   if (a(s, 'retard', 'a recuperer', 'pas rendu', 'pas revenu', 'pas encore rendu', 'non rendus', 'a rendre', 'a retourner')) return 'retards';
   if (a(s, 'a traiter', 'ma journee', 'a transmettre', 'nouvelles demandes', 'en attente', 'quoi faire aujourd hui', 'que dois je faire', 'mon travail')) return archive ? 'journee' : 'mes_demandes';
-  if (a(s, 'qui a', 'chez qui', 'qui detient', 'qui possede', 'qui l a', 'emprunte par', 'sorti chez')) return 'qui_a';
+  if (a(s, 'qui a', 'chez qui', 'qui detient', 'qui possede', 'qui l a', 'emprunte par', 'sorti chez', 'est revenu', 'est il revenu', 'est rentre', 'est il rentre', 'a ete rendu', 'est il rendu', 'est il sorti', 'est sorti')) return 'qui_a';
   if (a(s, 'mes demandes', 'ma demande', 'mes dossiers', 'ou en est', 'ou en sont', 'statut', 'suivi', 'mes prets')) return 'mes_demandes';
   if (a(s, 'je voudrais', 'je veux', 'il me faut', 'j ai besoin', 'demander le', 'demande le', 'besoin du', 'besoin de')) return 'demander';
   if (a(s, 'ou est', 'ou se trouve', 'present', 'presente', 'aux archives', 'quelle armoire', 'quelle semaine', 'entre aux', 'est il entre', 'trouver', 'retrouver', 'cherche', 'localiser')) return 'ou_est';
@@ -230,6 +232,8 @@ async function repondreAide(tenantId, question, droits) {
   let entree = choix && choix.n > 0 ? choix.x : null;
   if (!entree) entree = await aideParLeSens(question, candidates);
   if (!entree) {
+    const redige = await rediger(tenantId, question, droits);
+    if (redige) return redige;
     return {
       texte: 'Je n\'ai pas trouvé d\'aide sur ce point. Voici ce que je sais expliquer :',
       suggestions: candidates.slice(0, 5).map((x) => QUESTION_AIDE[x.cle]).filter(Boolean),
@@ -241,6 +245,23 @@ async function repondreAide(tenantId, question, droits) {
     .replace('{annees}', reglages.mfiles_annees || 'à régler par l\'administrateur');
   const lien = droits.archive && entree.lienArchive ? entree.lienArchive : entree.lien;
   return { texte, actions: lien ? [{ type: 'lien', ...lien }] : [] };
+}
+
+/** Les passages les plus proches de la question (mots en commun), pour la rédaction par Ollama. */
+function passagesPour(question, droits, n = 4) {
+  const mots = plat(question).trim().split(' ').filter((m) => m.length >= 4);
+  const tous = [...CONNAISSANCES, ...AIDE.filter((x) => (!x.archiveSeul || droits.archive)).map((x) => x.texte.replace(/\*\*/g, ''))];
+  return tous
+    .map((p) => ({ p, n: mots.filter((m) => plat(p).includes(` ${m.slice(0, 6)}`)).length }))
+    .filter((x) => x.n > 0).sort((x, y) => y.n - x.n).slice(0, n).map((x) => x.p);
+}
+
+/** Réponse rédigée par Ollama à partir des passages ; null s'il n'est pas là. */
+async function rediger(tenantId, question, droits) {
+  const passages = passagesPour(question, droits);
+  if (!passages.length) return null;
+  const r = await ollama.rediger(tenantId, question, passages);
+  return r ? { texte: r.texte, source: 'ollama' } : null;
 }
 
 const VOCABULAIRE_AIDE = new Set(AIDE.flatMap((x) => x.mots.split(' ')).filter((m) => m.length >= 4));
@@ -296,8 +317,8 @@ const ligneSortie = (p, avecChez) => ({
   ton: p.en_retard ? 'rouge' : 'vert',
 });
 
-async function repondreOuEst(tenantId, question, droits, contexte) {
-  const cible = await entrepriseDans(question);
+async function repondreOuEst(tenantId, question, droits, contexte, indices = null) {
+  const cible = indices?.entreprise || indices?.acte ? { nom: indices.entreprise, acte: indices.acte, annee: null } : await entrepriseDans(question);
   if (!cible.nom && !cible.acte && contexte?.entreprise) cible.nom = contexte.entreprise;
   if (!cible.nom && !cible.acte) {
     return { texte: 'De quel dossier s\'agit-il ? Donnez-moi le **nom de l\'entreprise** ou le **n° d\'acte**.', suggestions: ['Où est le dossier Credo BTP ?'] };
@@ -340,8 +361,8 @@ async function repondreOuEst(tenantId, question, droits, contexte) {
   return res;
 }
 
-async function repondreQuiA(tenantId, question, droits, contexte) {
-  const cible = await entrepriseDans(question);
+async function repondreQuiA(tenantId, question, droits, contexte, indices = null) {
+  const cible = indices?.entreprise || indices?.acte ? { nom: indices.entreprise, acte: indices.acte } : await entrepriseDans(question);
   const nom = cible.acte || cible.nom || contexte?.entreprise;
   if (!droits.archive) {
     const miens = nom ? await sortiesDe(tenantId, nom, { userId: droits.userId }) : [];
@@ -496,8 +517,8 @@ async function repondreChiffres(tenantId, question, droits) {
   };
 }
 
-async function repondreSemaine(tenantId, question) {
-  const date = dateDans(question);
+async function repondreSemaine(tenantId, question, indices = null) {
+  const date = indices?.date || dateDans(question);
   const w = await entreeService.semaine(tenantId, date).catch(() => null);
   if (!w) return { texte: 'Je n\'ai pas compris la date. Écrivez par exemple « semaine du 3 octobre 2025 ».' };
   const n = w.dossiers.length;
@@ -535,6 +556,20 @@ async function repondre(user, question, contexte = {}) {
   let quoi = intention(q, droits);
   // « Où est le plan des armoires ? » : ce n'est pas un dossier, c'est de l'aide.
   if (['ou_est', 'inconnu'].includes(quoi) && !ia.acteDans(q) && sujetDAide(nomDans(q))) quoi = 'aide';
+  // Question non reconnue : le modèle de langue (Ollama), s'il est là, la lit.
+  let indices = null;
+  if (quoi === 'inconnu') {
+    const lu = await ollama.analyser(tenantId, q);
+    // Un nom d'entreprise lu, c'est un dossier qu'on cherche, pas de l'aide.
+    if (lu && (lu.entreprise || lu.acte) && ['aide', 'autre', 'salut'].includes(lu.intention)) lu.intention = 'ou_est';
+    if (lu && lu.intention !== 'autre') {
+      indices = lu;
+      quoi = lu.intention === 'journee' && !droits.archive ? 'mes_demandes' : lu.intention;
+    } else if (lu) {
+      const redige = await rediger(tenantId, q, droits);
+      if (redige) return { intention: 'autre', ...redige };
+    }
+  }
   // Une question sans mot-clé qui contient un nom : on cherche le dossier.
   if (quoi === 'inconnu' && (ia.acteDans(q) || nomDans(q))) quoi = 'ou_est';
   let res;
@@ -547,17 +582,17 @@ async function repondre(user, question, contexte = {}) {
     case 'merci': res = { texte: 'Avec plaisir.' }; break;
     case 'aide': res = await repondreAide(tenantId, q, droits); break;
     case 'chiffres': res = await repondreChiffres(tenantId, q, droits); break;
-    case 'semaine': res = droits.archive ? await repondreSemaine(tenantId, q) : { texte: 'Les semaines d\'entrée sont tenues par l\'archive. Dites-moi plutôt quel dossier vous cherchez.' }; break;
+    case 'semaine': res = droits.archive ? await repondreSemaine(tenantId, q, indices) : { texte: 'Les semaines d\'entrée sont tenues par l\'archive. Dites-moi plutôt quel dossier vous cherchez.' }; break;
     case 'retards': res = await repondreRetards(tenantId, droits); break;
     case 'journee': res = await repondreJournee(tenantId); break;
-    case 'qui_a': res = await repondreQuiA(tenantId, q, droits, contexte); break;
+    case 'qui_a': res = await repondreQuiA(tenantId, q, droits, contexte, indices); break;
     case 'mes_demandes': res = await repondreMesDemandes(tenantId, q, droits); break;
     case 'demander':
-    case 'ou_est': res = await repondreOuEst(tenantId, q, droits, contexte); break;
+    case 'ou_est': res = await repondreOuEst(tenantId, q, droits, contexte, indices); break;
     default:
       res = { texte: 'Je n\'ai pas bien compris. Je peux trouver un dossier, suivre vos demandes, compter, ou expliquer l\'application.', suggestions: suggestionsAccueil(droits) };
   }
-  return { intention: quoi, ...res };
+  return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}) };
 }
 
-module.exports = { repondre, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, AIDE };
+module.exports = { repondre, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };

@@ -92,6 +92,55 @@ const STATUTS_IA = {
   erreur: ['indisponible', 'text-red-600'],
 };
 
+/** DocuBot et Ollama : l'adresse du serveur, le modèle, et un essai. */
+const CarteOllama = ({ v, change, enregistrer, envoi, modifie, champ }) => {
+  const [etat, setEtat] = useState(null);
+  const [essai, setEssai] = useState(false);
+  const tester = async () => {
+    setEssai(true);
+    try { setEtat(await listeService.etatOllama()); } catch { setEtat({ joignable: false, erreur: 'essai impossible' }); } finally { setEssai(false); }
+  };
+  return (
+    <Carte icone={Sparkles} titre="DocuBot : modèle de langue (Ollama)"
+      aide="Facultatif. Avec Ollama sur un serveur de l'AFGC, DocuBot comprend les questions formulées librement et rédige l'aide. Sans lui, DocuBot répond avec ses règles."
+      onEnregistrer={async () => { await enregistrer('ollama', 'ollama_url', 'ollama_modele')(); setEtat(null); }} envoi={envoi === 'ollama'} modifie={modifie('ollama_url', 'ollama_modele')}>
+      <label className="block text-sm font-bold text-slate-700">Adresse d'Ollama
+        <input value={v.ollama_url} onChange={(e) => change('ollama_url')(e.target.value)} placeholder="http://localhost:11434" className={`mt-1 ${champ}`} />
+      </label>
+      <label className="block mt-3 text-sm font-bold text-slate-700">Modèle
+        <input value={v.ollama_modele} onChange={(e) => change('ollama_modele')(e.target.value)} placeholder="docubot-afgc" className={`mt-1 ${champ}`} />
+      </label>
+      <p className="mt-1 text-xs text-slate-500">« docubot-afgc » une fois entraîné ; tant qu'il n'est pas installé, DocuBot prend « qwen3:4b-instruct ».</p>
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" onClick={tester} disabled={essai || !v.ollama_url}
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm font-semibold text-slate-800 hover:border-slate-500 disabled:opacity-40 inline-flex items-center gap-2">
+          {essai && <Loader2 size={14} className="animate-spin" />} Tester la connexion
+        </button>
+        {etat && (etat.joignable
+          ? <span className="text-sm text-green-700">Joignable · modèle servi : <strong>{etat.modele_servi || 'aucun installé'}</strong></span>
+          : <span className="text-sm text-red-600">{etat.configure === false ? 'Enregistrez d\'abord l\'adresse.' : `Injoignable (${etat.erreur || 'erreur'})`}</span>)}
+      </div>
+      <div className="mt-5 pt-4 border-t border-slate-200">
+        <h3 className="text-sm font-bold text-slate-900">Entraîner DocuBot</h3>
+        <ol className="mt-2 space-y-1.5 text-sm text-slate-700 list-decimal pl-5">
+          <li>
+            Téléchargez le jeu d'exemples (noms d'entreprise inventés : rien de l'AFGC ne sort) :{' '}
+            <button type="button" onClick={() => listeService.telechargerJeuDocubot('entrainement').catch(() => toast.error('Téléchargement impossible.'))} className="font-semibold text-slate-900 underline">entraînement</button>
+            {' · '}
+            <button type="button" onClick={() => listeService.telechargerJeuDocubot('test').catch(() => toast.error('Téléchargement impossible.'))} className="font-semibold text-slate-900 underline">test</button>
+          </li>
+          <li>
+            Ouvrez <a href="https://colab.research.google.com" target="_blank" rel="noreferrer" className="font-semibold text-slate-900 underline">Google Colab</a>,
+            importez le <a href="/ia/entrainer-docubot.ipynb" download className="font-semibold text-slate-900 underline">carnet d'entraînement</a>,
+            choisissez un GPU T4, puis « Tout exécuter » (environ une heure). Il produit <code>docubot-afgc.zip</code>.
+          </li>
+          <li>Sur le serveur, en administrateur : <code className="text-xs">scripts\installer-docubot.ps1 -Paquet docubot-afgc.zip</code>, puis « Tester la connexion » ci-dessus.</li>
+        </ol>
+      </div>
+    </Carte>
+  );
+};
+
 /** Les modèles d'aide automatique qui tournent sur le serveur (lecture seule). */
 const AideAutomatique = () => {
   const [etat, setEtat] = useState(null);
@@ -149,6 +198,8 @@ const AdministrationAfgc = () => {
       mfiles_annees: s.mfiles_annees || '',
       mfiles_url: s.mfiles_url || '',
       loan_default_days: String(s.loan_default_days || '7'),
+      ollama_url: s.ollama_url || '',
+      ollama_modele: s.ollama_modele || 'docubot-afgc',
     };
     setInitial(valeurs);
     setV(valeurs);
@@ -264,6 +315,7 @@ const AdministrationAfgc = () => {
           </div>
         </Carte>
         <AideAutomatique />
+        <CarteOllama v={v} change={change} enregistrer={enregistrer} envoi={envoi} modifie={modifie} champ={champ} />
       </div>
     </div>
   );
