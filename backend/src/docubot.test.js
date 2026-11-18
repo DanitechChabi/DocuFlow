@@ -30,6 +30,20 @@ ok(sem.du === '2026-11-13' && sem.au === '2026-11-20', 'cette semaine : du vendr
 ok(d.periodeDans('ce mois', jour).du === '2026-11-01' && d.periodeDans('en octobre 2025', jour).libelle === 'en octobre 2025', 'ce mois, un mois nommé');
 ok(d.periodeDans('en 2025', jour).au === '2026-01-01' && d.periodeDans('en tout', jour) === null, 'une année ; sinon pas de période');
 ok(d.suggestionsAccueil(archive).length === 4 && d.suggestionsAccueil(agent).every((s) => !/traiter|retard/.test(s)), 'suggestions selon le rôle');
+// Questions écrites librement : le modèle appris doit en comprendre au moins 90 %.
+const appris = require('./services/intentionService');
+const debut = Date.now();
+appris.pret();
+ok(Date.now() - debut < 3000, `apprentissage au démarrage en ${Date.now() - debut} ms`);
+const ATTENDU = { ou_est: ['ou_est', 'demander'], salut: ['salut', 'merci'], autre: ['hors_sujet', 'inconnu'] };
+const reelles = require('./config/questionsReellesDocubot');
+const justes = reelles.filter(([q, i]) => (ATTENDU[i] || [i]).includes(d.comprendre(q, archive))).length;
+console.log(`        questions libres comprises : ${justes}/${reelles.length} (${Math.round((100 * justes) / reelles.length)} %)`);
+ok(justes / reelles.length >= 0.9, 'au moins 90 % des questions libres comprises');
+ok(d.comprendre('quelle est la capitale du Bénin ?', archive) === 'hors_sujet', 'hors sujet reconnu');
+ok(d.nomDans('Zinvo Transit a été rapporté ou pas ?') === 'Zinvo Transit' && d.nomDans('tu sais où je peux trouver le dossier de Sonaco ?') === 'Sonaco', 'nom d\'entreprise dans une question libre');
+ok(d.nomDans('est-ce que Mme Adjovi a rendu le dossier Gnonlonfoun ?') === 'Gnonlonfoun' && d.nomDans('Retrouve l\'acte 2025/4410 stp') === null, 'le nom après « dossier » ; rien d\'autre qu\'un acte');
+ok(d.nomDans('mes demandes sont validées ?', { majuscules: true }) === null, 'suivi des demandes : pas de faux nom');
 const routes = require('./routes/iaRoutes');
 ok(routes.stack.some((l) => l.route?.path === '/docubot' && l.route.methods.post), 'route déclarée');
 

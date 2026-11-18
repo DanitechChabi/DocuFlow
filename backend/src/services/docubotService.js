@@ -23,6 +23,7 @@ const entreeService = require('./entreeService');
 const settingsService = require('./settingsService');
 const { NOM_SIMPLE, nomSimple } = require('../helpers/nomEntreprise');
 const ollama = require('./ollamaService');
+const appris = require('./intentionService');
 const CONNAISSANCES = require('../config/connaissancesAfgc');
 
 const sansAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -105,16 +106,69 @@ const BRUIT = new Set(('ou est se trouve trouve trouver retrouver cherche cherch
   + 'sont ai as avez avons ont j puis peux ce cet cette ces mois annee temps garder combien quand pourquoi comment nos notre votre vos leur leurs').split(' '));
 
 /** Le nom cherché dans la question : ce qui reste une fois les mots de la question retirés. */
-function nomDans(question) {
+// Verbes et mots courants des questions libres : jamais un nom d'entreprise.
+const COURANTS = new Set(('tu sais peux pouvez pourriez voudrais veux vouloir faut besoin savoir dire voir vu vérifier verifier montre montrer '
+  + 'montre-moi dis-moi donne-moi retrouve retrouver trouve trouver cherche chercher localiser arrive arriver arrivé arrive recu reçu recus '
+  + 'range rangé rangee classé classe classer entre entré pris prendre parti partie rapporte rapporté ramene ramené restitue restitué '
+  + 'remis rendre rendu revient revenir revenu emprunte emprunté garde garder détient detient possède possede travaille sorti sortie '
+  + 'transmis transmise traité traitée traite validé validée validées valide plus pas ou oui non ete été deja déjà toujours encore '
+  + 'actuellement maintenant hier aujourd lundi mardi mercredi jeudi vendredi samedi dimanche quand depuis quelqu quelqu\'un un agent '
+  + 'casier rayon armoire semaine point date lettre mme m monsieur madame mr dans chez vous nous moi on c\'est est-ce n\'est').split(' '));
+const norm = (m) => sansAccents(m).replace(/^[ld]['’]/, '').replace(/['’].*$/, '');
+const inutile = (m) => /^[ldLDjJnNsScC]?['’]?$/.test(m) || BRUIT.has(norm(m)) || COURANTS.has(norm(m)) || COURANTS.has(sansAccents(m));
+
+/**
+ * Le nom cherché dans la question. Dans l'ordre : les mots en majuscule
+ * (« Kalimo SARL », « Zinvo Transit ») — de préférence ceux qui suivent
+ * « dossier » —, puis ce qui suit « dossier » ou « société », puis ce qui
+ * reste une fois les mots de la question retirés. `majuscules` : seulement
+ * le premier cas (le suivi de ses demandes ne cherche pas « lundi »).
+ */
+function nomDans(question, { majuscules = false } = {}) {
   const acte = ia.acteDans(question);
   // Les points d'un sigle (« B.T.P ») restent ; ceux de fin de phrase partent.
   let s = String(question || '').replace(/[?!,;:«»"“”()]/g, ' ').replace(/\.(?=\s|$)/g, ' ');
   if (acte) s = s.replace(acte, ' ');
   s = s.replace(/\bactes?\s*(n\s*[°o.]?)?\s*/gi, ' ').replace(/\b(19|20)\d{2}\b/g, ' ');
-  const mots = s.split(/\s+/).filter(Boolean);
-  const gardes = mots.filter((m) => !BRUIT.has(sansAccents(m).replace(/^[ld]'/, '').replace(/'.*$/, '')) && !/^[ld]'$/i.test(m));
-  // « l'entreprise Credo » : l' et d' collés au nom.
-  const nom = gardes.map((m) => m.replace(/^[ldLD]['’]/, '')).join(' ').trim();
+  const mots = s.split(/\s+/).filter(Boolean).map((m) => m.replace(/^[ldLD]['’](?=\p{Lu})/u, ''));
+
+  // 1. Les suites de mots en majuscule (« et », « & » permis au milieu).
+  const suites = [];
+  let suite = null;
+  mots.forEach((m, i) => {
+    const majuscule = /^[\p{Lu}0-9]/u.test(m) && !inutile(m);
+    if (majuscule) {
+      if (!suite) suite = { debut: i, mots: [] };
+      suite.mots.push(m);
+    } else if (suite && ['et', '&'].includes(m.toLowerCase()) && /^\p{Lu}/u.test(mots[i + 1] || '')) {
+      suite.mots.push(m);
+    } else if (suite) { suites.push(suite); suite = null; }
+  });
+  if (suite) suites.push(suite);
+  if (suites.length) {
+    const apresDossier = suites.find((x) => /^(dossier|dossiers|classeur|société|societe|entreprise|ets|établissements|etablissements)$/i.test(mots[x.debut - 1] || '')
+      || /^(dossier|société|societe)$/i.test(mots[x.debut - 2] || ''));
+    const choisie = apresDossier || suites.sort((x, y) => y.mots.length - x.mots.length)[0];
+    const nom = choisie.mots.join(' ');
+    if (nom.length >= 2) return nom;
+  }
+  if (majuscules) return null;
+
+  // 2. Ce qui suit « dossier (de la société) » jusqu'au premier mot de question.
+  const i = mots.findIndex((m) => /^(dossier|classeur|société|societe|entreprise)$/i.test(m));
+  if (i >= 0) {
+    const apres = [];
+    for (const m of mots.slice(i + 1)) {
+      if (['de', 'du', 'des', 'la', 'le', 'l'].includes(m.toLowerCase()) && !apres.length) continue;
+      if (/^(société|societe|ets|entreprise|établissements|etablissements)$/i.test(m) && !apres.length) continue;
+      if (inutile(m)) break;
+      apres.push(m);
+    }
+    if (apres.join(' ').length >= 2) return apres.join(' ');
+  }
+
+  // 3. Ce qui reste.
+  const nom = mots.filter((m) => !inutile(m)).join(' ').trim();
   return nom.length >= 2 ? nom : null;
 }
 
@@ -124,6 +178,10 @@ async function entrepriseDans(question) {
   const nom = lu.entreprise || ia.entrepriseNommee(question) || nomDans(question);
   return { nom, acte: lu.acte || ia.acteDans(question), annee: lu.annee || null };
 }
+
+// Confiance minimale pour suivre le modèle appris plutôt que les règles
+// (mesurée : 96 % de questions libres comprises, contre 71 % pour les règles).
+const SEUIL_APPRIS = 0.6;
 
 /** L'intention de la question. */
 function intention(question, { archive }) {
@@ -415,7 +473,7 @@ function etatDemande(d) {
 }
 
 async function repondreMesDemandes(tenantId, question, droits) {
-  const cible = nomDans(question);
+  const cible = nomDans(question, { majuscules: true }) || (/\bpour\s+(?:la\s+|le\s+)?(?:société\s+|ets\s+)?([a-z0-9][\w .&-]{1,60})$/i.exec(question.replace(/[?!.]+\s*$/, ''))?.[1] || null);
   const params = [tenantId, droits.userId];
   let filtre = '';
   if (cible) { params.push(`%${cible.replace(/[\\%_]/g, (c) => `\\${c}`)}%`); filtre = 'AND (q.nom_entreprise ILIKE $3 OR q.num_acte ILIKE $3 OR q.num_dossier ILIKE $3)'; }
@@ -545,6 +603,25 @@ function suggestionsAccueil(droits) {
 }
 
 /**
+ * Ce que veut la question, avant Ollama : les règles, corrigées par le
+ * modèle appris quand il est sûr de lui. Rend une intention de repondre().
+ */
+function comprendre(q, droits) {
+  let quoi = intention(q, droits);
+  // Le modèle appris sur le jeu d'exemples lit les tournures que les règles
+  // ne prévoient pas ; on le suit quand il est sûr de lui.
+  const lu = appris.predire(q);
+  if (lu.confiance >= SEUIL_APPRIS && !(quoi === 'merci' && lu.intention === 'salut') && !(quoi === 'demander' && lu.intention === 'ou_est')) {
+    quoi = lu.intention === 'autre' ? 'hors_sujet' : lu.intention;
+    if (quoi === 'journee' && !droits.archive) quoi = 'mes_demandes';
+    if (quoi === 'semaine' && !dateDans(q)) quoi = 'chiffres';
+  }
+  // « Où est le plan des armoires ? » : ce n'est pas un dossier, c'est de l'aide.
+  if (['ou_est', 'inconnu'].includes(quoi) && !ia.acteDans(q) && sujetDAide(nomDans(q))) quoi = 'aide';
+  return quoi;
+}
+
+/**
  * Répond à une question. Rend { texte, elements?, actions?, suggestions?, contexte? }.
  * `contexte` : ce dont on parlait (l'entreprise), pour « et qui l'a ? ».
  */
@@ -553,9 +630,7 @@ async function repondre(user, question, contexte = {}) {
   const droits = await droitsDe(user);
   const tenantId = user.tenant_id;
   if (!q) return { texte: 'Posez-moi une question.', suggestions: suggestionsAccueil(droits) };
-  let quoi = intention(q, droits);
-  // « Où est le plan des armoires ? » : ce n'est pas un dossier, c'est de l'aide.
-  if (['ou_est', 'inconnu'].includes(quoi) && !ia.acteDans(q) && sujetDAide(nomDans(q))) quoi = 'aide';
+  let quoi = comprendre(q, droits);
   // Question non reconnue : le modèle de langue (Ollama), s'il est là, la lit.
   let indices = null;
   if (quoi === 'inconnu') {
@@ -580,6 +655,12 @@ async function repondre(user, question, contexte = {}) {
       break;
     }
     case 'merci': res = { texte: 'Avec plaisir.' }; break;
+    case 'hors_sujet': {
+      // Hors des archives : Ollama, s'il est là, peut s'appuyer sur les procédures ; sinon on le dit simplement.
+      const redige = await rediger(tenantId, q, droits);
+      res = redige || { texte: 'Je réponds sur les dossiers et les demandes des archives de l\'AFGC. Cette question sort de mon domaine.', suggestions: suggestionsAccueil(droits) };
+      break;
+    }
     case 'aide': res = await repondreAide(tenantId, q, droits); break;
     case 'chiffres': res = await repondreChiffres(tenantId, q, droits); break;
     case 'semaine': res = droits.archive ? await repondreSemaine(tenantId, q, indices) : { texte: 'Les semaines d\'entrée sont tenues par l\'archive. Dites-moi plutôt quel dossier vous cherchez.' }; break;
@@ -595,4 +676,4 @@ async function repondre(user, question, contexte = {}) {
   return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}) };
 }
 
-module.exports = { repondre, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
+module.exports = { repondre, comprendre, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
