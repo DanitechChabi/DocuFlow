@@ -15,37 +15,30 @@ Sans Ollama, ou si le modèle ne répond pas, DocuBot fonctionne comme avant.
 
 ## Les quatre étapes
 
-### 1. Le jeu d'exemples
+### 1 et 2. L'entraînement, sur Google Colab (gratuit, faisable depuis un téléphone)
 
-Dans DocuFlow, ouvrez **Réglages → DocuBot : modèle de langue → Entraîner DocuBot** et téléchargez :
+1. Téléchargez le carnet : https://afgc.vercel.app/ia/entrainer-docubot.ipynb (ou depuis **Réglages → DocuBot : modèle de langue**).
+2. Ouvrez https://colab.research.google.com, choisissez *Importer*, puis le carnet.
+3. Menu *Exécution → Modifier le type d'exécution* → **GPU T4** → Enregistrer.
+4. *Exécution → Tout exécuter*, puis **autorisez Google Drive** dans la fenêtre qui s'ouvre au début.
+5. Comptez **30 à 45 minutes**. Gardez l'onglet ouvert ; sur téléphone, laissez l'écran allumé et branchez le chargeur. La cellule 5 affiche le score sur les questions de test (« Intention juste »).
+6. À la fin, **`docubot-afgc.zip`** (environ 4,3 Go : le modèle GGUF et son `Modelfile`) se trouve dans **Mon Drive → DocuBot**. Les adaptateurs appris y sont aussi copiés dès la fin de l'apprentissage, pour ne rien perdre si la session coupe pendant la conversion.
 
-- `jeu-docubot-entrainement.jsonl` : environ 4 000 questions, chacune avec la bonne lecture ;
-- `jeu-docubot-test.jsonl` : environ 400 autres questions, pour mesurer.
+Le carnet récupère tout seul le jeu d'exemples publié avec DocuFlow (`/ia/jeu-docubot-*.jsonl`). Ses noms d'entreprise sont **inventés** : rien de l'AFGC ne part sur Colab. Les noms du test diffèrent de ceux de l'entraînement : on mesure si le modèle a compris, pas s'il a appris par cœur.
 
-Les noms d'entreprise y sont **inventés**. Rien de l'AFGC ne part donc sur Colab, et les noms du test diffèrent de ceux de l'entraînement : on mesure si le modèle a compris, pas s'il a appris par cœur.
+Le carnet apprend avec la méthode LoRA, c'est-à-dire de petits « adaptateurs » ajoutés au modèle. Il les fusionne ensuite au modèle et le convertit pour Ollama (GGUF, 8 bits), avec les outils de llama.cpp.
 
-Variante avec les vrais noms, à réserver à un entraînement sur un poste de l'AFGC :
+**Variante avec les vrais noms**, à réserver à un entraînement sur un poste de l'AFGC :
 
 ```
 cd backend
 node scripts/ia-documentaire/generer-jeu.js --noms-reels --espace afgc --sortie ..\ia-documentaire\jeu
 ```
 
-### 2. L'entraînement, sur Google Colab (gratuit)
-
-1. Dans Réglages, téléchargez le **carnet d'entraînement** (`entrainer-docubot.ipynb`).
-2. Ouvrez https://colab.research.google.com → *Importer* → choisissez le carnet.
-3. Menu *Exécution → Modifier le type d'exécution* → **GPU T4** → Enregistrer.
-4. *Exécution → Tout exécuter*. À la cellule 2, choisissez les deux fichiers `.jsonl`.
-5. Comptez **40 à 70 minutes**. La cellule 5 affiche le score sur les questions de test.
-6. À la fin, le navigateur télécharge **`docubot-afgc.zip`** (environ 4,3 Go) : le modèle au format GGUF et son `Modelfile`.
-
-Le carnet apprend avec la méthode LoRA, c'est-à-dire de petits « adaptateurs » ajoutés au modèle. Il les fusionne ensuite au modèle et le convertit pour Ollama (GGUF, 8 bits), avec les outils de llama.cpp.
-
 ### 3. L'installation sur le serveur
 
 1. Installez **Ollama** pour Windows : https://ollama.com/download/windows (`OllamaSetup.exe`).
-2. Copiez `docubot-afgc.zip` sur le serveur.
+2. Sur le serveur, téléchargez `docubot-afgc.zip` depuis Google Drive (Mon Drive → DocuBot).
 3. En administrateur, depuis le dossier `scripts` de DocuFlow :
 
 ```

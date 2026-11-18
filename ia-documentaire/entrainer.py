@@ -6,13 +6,20 @@
 # un fichier **`docubot-afgc.gguf`** et son **`Modelfile`**, à installer dans Ollama.
 #
 # **Avant de lancer :** menu *Exécution → Modifier le type d'exécution → GPU T4*, puis
-# *Exécution → Tout exécuter*. Comptez 40 à 70 minutes. À la cellule 2, choisissez le fichier
-# `jeu-docubot-entrainement.jsonl` (et, si vous l'avez, `jeu-docubot-test.jsonl`).
+# *Exécution → Tout exécuter*. Autorisez l'accès à Google Drive quand la fenêtre s'ouvre
+# (tout au début). Rien d'autre à faire : le carnet récupère seul les exemples, et dépose le
+# modèle dans **Mon Drive → DocuBot**. Comptez 30 à 45 minutes ; gardez l'onglet ouvert
+# (sur téléphone : écran allumé, branché au chargeur).
 
 # %%
-# 1. Les outils (versions éprouvées avec ce carnet).
-import os, sys, subprocess
+# 1. Google Drive (là où le modèle sera déposé), puis les outils (versions éprouvées).
+import os, sys, subprocess, shutil
 SUR_COLAB = 'google.colab' in sys.modules
+DRIVE = '/content/drive/MyDrive/DocuBot'
+if SUR_COLAB:
+    from google.colab import drive
+    drive.mount('/content/drive')
+    os.makedirs(DRIVE, exist_ok=True)
 if SUR_COLAB or os.environ.get('INSTALLER') == '1':
     subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'transformers==5.23.0', 'peft==0.21.3', 'trl==1.18.1',
                     'datasets==5.2.0', 'accelerate==1.16.0', 'bitsandbytes', 'sentencepiece', 'gguf'], check=True)
@@ -24,10 +31,12 @@ if SUR_COLAB or os.environ.get('INSTALLER') == '1':
 # 2. Le jeu d'exemples (fabriqué par DocuFlow : node scripts/ia-documentaire/generer-jeu.js).
 JEU = os.environ.get('JEU', 'jeu-docubot-entrainement.jsonl')
 TEST = os.environ.get('TEST', 'jeu-docubot-test.jsonl')
-if SUR_COLAB and not os.path.exists(JEU):
-    from google.colab import files
-    print('Choisissez jeu-docubot-entrainement.jsonl (et jeu-docubot-test.jsonl si vous l\'avez).')
-    files.upload()
+# Les exemples (noms d'entreprise inventés) sont publiés avec DocuFlow : pas de fichier à choisir.
+ADRESSE = os.environ.get('ADRESSE_JEU', 'https://afgc.vercel.app/ia')
+import urllib.request
+for f in (JEU, TEST):
+    if not os.path.exists(f):
+        urllib.request.urlretrieve(f'{ADRESSE}/{f}', f)
 assert os.path.exists(JEU), f'{JEU} introuvable'
 print(sum(1 for _ in open(JEU, encoding='utf-8')), 'exemples d\'entraînement')
 
@@ -41,7 +50,7 @@ from trl import SFTTrainer, SFTConfig
 
 MODELE = os.environ.get('MODELE', 'Qwen/Qwen3-4B-Instruct-2507')
 NOM = os.environ.get('NOM', 'docubot-afgc')
-EPOQUES = float(os.environ.get('EPOQUES', '2'))
+EPOQUES = float(os.environ.get('EPOQUES', '1'))
 PAS_MAX = int(os.environ.get('PAS_MAX', '-1'))   # pour un essai rapide : PAS_MAX=20
 GPU = torch.cuda.is_available()
 BF16 = GPU and torch.cuda.is_bf16_supported()
@@ -73,6 +82,9 @@ entraineur = SFTTrainer(model=modele, args=reglages, train_dataset=jeu, processi
 entraineur.train()
 entraineur.model.save_pretrained(f'{NOM}-lora')
 tok.save_pretrained(f'{NOM}-lora')
+if SUR_COLAB:
+    # Sauvegarde intermédiaire : si la session coupe pendant la conversion, l'apprentissage est gardé.
+    shutil.copytree(f'{NOM}-lora', f'{DRIVE}/{NOM}-lora', dirs_exist_ok=True)
 
 # %%
 # 5. Un premier contrôle sur des questions jamais vues (noms différents de l'entraînement).
@@ -94,7 +106,7 @@ if os.path.exists(TEST):
         except Exception:
             lu = {}
         justes += lu.get('intention') == attendu['intention']
-    print(f'Intention juste : {justes}/{len(essais)}')
+    print(f'Intention juste : {justes}/{len(essais)} ({round(100 * justes / len(essais))} %)')
 
 # %%
 # 6. Fusion des adaptateurs dans le modèle, puis conversion pour Ollama (GGUF, 8 bits).
@@ -135,15 +147,6 @@ PARAMETER num_ctx 4096
 open('Modelfile', 'w', encoding='utf-8').write(MODELFILE)
 subprocess.run(['zip', '-q', '-0', f'{NOM}.zip', f'{NOM}.gguf', 'Modelfile'], check=True)
 print(f'Prêt : {NOM}.zip ({os.path.getsize(f"{NOM}.zip") / 1e9:.1f} Go)')
-# Plus sûr pour 4 Go : COPIER_DANS_DRIVE = True copie le paquet dans votre Google Drive
-# (une fenêtre demande l'autorisation), d'où vous le téléchargez tranquillement.
-COPIER_DANS_DRIVE = False
-if SUR_COLAB and COPIER_DANS_DRIVE:
-    from google.colab import drive
-    import shutil
-    drive.mount('/content/drive')
-    shutil.copy(f'{NOM}.zip', f'/content/drive/MyDrive/{NOM}.zip')
-    print(f'Copié dans Mon Drive : {NOM}.zip')
-elif SUR_COLAB:
-    from google.colab import files
-    files.download(f'{NOM}.zip')
+if SUR_COLAB:
+    shutil.copy(f'{NOM}.zip', f'{DRIVE}/{NOM}.zip')
+    print(f'Déposé dans Mon Drive → DocuBot → {NOM}.zip : à télécharger depuis le serveur.')
