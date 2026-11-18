@@ -124,18 +124,21 @@ const CarteOllama = ({ v, change, enregistrer, envoi, modifie, champ }) => {
         <h3 className="text-sm font-bold text-slate-900">Entraîner DocuBot</h3>
         <ol className="mt-2 space-y-1.5 text-sm text-slate-700 list-decimal pl-5">
           <li>
-            Téléchargez le jeu d'exemples (noms d'entreprise inventés : rien de l'AFGC ne sort) :{' '}
-            <button type="button" onClick={() => listeService.telechargerJeuDocubot('entrainement').catch(() => toast.error('Téléchargement impossible.'))} className="font-semibold text-slate-900 underline">entraînement</button>
-            {' · '}
-            <button type="button" onClick={() => listeService.telechargerJeuDocubot('test').catch(() => toast.error('Téléchargement impossible.'))} className="font-semibold text-slate-900 underline">test</button>
+            Téléchargez le <a href="/ia/entrainer-docubot.ipynb" download className="font-semibold text-slate-900 underline">carnet d'entraînement</a> (même
+            depuis un téléphone), puis importez-le dans <a href="https://colab.research.google.com" target="_blank" rel="noreferrer" className="font-semibold text-slate-900 underline">Google Colab</a>.
           </li>
           <li>
-            Ouvrez <a href="https://colab.research.google.com" target="_blank" rel="noreferrer" className="font-semibold text-slate-900 underline">Google Colab</a>,
-            importez le <a href="/ia/entrainer-docubot.ipynb" download className="font-semibold text-slate-900 underline">carnet d'entraînement</a>,
-            choisissez un GPU T4, puis « Tout exécuter » (environ une heure). Il produit <code>docubot-afgc.zip</code>.
+            Exécution → Modifier le type d'exécution → <strong>GPU T4</strong>, puis « Tout exécuter » et autorisez Google Drive. Le carnet prend seul
+            les exemples (noms d'entreprise inventés) et dépose <code>docubot-afgc.zip</code> dans Mon Drive → DocuBot (30 à 45 minutes, onglet ouvert).
           </li>
           <li>Sur le serveur, en administrateur : <code className="text-xs">scripts\installer-docubot.ps1 -Paquet docubot-afgc.zip</code>, puis « Tester la connexion » ci-dessus.</li>
         </ol>
+        <p className="mt-2 text-xs text-slate-500">
+          Exemples seuls :{' '}
+          <button type="button" onClick={() => listeService.telechargerJeuDocubot('entrainement').catch(() => toast.error('Téléchargement impossible.'))} className="underline">entraînement</button>
+          {' · '}
+          <button type="button" onClick={() => listeService.telechargerJeuDocubot('test').catch(() => toast.error('Téléchargement impossible.'))} className="underline">test</button>
+        </p>
       </div>
     </Carte>
   );
