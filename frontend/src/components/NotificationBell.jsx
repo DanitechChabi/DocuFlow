@@ -4,6 +4,7 @@ import { Bell, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationService } from '../services/notificationService';
 import { useDelayedUnmount } from '../hooks/useDelayedUnmount';
+import { ReglageNotifications } from './NotificationsAppareil';
 
 const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
   const [notifications, setNotifications] = useState([]);
@@ -159,6 +160,8 @@ const NotificationBell = ({ 'data-tour': dataTour, ...rest }) => {
                 </button>
               )}
             </div>
+
+            <ReglageNotifications />
 
             {/* List */}
             <div className="max-h-96 overflow-y-auto">

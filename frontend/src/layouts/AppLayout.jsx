@@ -8,6 +8,7 @@ import GlobalSearch from '../components/GlobalSearch';
 import ContextualTooltips from '../components/ContextualTooltips';
 import VisiteGuidee from '../components/onboarding/VisiteGuidee';
 import NotificationBell from '../components/NotificationBell';
+import { InviteNotifications } from '../components/NotificationsAppareil';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { estBureau } from '../utils/plateforme';
@@ -142,6 +143,7 @@ const AppLayout = () => {
         </header>
 
         <main className="flex-1 overflow-y-auto relative">
+          {!estBureau() && <InviteNotifications />}
           {/* `key` sur le chemin : React remonte le contenu à chaque navigation,
               ce qui rejoue `page-enter` — sans ça, l'Outlet remplace le contenu
               sans aucune transition. */}
