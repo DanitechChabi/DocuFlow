@@ -17,6 +17,10 @@ import os, sys, subprocess, shutil
 SUR_COLAB = 'google.colab' in sys.modules
 DRIVE = '/content/drive/MyDrive/DocuBot'
 if SUR_COLAB:
+    import torch
+    if not torch.cuda.is_available():
+        raise SystemExit('\n\n>>> PAS DE CARTE GRAPHIQUE. Menu Exécution → Modifier le type d\'exécution → choisir « T4 GPU » → Enregistrer, puis Exécution → Tout exécuter.\n')
+    print('Carte graphique trouvée : on continue.')
     from google.colab import drive
     drive.mount('/content/drive')
     os.makedirs(DRIVE, exist_ok=True)
