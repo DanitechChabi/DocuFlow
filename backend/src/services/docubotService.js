@@ -24,6 +24,8 @@ const settingsService = require('./settingsService');
 const { NOM_SIMPLE, nomSimple } = require('../helpers/nomEntreprise');
 const ollama = require('./ollamaService');
 const appris = require('./intentionService');
+const apprentissage = require('./apprentissageService');
+const agent = require('./docubotAgent');
 const CONNAISSANCES = require('../config/connaissancesAfgc');
 
 const sansAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -404,7 +406,7 @@ async function repondreOuEst(tenantId, question, droits, contexte, indices = nul
     const approche = p.entrees[0]?.approche;
     res.texte = approche
       ? `Je ne trouve pas « ${libelle} » écrit ainsi, mais un **nom proche** :`
-      : `« **${libelle}** » est aux archives${p.total > 1 ? ` (${pluriel(p.total, 'entrée')})` : ''} :`;
+      : `« **${libelle}** » est aux archives${p.total > 1 ? ` (${pluriel(p.total, 'entrée')}, toutes années confondues)` : ''} :`;
     // Trois fiches suffisent ; la recherche complète est à un clic.
     res.elements = elements.slice(0, 3);
     if (p.total > res.elements.length) res.texte += approche ? '' : ` voici les ${res.elements.length} plus récentes.`;
@@ -592,7 +594,7 @@ async function repondreSemaine(tenantId, question, indices = null) {
 async function droitsDe(user) {
   const possede = (p) => roleService.possede(user.tenant_id, user.role, p).catch(() => false);
   const [archive, demandeur, admin] = await Promise.all([possede('requests.process'), possede('requests.create'), possede('users.view')]);
-  return { archive, demandeur, admin, userId: user.id };
+  return { archive, demandeur, admin, userId: user.id, tenantId: user.tenant_id };
 }
 
 /** Suggestions d'accueil, selon le rôle. */
@@ -606,19 +608,41 @@ function suggestionsAccueil(droits) {
  * Ce que veut la question, avant Ollama : les règles, corrigées par le
  * modèle appris quand il est sûr de lui. Rend une intention de repondre().
  */
-function comprendre(q, droits) {
+function comprendreDetail(q, droits) {
   let quoi = intention(q, droits);
-  // Le modèle appris sur le jeu d'exemples lit les tournures que les règles
-  // ne prévoient pas ; on le suit quand il est sûr de lui.
-  const lu = appris.predire(q);
+  let source = 'regles';
+  // Le modèle appris (jeu d'exemples + usage de l'organisation) lit les
+  // tournures que les règles ne prévoient pas ; on le suit quand il est sûr de lui.
+  const lu = appris.predire(q, droits.tenantId ?? null);
   if (lu.confiance >= SEUIL_APPRIS && !(quoi === 'merci' && lu.intention === 'salut') && !(quoi === 'demander' && lu.intention === 'ou_est')) {
+    const avant = quoi;
     quoi = lu.intention === 'autre' ? 'hors_sujet' : lu.intention;
     if (quoi === 'journee' && !droits.archive) quoi = 'mes_demandes';
     if (quoi === 'semaine' && !dateDans(q)) quoi = 'chiffres';
+    if (quoi !== avant) source = 'appris';
   }
   // « Où est le plan des armoires ? » : ce n'est pas un dossier, c'est de l'aide.
   if (['ou_est', 'inconnu'].includes(quoi) && !ia.acteDans(q) && sujetDAide(nomDans(q))) quoi = 'aide';
-  return quoi;
+  return { quoi, confiance: Math.round(lu.confiance * 100) / 100, source };
+}
+
+/** Ce que veut la question, avant Ollama (voir comprendreDetail). */
+const comprendre = (q, droits) => comprendreDetail(q, droits).quoi;
+
+/** Les recherches de DocuBot, offertes comme outils au modèle de langue (docubotAgent). */
+function outilsPour(tenantId, droits) {
+  const cible = (x) => (/\d+\s*\/\s*\d+|^\d+$/.test(String(x || '').trim()) ? { acte: String(x).trim() } : { entreprise: x || null });
+  const reserve = { texte: 'Réservé à l\'archive.' };
+  return {
+    chercher_dossier: ({ entreprise, acte } = {}) => repondreOuEst(tenantId, '', droits, {}, { entreprise: entreprise || null, acte: acte || null }),
+    qui_a_le_dossier: ({ entreprise } = {}) => repondreQuiA(tenantId, '', droits, {}, cible(entreprise)),
+    mes_demandes: ({ entreprise } = {}) => repondreMesDemandes(tenantId, entreprise ? `mes demandes pour ${entreprise}` : 'mes demandes', droits),
+    retards: () => repondreRetards(tenantId, droits),
+    travail_du_jour: () => (droits.archive ? repondreJournee(tenantId) : reserve),
+    chiffres: ({ question } = {}) => repondreChiffres(tenantId, question || 'combien de demandes', droits),
+    entrees_semaine: ({ date } = {}) => (droits.archive ? repondreSemaine(tenantId, String(date || ''), { date: /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? date : null }) : reserve),
+    aide: ({ question } = {}) => repondreAide(tenantId, question || '', droits),
+  };
 }
 
 /**
@@ -630,7 +654,17 @@ async function repondre(user, question, contexte = {}) {
   const droits = await droitsDe(user);
   const tenantId = user.tenant_id;
   if (!q) return { texte: 'Posez-moi une question.', suggestions: suggestionsAccueil(droits) };
-  let quoi = comprendre(q, droits);
+  const lecture = comprendreDetail(q, droits);
+  let quoi = lecture.quoi;
+  // Question complexe, ou non reconnue : si Ollama est là, DocuBot raisonne
+  // en enchaînant ses recherches (docubotAgent).
+  if ((agent.complexe(q) || quoi === 'inconnu') && !['salut', 'merci'].includes(quoi) && await ollama.regle(tenantId)) {
+    const r = await agent.raisonner(tenantId, q, droits, outilsPour(tenantId, droits));
+    if (r) {
+      const echange = await apprentissage.noter(tenantId, user.id, q, { intention: quoi, confiance: lecture.confiance, source: 'agent' });
+      return { intention: 'raisonnement', ...r, echange };
+    }
+  }
   // Question non reconnue : le modèle de langue (Ollama), s'il est là, la lit.
   let indices = null;
   if (quoi === 'inconnu') {
@@ -642,7 +676,10 @@ async function repondre(user, question, contexte = {}) {
       quoi = lu.intention === 'journee' && !droits.archive ? 'mes_demandes' : lu.intention;
     } else if (lu) {
       const redige = await rediger(tenantId, q, droits);
-      if (redige) return { intention: 'autre', ...redige };
+      if (redige) {
+        const echange = await apprentissage.noter(tenantId, user.id, q, { intention: 'hors_sujet', confiance: lecture.confiance, source: 'ollama' });
+        return { intention: 'autre', ...redige, echange };
+      }
     }
   }
   // Une question sans mot-clé qui contient un nom : on cherche le dossier.
@@ -673,7 +710,9 @@ async function repondre(user, question, contexte = {}) {
     default:
       res = { texte: 'Je n\'ai pas bien compris. Je peux trouver un dossier, suivre vos demandes, compter, ou expliquer l\'application.', suggestions: suggestionsAccueil(droits) };
   }
-  return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}) };
+  const source = indices ? 'ollama' : res.source || lecture.source;
+  const echange = await apprentissage.noter(tenantId, user.id, q, { intention: quoi, confiance: lecture.confiance, source });
+  return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}), echange };
 }
 
-module.exports = { repondre, comprendre, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
+module.exports = { repondre, comprendre, comprendreDetail, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };

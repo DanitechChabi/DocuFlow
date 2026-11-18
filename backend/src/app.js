@@ -381,6 +381,20 @@ const server = ecouter(app, () => {
     // noms d'entreprise. Un peu après le démarrage, pour ne pas le ralentir.
     // DocuBot : le modèle des intentions apprend sur son jeu d'exemples (≈ 0,1 s).
     try { require('./services/intentionService').pret(); } catch (err) { console.error('[docubot] apprentissage :', err.message); }
+    // Puis ce qu'il a appris de l'usage de chaque organisation (056), et chaque nuit.
+    require('./services/apprentissageService').demarrer();
+    // La veille du matin, par courriel à l'archive (056).
+    require('./services/veilleService').demarrer();
+    // Le modèle de langue (Ollama), s'il est réglé : chargé maintenant et
+    // gardé chargé, pour que la première question n'attende pas.
+    const prechauffer = async () => {
+      try {
+        const r = await require('./config/db').query("SELECT DISTINCT tenant_id FROM settings WHERE key = 'ollama_url' AND COALESCE(value::text, '') NOT IN ('', 'null', '\"\"')");
+        for (const { tenant_id: t } of r.rows) await require('./services/ollamaService').prechauffer(t);
+      } catch { /* sans Ollama : rien à charger */ }
+    };
+    setTimeout(prechauffer, 20000).unref();
+    setInterval(prechauffer, 6 * 60 * 60 * 1000).unref();
     setTimeout(() => {
       const ia = require('./services/iaService');
       const actifs = ia.modelesActifs();

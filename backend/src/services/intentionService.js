@@ -60,9 +60,46 @@ function pret() {
   return modele;
 }
 
-/** { intention, confiance (0-1), classement } pour une question. */
-function predire(question) {
-  const m = pret();
+// ---------------------------------------------------------------------------
+// Modèles par organisation : le modèle de base, plus les exemples tirés de
+// l'usage (questions corrigées par l'archive, réponses jugées utiles). Un
+// exemple de l'usage compte comme POIDS_USAGE exemples du jeu : il dit
+// comment les agents parlent vraiment.
+// ---------------------------------------------------------------------------
+const POIDS_USAGE = 4;
+const espaces = new Map(); // tenant → { modele, exemples, le }
+
+/** Réentraîne le modèle d'une organisation : base + exemples [{ question, intention }] de l'usage. */
+function entrainerEspace(tenantId, exemples) {
+  const base = pret();
+  const parClasse = {};
+  for (const [k, c] of Object.entries(base.parClasse)) parClasse[k] = { n: c.n, total: c.total, compte: new Map(c.compte) };
+  const vocabulaire = new Set(Object.values(base.parClasse).flatMap((c) => [...c.compte.keys()]));
+  let n = base.n;
+  for (const { question, intention } of exemples) {
+    const c = (parClasse[intention] ||= { n: 0, total: 0, compte: new Map() });
+    c.n += POIDS_USAGE;
+    n += POIDS_USAGE;
+    for (const t of new Set(traits(question))) {
+      c.compte.set(t, (c.compte.get(t) || 0) + POIDS_USAGE);
+      c.total += POIDS_USAGE;
+      vocabulaire.add(t);
+    }
+  }
+  const modele = { parClasse, v: vocabulaire.size, n };
+  espaces.set(Number(tenantId), { modele, exemples: exemples.length, le: new Date() });
+  return { exemples: exemples.length };
+}
+
+/** Ce que sait le modèle d'une organisation. */
+function etatEspace(tenantId) {
+  const e = espaces.get(Number(tenantId));
+  return { exemples_base: pret().n, exemples_usage: e?.exemples || 0, entraine_le: e?.le || null };
+}
+
+/** { intention, confiance (0-1), classement } pour une question (modèle de l'organisation s'il existe). */
+function predire(question, tenantId = null) {
+  const m = (tenantId !== null && espaces.get(Number(tenantId))?.modele) || pret();
   const t = [...new Set(traits(question))].filter((x) => Object.values(m.parClasse).some((c) => c.compte.has(x)));
   const scores = Object.entries(m.parClasse).map(([classe, c]) => {
     let s = Math.log(c.n / m.n);
@@ -78,4 +115,4 @@ function predire(question) {
   };
 }
 
-module.exports = { traits, entrainer, pret, predire };
+module.exports = { traits, entrainer, pret, predire, entrainerEspace, etatEspace, POIDS_USAGE };

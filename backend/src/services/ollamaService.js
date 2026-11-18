@@ -102,13 +102,56 @@ async function discuter(tenantId, messages, { json = false, delai = 30000 } = {}
     const r = await appel(c.url, '/api/chat', {
       model: modele, stream: false, messages, ...(json ? { format: 'json' } : {}),
       options: { temperature: json ? 0 : 0.2, num_predict: json ? 120 : 300 },
-      keep_alive: '30m',
+      keep_alive: '24h',
     }, delai);
     return { texte: String(r.message?.content || '').trim(), modele };
   } catch (err) {
     console.error(`[ollama] ${err.name === 'AbortError' ? 'pas de réponse à temps' : err.message}`);
     return null;
   }
+}
+
+/**
+ * Un tour de conversation avec des outils (appel de fonctions d'Ollama) :
+ * rend le message du modèle ({ content, tool_calls }) ou null.
+ */
+async function tourAvecOutils(tenantId, messages, outils, { delai = 60000 } = {}) {
+  const c = await config(tenantId);
+  if (!c.url) return null;
+  try {
+    const modele = await modeleServi(c);
+    if (!modele) return null;
+    const r = await appel(c.url, '/api/chat', {
+      model: modele, stream: false, messages, tools: outils,
+      options: { temperature: 0.1, num_predict: 400 }, keep_alive: '24h',
+    }, delai);
+    return { ...(r.message || {}), modele };
+  } catch (err) {
+    console.error(`[ollama] ${err.name === 'AbortError' ? 'pas de réponse à temps' : err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Charge le modèle en mémoire et l'y garde : sans cela, la première question
+ * attend le chargement (une minute et plus sur un serveur sans carte graphique).
+ */
+async function prechauffer(tenantId) {
+  const c = await config(tenantId);
+  if (!c.url) return false;
+  try {
+    const modele = await modeleServi(c);
+    if (!modele) return false;
+    await appel(c.url, '/api/generate', { model: modele, prompt: '', keep_alive: '24h' }, 180000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Ollama est-il réglé pour cette organisation ? */
+async function regle(tenantId) {
+  return Boolean((await config(tenantId)).url);
 }
 
 /** Lit l'intention d'une question : { intention, entreprise, acte, date } ou null. */
@@ -141,4 +184,4 @@ async function rediger(tenantId, question, passages) {
   return r && r.texte ? r : null;
 }
 
-module.exports = { config, etat, analyser, rediger, CONSIGNE_ANALYSE, CONSIGNE_REDACTION, INTENTIONS, MODELE_DEFAUT, MODELE_REPLI };
+module.exports = { config, etat, analyser, rediger, tourAvecOutils, regle, prechauffer, CONSIGNE_ANALYSE, CONSIGNE_REDACTION, INTENTIONS, MODELE_DEFAUT, MODELE_REPLI };
