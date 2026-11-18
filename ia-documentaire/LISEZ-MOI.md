@@ -9,7 +9,19 @@ Le modèle ne remplace pas les données. Il a deux rôles :
 
 Sans Ollama, ou si le modèle ne répond pas, DocuBot fonctionne comme avant.
 
-## Le modèle choisi
+## Deux niveaux d'apprentissage
+
+1. **Toujours actif, sans rien installer** : au démarrage du serveur, DocuBot apprend sur le jeu d'exemples ci-dessous (environ 4 500 questions, en 0,1 seconde, sans carte graphique). Ce petit modèle bayésien (`backend/src/services/intentionService.js`) reconnaît ce que veut une question tournée librement. Mesures sur des questions écrites à la main, hors des exemples :
+
+   | | Règles seules | Avec le modèle appris |
+   |---|---|---|
+   | 70 questions libres (`config/questionsReellesDocubot.js`) | 46 % | 97 % |
+   | 24 questions jamais vues pendant les réglages | 71 % | 96 % |
+
+   Les formulations ajoutées au jeu ont été écrites après avoir vu les erreurs sur les 70 questions libres : le second jeu, jamais vu, est la mesure la plus honnête. Un test empêche le score des questions libres de descendre sous 90 %.
+2. **En option, Ollama** : un vrai modèle de langue, entraîné sur Colab (ci-dessous), pour les questions que le premier niveau ne sait pas lire et pour rédiger l'aide.
+
+## Le modèle choisi (niveau 2)
 
 **Qwen3 4B Instruct 2507** (`Qwen/Qwen3-4B-Instruct-2507` sur Hugging Face), sous **licence Apache 2.0**, ce qui permet l'usage en entreprise. Il est bon en français, assez petit pour tourner sans carte graphique sur le serveur (environ 3 Go de mémoire, quelques secondes par question), et assez grand pour bien apprendre.
 

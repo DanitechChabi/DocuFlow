@@ -48,6 +48,7 @@ const unActe = () => un([`${un([2024, 2025, 2026])}/${1 + Math.floor(hasard() * 
 // ---------------------------------------------------------------------------
 const MODELES = {
   ou_est: [
+    'vous avez le dossier {E} chez vous aux archives ?', 'il est où le classeur de {E}', 'je voudrais savoir où on a rangé {E}', 'le dossier {E} se trouve dans quel rayon', 'on a classé {E} où ?', "{E} c'est dans quelle armoire", 'pouvez-vous chercher {E} dans les archives', 'le dossier {E} existe chez vous ?', "vous l'avez reçu le dossier {E} ?", 'merci de me localiser le dossier {E}',
     'Où est le dossier {E} ?', 'où se trouve le dossier de {P} {E}', 'Le dossier {E} est-il aux archives ?', 'Dans quelle armoire est rangé {E} ?',
     'Quelle semaine pour le dossier {E} ?', 'tu peux me retrouver {E} ?', 'je cherche le dossier {E}', '{E}', '{E} acte {A}', 'acte {A}',
     'où est l\'acte {A} ?', 'le dossier de {E} a-t-il été entré ?', 'Est-ce que {E} est classé ?', 'à quelle date le point de {E} ?',
@@ -56,35 +57,42 @@ const MODELES = {
     'dans quelle lettre est {E}', 'J\'aurais besoin du dossier {E}, il est où ?', 'est ce que vous avez le dossier {E}',
   ],
   qui_a: [
+    'le dossier {E} a été ramené ?', 'on a rapporté le dossier {E} ?', '{E} a été restitué ou pas ?', "quelqu'un a pris le dossier {E} ?", "le dossier {E} n'est pas à sa place, il est chez qui", '{E} est encore chez un agent ?', "l'agent a remis le dossier {E} ?", 'le dossier {E} est parti chez qui', 'qui travaille sur le dossier {E} en ce moment', '{E}, il est sorti depuis quand ?',
     'Qui a le dossier {E} ?', 'chez qui est {E} ?', 'Le dossier {E} est-il sorti ?', 'Est-ce que {E} est revenu ?', 'qui détient l\'acte {A} ?',
     '{E} a été rendu ?', 'le dossier de {E} est toujours dehors ?', 'Qui a emprunté {E} ?', 'est-ce que quelqu\'un a le dossier {E}',
     'le dossier {E} est-il rentré aux archives ?', 'qui l\'a pris, le dossier {E} ?', 'quand revient le dossier {E} ?', '{E} est chez qui',
     'Le dossier de la {P} {E} n\'est pas dans l\'armoire, qui l\'a ?', 'qui garde l\'acte {A}', 'à qui on a transmis {E} ?',
   ],
   mes_demandes: [
+    "ce que j'ai demandé, ça avance ?", "les dossiers que j'ai demandés", 'ma requête pour {E} est traitée ?', "où en est ce que j'ai demandé pour {E}", "l'archive a bien reçu ce que j'ai demandé ?", "j'attends le dossier {E} depuis hier", 'ma demande a été rejetée ?', "je n'ai pas encore reçu le dossier que j'ai demandé",
     'Où en sont mes demandes ?', 'où en est ma demande {E} ?', 'mes demandes', 'quel est le statut de ma demande ?', 'ma demande pour {E} a été traitée ?',
     'Est-ce que l\'archive a reçu ma demande ?', 'suivi de mes dossiers', 'qu\'est devenue ma demande de {E}', 'j\'ai demandé {E} hier, c\'est en cours ?',
     'mes dossiers demandés', 'ma demande est-elle partie ?', 'on a traité ma demande ?', 'état de mes demandes svp',
   ],
   retards: [
+    "j'ai encore des dossiers chez moi ?", 'des dossiers à ramener ?', 'je dois ramener quels dossiers', "les dossiers que je n'ai pas encore rapportés", 'qui garde des dossiers trop longtemps', 'dossiers dont le délai est dépassé', 'les retardataires', 'quels prêts ont dépassé la date',
     'Quels dossiers sont en retard ?', 'ai-je des dossiers à rendre ?', 'dossiers à récupérer', 'qui n\'a pas rendu son dossier ?', 'les retards',
     'liste des dossiers pas encore rentrés', 'est-ce que je dois rendre un dossier ?', 'quels agents sont en retard', 'dossiers non retournés',
     'qu\'est-ce que je dois rapporter aux archives ?', 'y a-t-il des retards ?', 'dossiers dont la date de retour est passée',
   ],
   journee: [
+    "qu'est-ce qui m'attend aujourd'hui", 'y a-t-il du travail en attente', 'les nouvelles demandes du jour', 'il y a des demandes à servir ?', 'quoi de prévu ce matin', "les dossiers à sortir aujourd'hui", 'tâches du jour', 'ce qui reste à traiter',
     'Qu\'est-ce que j\'ai à traiter ?', 'ma journée', 'quoi de neuf aujourd\'hui ?', 'combien de demandes en attente pour moi', 'qu\'est-ce que je dois faire ce matin ?',
     'les demandes à transmettre', 'nouvelles demandes ?', 'le travail du jour', 'quelles demandes sont arrivées ?', 'résumé de la journée',
   ],
   chiffres: [
+    'les statistiques de la semaine', 'donne-moi les chiffres du mois', 'combien au total cette année', 'le nombre de dossiers sortis ce mois', 'combien de dossiers la semaine dernière', 'quel volume de demandes ce mois-ci', 'compte les dossiers entrés', "combien d'actes enregistrés en {Y}",
     'Combien de dossiers entrés ce mois ?', 'combien de dossiers sortis ?', 'nombre de demandes cette semaine', 'combien de dossiers en {M} {Y} ?',
     'combien de dossiers retournés aujourd\'hui', 'combien de demandes en {Y}', 'total des dossiers entrés cette année', 'combien d\'agents ?',
     'statistiques du mois', 'combien de dossiers sont dehors en ce moment ?', 'il y a eu combien de points cette semaine',
   ],
   semaine: [
+    'les dossiers du {D}', 'ce qui est entré le {D}', 'la liste du point du {D}', 'affiche la semaine du {D}',
     'Semaine du {D}', 'les dossiers entrés le {D}', 'point du {D}', 'qu\'est-ce qui est entré la semaine du {D} ?', 'dossiers du {D}',
     'montre-moi la semaine du {D}', 'combien de dossiers le {D}', 'les entrées du {D}',
   ],
   aide: [
+    'comment ça marche pour rendre un dossier', 'explique-moi comment demander un dossier', 'explique-moi la semaine de production', 'comment fonctionne le classement', 'je ne sais pas comment faire une demande', "aide-moi à utiliser l'application", "c'est quoi un point", 'comment je retrouve un dossier moi-même', 'où je vois mes dossiers', 'que veut dire « à compléter »', 'comment marche la copie numérique', 'comment rendre plusieurs dossiers', 'je fais comment pour envoyer une liste', 'comment on se connecte',
     'Comment demander un dossier ?', 'comment faire une demande', 'comment demander plusieurs dossiers ?', 'comment annuler une demande ?',
     'que faire quand on me demande des compléments ?', 'comment rendre un dossier ?', 'combien de temps puis-je garder un dossier ?',
     'c\'est quoi la copie M-Files ?', 'comment marche la douchette ?', 'comment importer les points Excel ?', 'où est le plan des armoires ?',
@@ -92,8 +100,10 @@ const MODELES = {
     'pourquoi la semaine commence le vendredi ?', 'comment trouver un acte de décembre ?', 'j\'ai oublié mon mot de passe', 'comment supprimer un classeur importé',
     'c\'est quoi une typologie ?', 'qui peut créer des comptes ?', 'comment envoyer une liste de soldes créditeurs',
   ],
-  salut: ['Bonjour', 'bonsoir', 'merci', 'merci beaucoup', 'salut DocuBot', 'ok merci', 'bonjour docubot'],
+  salut: [
+    'bonjour à vous', 'salut, ça va ?', 'bonne journée', 'merci pour ton aide', 'coucou', "ok c'est noté, merci",'Bonjour', 'bonsoir', 'merci', 'merci beaucoup', 'salut DocuBot', 'ok merci', 'bonjour docubot'],
   autre: [
+    'quelle est la capitale de la France ?', 'il fera beau ce week-end ?', 'combien coûte une voiture neuve', 'qui a gagné la coupe du monde', 'donne-moi une recette de riz', 'écris une lettre de motivation', 'traduis bonjour en anglais', 'quel âge a le président ?', 'combien de jours dans une année bissextile', 'parle-moi de football', 'quelle est la population de Cotonou', "tu peux m'aider pour mes devoirs", 'envoie un message à mon chef', 'quels sont les horaires de la banque',
     'Quel temps fait-il à Cotonou ?', 'raconte-moi une blague', 'qui a gagné le match hier ?', 'quel est le cours du dollar ?', 'écris-moi un poème',
     'quelle heure est-il ?', 'tu es qui ?', 'traduis ce texte en anglais', 'combien font 12 fois 8 ?', 'donne-moi une recette de pâte',
   ],

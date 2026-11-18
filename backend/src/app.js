@@ -379,6 +379,8 @@ const server = ecouter(app, () => {
     require('./services/echeanceService').demarrerEcheances();
     // Aide automatique (055) : les modèles tenus en mémoire, puis l'index des
     // noms d'entreprise. Un peu après le démarrage, pour ne pas le ralentir.
+    // DocuBot : le modèle des intentions apprend sur son jeu d'exemples (≈ 0,1 s).
+    try { require('./services/intentionService').pret(); } catch (err) { console.error('[docubot] apprentissage :', err.message); }
     setTimeout(() => {
       const ia = require('./services/iaService');
       const actifs = ia.modelesActifs();
