@@ -35,7 +35,7 @@ const appris = require('./services/intentionService');
 const debut = Date.now();
 appris.pret();
 ok(Date.now() - debut < 3000, `apprentissage au démarrage en ${Date.now() - debut} ms`);
-const ATTENDU = { ou_est: ['ou_est', 'demander'], salut: ['salut', 'merci'], autre: ['hors_sujet', 'inconnu'] };
+const ATTENDU = { ou_est: ['ou_est', 'demander'], salut: ['salut', 'merci'], autre: ['hors_sujet', 'inconnu'], retards: ['retards', 'mes_prets'] };
 const reelles = require('./config/questionsReellesDocubot');
 const justes = reelles.filter(([q, i]) => (ATTENDU[i] || [i]).includes(d.comprendre(q, archive))).length;
 console.log(`        questions libres comprises : ${justes}/${reelles.length} (${Math.round((100 * justes) / reelles.length)} %)`);
@@ -44,6 +44,14 @@ ok(d.comprendre('quelle est la capitale du Bénin ?', archive) === 'hors_sujet',
 ok(d.nomDans('Zinvo Transit a été rapporté ou pas ?') === 'Zinvo Transit' && d.nomDans('tu sais où je peux trouver le dossier de Sonaco ?') === 'Sonaco', 'nom d\'entreprise dans une question libre');
 ok(d.nomDans('est-ce que Mme Adjovi a rendu le dossier Gnonlonfoun ?') === 'Gnonlonfoun' && d.nomDans('Retrouve l\'acte 2025/4410 stp') === null, 'le nom après « dossier » ; rien d\'autre qu\'un acte');
 ok(d.nomDans('mes demandes sont validées ?', { majuscules: true }) === null, 'suivi des demandes : pas de faux nom');
+// Questions courtes et familières (relevées en ligne) : sans base.
+const cas2 = [['slt', 'salut'], ['ok', 'merci'], ['15370', 'ou_est'], ['stat', 'chiffres'], ['mes prêts', 'mes_prets'],
+  ['qu est ce qui est sorti aujourd hui', 'sorties_jour'], ['les dossiers de la semaine', 'semaine'], ['quand est-ce que je reçois mon dossier', 'mes_demandes'], ['aide', 'aide']];
+for (const [q, i] of cas2) ok(d.comprendre(q, archive) === i, `« ${q} » → ${i}`);
+const c1 = d.cibleDans('attestation credo btp 2025');
+ok(c1.nom === 'credo btp' && c1.annee === 2025 && c1.typologie === 'attestation', 'cible : la typologie et l\'année ne sont pas le nom');
+ok(d.cibleDans('est ce que credo btp est disponible').nom === 'credo btp' && d.cibleDans('donne moi le dossier logos ingenierie').nom === 'logos ingenierie', 'cible : « disponible », « donne-moi » retirés');
+ok(d.cibleDans('15370').acte === '15370' && d.cibleDans('c ou credo btp').nom === 'credo btp' && d.cibleDans('je veux le dossier de solutions services plus').nom === 'solutions services plus', 'cible : n° seul, abréviations, « plus » dans un nom');
 const routes = require('./routes/iaRoutes');
 ok(routes.stack.some((l) => l.route?.path === '/docubot' && l.route.methods.post), 'route déclarée');
 

@@ -294,11 +294,12 @@ async function chercherEntrees(tenantId, { nom, numeros, annee }) {
        SELECT to_char(date_point, 'YYYY-MM-DD') AS date_point, to_char(semaine, 'YYYY-MM-DD') AS semaine,
               to_char(semaine + 6, 'YYYY-MM-DD') AS au, rubrique, num_actes, denomination, lettre, type_garantie,
               ${ARMOIRE_SQL('dossiers_entres')} AS armoire,
-              (${scoreNom})::float AS score_nom, ${ordreAnnee} AS ordre_annee
+              (${scoreNom})::float AS score_nom, ${ordreAnnee} AS ordre_annee,
+              ${nom.length >= 2 ? `(${NOM_SIMPLE} = ${p(nom)})` : 'false'} AS exact
          FROM dossiers_entres WHERE ${conds.join(' AND ')}
      ) t
      WHERE ${numeros.length ? 'true' : `score_nom >= ${SEUIL_NOM}`}
-     ORDER BY score_nom DESC, ordre_annee, date_point DESC
+     ORDER BY exact DESC, score_nom DESC, ordre_annee, date_point DESC
      LIMIT 5`,
     params
   );
@@ -326,7 +327,7 @@ async function chercherEntrees(tenantId, { nom, numeros, annee }) {
   }
   return {
     total: r.rows[0]?.total || 0,
-    entrees: r.rows.map(({ score_nom: s, ordre_annee: _o, total: _t, ...e }) => ({ ...e, nom_concorde: !avecNom || s >= SEUIL_NOM })),
+    entrees: r.rows.map(({ score_nom: s, ordre_annee: _o, total: _t, exact: _x, ...e }) => ({ ...e, nom_concorde: !avecNom || s >= SEUIL_NOM })),
   };
 }
 
