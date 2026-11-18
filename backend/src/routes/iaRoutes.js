@@ -59,4 +59,23 @@ router.post('/docubot', async (req, res) => {
   }
 });
 
+// DocuBot apprend : l'avis de la personne sur une réponse, et les corrections de l'archive.
+const apprentissage = require('../services/apprentissageService');
+const geste = (fn) => async (req, res) => {
+  try { res.json(await fn(req)); } catch (err) {
+    if (!err.statut) console.error('[docubot]', err.message);
+    res.status(err.statut || 500).json({ message: err.statut ? err.message : 'Opération impossible.' });
+  }
+};
+router.post('/docubot/echanges/:id/avis', geste((req) => apprentissage.avis(req.user.tenant_id, req.user.id, req.params.id, req.body || {})));
+router.get('/docubot/apprentissage', requireAnyPermission(['requests.process']), geste((req) => apprentissage.aRevoir(req.user.tenant_id)));
+router.post('/docubot/echanges/:id/correction', requireAnyPermission(['requests.process']), geste((req) => apprentissage.corriger(req.user.tenant_id, req.user, req.params.id, req.body?.intention)));
+
+// La veille : ce que l'archive doit savoir ce matin.
+router.get('/docubot/veille', requireAnyPermission(['requests.process']), geste(async (req) => {
+  const veille = require('../services/veilleService');
+  const b = await veille.bilan(req.user.tenant_id);
+  return { ...b, texte: veille.enTexte(b) };
+}));
+
 module.exports = router;

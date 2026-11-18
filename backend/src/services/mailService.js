@@ -61,6 +61,8 @@ const EVENT_SETTING = {
   complement_demande: 'notify_on_status_change',
   servi_mfiles: 'notify_on_status_change',
   complement_fourni: 'notify_archive_on_request',
+  // Le point du matin de DocuBot, à l'archive.
+  veille_docubot: 'notify_archive_on_request',
   status_update: 'notify_on_status_change',
   delivered: 'notify_on_status_change',
   assigned: 'notify_on_assignment',
@@ -454,6 +456,22 @@ const TEMPLATES = {
       ${requestBlock(r)}
       <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:12px 0 0;">Complétez-la puis renvoyez-la depuis « Mes dossiers ».</p>
       ${ctaButton('Compléter ma demande', lien(branding, '/demandes/mes-demandes'))}
+    `, branding),
+  }),
+
+  // veille_docubot, à l'archive : `extra` = le bilan de veilleService.
+  veille_docubot: (r, branding, b = {}) => ({
+    subject: `DocuBot : ${(b.items || []).length} point${(b.items || []).length > 1 ? 's' : ''} à voir ce matin`,
+    html: layout(`
+      <h1 style="font-size:18px;color:${COLORS.primary};margin:0 0 8px;">Ce matin aux archives</h1>
+      <p style="font-size:14px;color:${COLORS.slate};line-height:1.6;margin:0 0 12px;">Bonjour,<br />Voici ce que DocuBot a relevé.</p>
+      ${(b.items || []).map((i) => `
+        <div style="margin:0 0 12px;padding:10px 14px;border-left:4px solid ${i.niveau === 'alerte' ? '#dc2626' : '#d97706'};background:#f8fafc;border-radius:6px;">
+          <div style="font-weight:700;color:${COLORS.primary};font-size:15px;">${escapeHtml(i.titre)}</div>
+          <div style="font-size:13px;color:${COLORS.slate};margin-top:2px;">${escapeHtml(i.detail)}</div>
+          ${(i.exemples || []).length ? `<ul style="margin:6px 0 0;padding-left:18px;font-size:13px;color:${COLORS.slate};">${i.exemples.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>` : ''}
+        </div>`).join('')}
+      ${ctaButton('Ouvrir DocuFlow', lien(branding, '/'))}
     `, branding),
   }),
 

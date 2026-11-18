@@ -1,4 +1,5 @@
 import {
+  GraduationCap,
   LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
 } from 'lucide-react';
 
@@ -61,6 +62,7 @@ const EDITIONS = {
       { section: 'Les fonds', to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
       { section: 'Les fonds', to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
       { section: 'Pilotage', to: '/archives/tableau-de-bord', label: 'Tableau de bord', icone: BarChart3, permission: 'requests.process' },
+      { section: 'Pilotage', to: '/archives/docubot', label: 'DocuBot apprend', icone: GraduationCap, permission: 'requests.process' },
       { section: 'Administration', to: '/admin/comptes', label: 'Comptes', icone: Users, permission: 'users.view' },
       { section: 'Administration', to: '/admin/reglages', label: 'Réglages', icone: Settings2, permission: 'settings.manage' },
     ],
@@ -99,6 +101,7 @@ const EDITIONS = {
       '/archives/entrees': () => import('../pages/editions/afgc/EntreesAfgc'),
       '/archives/douchette': () => import('../pages/editions/afgc/DouchetteAfgc'),
       '/archives/tableau-de-bord': () => import('../pages/editions/afgc/TableauBordAfgc'),
+      '/archives/docubot': () => import('../pages/editions/afgc/DocubotApprendAfgc'),
       '/admin/comptes': () => import('../pages/editions/afgc/ComptesAfgc'),
       '/admin/reglages': () => import('../pages/editions/afgc/AdministrationAfgc'),
     },

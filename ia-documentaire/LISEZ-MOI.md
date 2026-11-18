@@ -21,6 +21,12 @@ Sans Ollama, ou si le modèle ne répond pas, DocuBot fonctionne comme avant.
    Les formulations ajoutées au jeu ont été écrites après avoir vu les erreurs sur les 70 questions libres : le second jeu, jamais vu, est la mesure la plus honnête. Un test empêche le score des questions libres de descendre sous 90 %.
 2. **En option, Ollama** : un vrai modèle de langue, entraîné sur Colab (ci-dessous), pour les questions que le premier niveau ne sait pas lire et pour rédiger l'aide.
 
+## DocuBot autonome
+
+- **Il apprend seul de l'usage.** Chaque question est gardée avec ce qu'il a compris (table `docubot_echanges`, effacée après un an). Sous chaque réponse, « Utile ? Oui · Non » ; sur « Non », la personne dit ce qu'elle voulait. L'archive revoit les questions mal comprises dans **Pilotage → DocuBot apprend**. Chaque correction, et chaque réponse jugée utile, devient un exemple propre à l'organisation : il pèse 4 fois un exemple du jeu. DocuBot se réentraîne aussitôt, puis chaque nuit vers 2 h.
+- **Il veille.** À l'ouverture de DocuBot, l'archive voit « Ce matin » : retards, demandes en attente depuis plus de 2 jours, compléments sans réponse depuis 3 jours, dossiers demandés plusieurs fois, dossiers sortis 3 fois en deux mois (à numériser), dossiers dehors depuis plus d'un mois, point d'hier non importé. Le nombre d'alertes s'affiche sur le bouton. Les jours ouvrés, à partir de 7 h 30, un courriel part une fois à l'archive s'il y a une alerte.
+- **Il raisonne** (avec Ollama). Pour une question composée (« … sortis, et chez qui ? », « compare… », « pourquoi… »), le modèle de langue choisit lui-même ses recherches, parmi les mêmes que DocuBot, en lit les résultats et rédige la réponse. Il ne voit que ce que la personne a le droit de voir, et la consigne lui interdit d'inventer. La réponse indique « A consulté : … ». Sans carte graphique, comptez 20 à 40 secondes. Le modèle est chargé au démarrage du serveur et gardé en mémoire.
+
 ## Le modèle choisi (niveau 2)
 
 **Qwen3 4B Instruct 2507** (`Qwen/Qwen3-4B-Instruct-2507` sur Hugging Face), sous **licence Apache 2.0**, ce qui permet l'usage en entreprise. Il est bon en français, assez petit pour tourner sans carte graphique sur le serveur (environ 3 Go de mémoire, quelques secondes par question), et assez grand pour bien apprendre.

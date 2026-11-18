@@ -49,6 +49,59 @@ const Fiche = ({ e }) => (
   </div>
 );
 
+// Ce que la personne voulait, quand la réponse n'allait pas (DocuBot en apprend).
+const VOULAIT = [
+  ['ou_est', 'Trouver un dossier'], ['qui_a', 'Savoir qui a un dossier'], ['mes_demandes', 'Suivre mes demandes'],
+  ['retards', 'Retards, dossiers à rendre'], ['chiffres', 'Des chiffres'], ['aide', 'Comment faire'], ['autre', 'Autre chose'],
+];
+const ETAPES = {
+  chercher_dossier: 'recherche du dossier', qui_a_le_dossier: 'dossiers sortis', mes_demandes: 'vos demandes', retards: 'retards',
+  travail_du_jour: 'travail du jour', chiffres: 'chiffres', entrees_semaine: 'entrées de la semaine', aide: 'procédures',
+};
+
+/** « Utile ? Oui · Non » : chaque avis entraîne DocuBot. */
+const Avis = ({ m, onAvis }) => {
+  if (!m.echange) return null;
+  if (m.avis === 'oui') return <p className="text-[11px] text-slate-400">Merci, c'est noté.</p>;
+  if (m.avis === 'appris') return <p className="text-[11px] text-slate-400">Merci : DocuBot en tient compte dès maintenant.</p>;
+  if (m.avis === 'non') {
+    return (
+      <div className="text-[11px] text-slate-500">
+        Que vouliez-vous ?{' '}
+        {VOULAIT.map(([cle, libelle]) => (
+          <button key={cle} type="button" onClick={() => onAvis(m, false, cle)} className="mr-1.5 mt-1 px-2 py-0.5 rounded-full border border-slate-300 bg-white hover:border-slate-500">{libelle}</button>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <p className="text-[11px] text-slate-400">
+      Utile ?{' '}
+      <button type="button" onClick={() => onAvis(m, true)} className="underline hover:text-slate-700">Oui</button>
+      {' · '}
+      <button type="button" onClick={() => onAvis(m, false)} className="underline hover:text-slate-700">Non</button>
+    </p>
+  );
+};
+
+/** Le point du matin (archive) : ce que DocuBot a relevé sans qu'on le lui demande. */
+const Veille = ({ veille, onLien }) => {
+  if (!veille) return null;
+  return (
+    <div className="space-y-2">
+      <Texte texte={veille.texte} />
+      {veille.items.map((i) => (
+        <button key={i.cle} type="button" onClick={() => onLien(i.lien)}
+          className={`w-full text-left rounded-md border border-slate-200 border-l-4 ${i.niveau === 'alerte' ? 'border-l-red-500' : 'border-l-amber-500'} bg-white px-3 py-2 hover:border-slate-400`}>
+          <div className="text-sm font-semibold text-slate-900">{i.titre}</div>
+          <div className="text-[13px] text-slate-600">{i.detail}</div>
+          {i.exemples.length > 0 && <ul className="mt-1 text-[12px] text-slate-500 list-disc pl-4">{i.exemples.map((e) => <li key={e}>{e}</li>)}</ul>}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const DocuBotAfgc = () => {
   const navigate = useNavigate();
   const sauve = lire();
@@ -58,6 +111,8 @@ const DocuBotAfgc = () => {
   const [accueil, setAccueil] = useState(null);
   const [saisie, setSaisie] = useState('');
   const [attente, setAttente] = useState(false);
+  const [longue, setLongue] = useState(false);
+  const [veille, setVeille] = useState(null);
   const fin = useRef(null);
   const champ = useRef(null);
 
@@ -70,6 +125,17 @@ const DocuBotAfgc = () => {
     if (!ouvert || accueil) return;
     api.get('/ia/docubot').then((r) => setAccueil(r.data)).catch(() => setAccueil({ suggestions: [] }));
   }, [ouvert, accueil]);
+
+  // La veille du matin, pour l'archive : chargée une fois par session (10 min), son nombre d'alertes sur le bouton.
+  useEffect(() => {
+    let frais = null;
+    try { frais = JSON.parse(sessionStorage.getItem('afgc.docubot.veille')); } catch { /* sans stockage */ }
+    if (frais && Date.now() - frais.le < 10 * 60 * 1000) { setVeille(frais.veille); return; }
+    api.get('/ia/docubot/veille').then((r) => {
+      setVeille(r.data);
+      try { sessionStorage.setItem('afgc.docubot.veille', JSON.stringify({ le: Date.now(), veille: r.data })); } catch { /* sans stockage */ }
+    }).catch(() => setVeille(null)); // un agent n'y a pas accès : pas de veille
+  }, []);
 
   useEffect(() => {
     if (!ouvert) return undefined;
@@ -85,8 +151,10 @@ const DocuBotAfgc = () => {
     setMessages((m) => [...m, { de: 'moi', texte: q }]);
     setSaisie('');
     setAttente(true);
+    const minuteur = setTimeout(() => setLongue(true), 4000);
     try {
-      const { data } = await api.post('/ia/docubot', { question: q, contexte });
+      // Raisonner (Ollama, sans carte graphique) peut prendre une minute.
+      const { data } = await api.post('/ia/docubot', { question: q, contexte }, { timeout: 200000 });
       setMessages((m) => [...m, { de: 'bot', ...data }]);
       if (data.contexte) setContexte((c) => ({ ...c, ...data.contexte }));
     } catch (err) {
@@ -95,9 +163,19 @@ const DocuBotAfgc = () => {
         texte: err?.response?.status === 401 ? 'Votre session a expiré : reconnectez-vous.' : 'Je n\'ai pas pu répondre. Réessayez dans un instant.',
       }]);
     } finally {
+      clearTimeout(minuteur);
+      setLongue(false);
       setAttente(false);
     }
   }, [attente, contexte]);
+
+  // L'avis sur une réponse : enregistré, et DocuBot se réentraîne.
+  const donnerAvis = async (m, utile, voulait = null) => {
+    const marque = (avis) => setMessages((l) => l.map((x) => (x === m ? { ...x, avis } : x)));
+    if (!utile && !voulait) { marque('non'); return; }
+    marque(utile ? 'oui' : 'appris');
+    try { await api.post(`/ia/docubot/echanges/${m.echange}/avis`, { utile, voulait }); } catch { /* l'avis n'empêche rien */ }
+  };
 
   useEffect(() => {
     const surDemande = (e) => { setOuvert(true); if (typeof e.detail === 'string' && e.detail) envoyer(e.detail); };
@@ -121,6 +199,7 @@ const DocuBotAfgc = () => {
           className="fixed bottom-[68px] right-3 sm:bottom-[80px] sm:right-5 z-30 h-11 sm:h-12 pl-3.5 pr-4 rounded-full bg-slate-800 text-white shadow-md hover:bg-slate-900 inline-flex items-center gap-2 text-sm font-semibold"
           aria-label="Ouvrir DocuBot, l'assistant des archives" title="DocuBot : posez une question sur les dossiers">
           <MessageSquareText size={18} /> <span className="hidden sm:inline">DocuBot</span>
+          {veille?.alertes > 0 && <span className="ml-0.5 min-w-5 h-5 px-1 rounded-full bg-red-600 text-[11px] font-bold flex items-center justify-center" title="Points à voir ce matin">{veille.alertes}</span>}
         </button>
       )}
 
@@ -144,6 +223,7 @@ const DocuBotAfgc = () => {
               <div>
                 <Texte texte={'Bonjour ! Je réponds sur les **dossiers** et les **demandes** : où se trouve un dossier, qui l\'a, où en est une demande, ce qui est en retard… et comment faire dans l\'application.'} />
                 <p className="mt-2 text-xs text-slate-500">Écrivez comme vous parlez, par exemple « où est le dossier Credo BTP ? ».</p>
+                {veille?.items?.length > 0 && <div className="mt-4"><Veille veille={veille} onLien={(vers) => agir({ vers })} /></div>}
               </div>
             )}
             {messages.map((m, i) => (m.de === 'moi' ? (
@@ -154,6 +234,9 @@ const DocuBotAfgc = () => {
               <div key={i} className="space-y-2">
                 <Texte texte={m.texte} />
                 {m.source === 'ollama' && <p className="text-[11px] text-slate-400">Rédigé par le modèle de langue de l'AFGC, à partir des procédures de l'archive.</p>}
+                {m.source === 'agent' && m.etapes?.length > 0 && (
+                  <p className="text-[11px] text-slate-400">A consulté : {[...new Set(m.etapes)].map((e) => ETAPES[e] || e).join(', ')}.</p>
+                )}
                 {m.elements?.length > 0 && <div className="space-y-1.5">{m.elements.map((e, j) => <Fiche key={j} e={e} />)}</div>}
                 {m.actions?.length > 0 && (
                   <div className="flex flex-wrap gap-2">
@@ -165,11 +248,13 @@ const DocuBotAfgc = () => {
                     ))}
                   </div>
                 )}
+                <Avis m={m} onAvis={donnerAvis} />
               </div>
             )))}
             {attente && (
               <div className="flex items-center gap-1 text-slate-400" aria-label="DocuBot écrit">
                 {[0, 1, 2].map((k) => <span key={k} className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" style={{ animationDelay: `${k * 0.15}s` }} />)}
+                {longue && <span className="ml-2 text-xs">DocuBot réfléchit et consulte les archives…</span>}
               </div>
             )}
             {!attente && (() => {
