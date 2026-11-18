@@ -157,6 +157,7 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/entrees', require('./routes/entreeRoutes'));
 app.use('/api/ia', require('./routes/iaRoutes'));
 app.use('/api/cartons', require('./routes/cartonsRoutes'));
+app.use('/api/push', require('./routes/pushRoutes'));
 // Plan de classement et calendrier de conservation (AFGC) : consultables par tous les comptes.
 app.get('/api/plan-classement', require('./middlewares/authMiddleware'), (req, res) => res.json(require('./services/planService').lister()));
 app.use('/api/comptes', require('./routes/comptesRoutes'));
@@ -388,6 +389,8 @@ const server = ecouter(app, () => {
     require('./services/apprentissageService').demarrer();
     // La veille du matin, par courriel à l'archive (056).
     require('./services/veilleService').demarrer();
+    // Les notifications importantes, poussées sur les appareils abonnés (058).
+    require('./services/pushService').demarrer();
     // Le modèle de langue (Ollama), s'il est réglé : chargé maintenant et
     // gardé chargé, pour que la première question n'attende pas.
     const prechauffer = async () => {

@@ -66,6 +66,24 @@ self.addEventListener('fetch', (e) => {
     return x || reseau;
   }));
 });
+// Notifications poussées par le serveur (058) : visibles même application fermée.
+self.addEventListener('push', (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { texte: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(m.titre || ${JSON.stringify(m.name)}, {
+    body: m.texte || '', tag: m.tag, icon: ${JSON.stringify(m.icones.petite)}, badge: ${JSON.stringify(m.icones.petite)},
+    data: { lien: m.lien || '/' }, requireInteraction: false,
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const lien = (e.notification.data && e.notification.data.lien) || '/';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((fenetres) => {
+    const ouverte = fenetres.find((f) => new URL(f.url).origin === self.location.origin);
+    if (ouverte) return ouverte.focus().then((f) => f && f.navigate ? f.navigate(lien) : null);
+    return self.clients.openWindow(lien);
+  }));
+});
 `;
 }
 

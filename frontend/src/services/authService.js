@@ -38,6 +38,12 @@ export const authService = {
   /** Départements d'un espace, pour l'inscription : { departements, creation, domaines }. */
   departements: async (slug) => (await api.get(`/auth/company/${encodeURIComponent(slug)}/departements`)).data,
   logout: () => {
+    // Cet appareil ne reçoit plus les notifications de ce compte (058) ; il
+    // garde l'autorisation du navigateur pour la prochaine connexion.
+    const jeton = localStorage.getItem('token');
+    navigator.serviceWorker?.getRegistration?.().then((reg) => reg?.pushManager.getSubscription()).then((abo) => {
+      if (abo && jeton) api.delete('/push/abonnement', { data: { endpoint: abo.endpoint }, headers: { Authorization: `Bearer ${jeton}` } }).catch(() => {});
+    }).catch(() => {});
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     signalerSession();
