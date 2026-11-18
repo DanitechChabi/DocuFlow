@@ -156,6 +156,9 @@ app.use('/api/requests', requestRoutes);
 // Entrée des dossiers aux archives (049) : points journaliers, semaines de production, recherche.
 app.use('/api/entrees', require('./routes/entreeRoutes'));
 app.use('/api/ia', require('./routes/iaRoutes'));
+app.use('/api/cartons', require('./routes/cartonsRoutes'));
+// Plan de classement et calendrier de conservation (AFGC) : consultables par tous les comptes.
+app.get('/api/plan-classement', require('./middlewares/authMiddleware'), (req, res) => res.json(require('./services/planService').lister()));
 app.use('/api/comptes', require('./routes/comptesRoutes'));
 app.use('/api/users', userRoutes);
 app.use('/api/sections', sectionRoutes);

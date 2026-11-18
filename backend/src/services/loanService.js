@@ -139,11 +139,31 @@ const NATURES_PRET = ['original', 'copie', 'consultation'];
 // notification est regroupée par l'appelant (un avis pour la liste, pas
 // quarante) ; `avecSuites: false` = ni scan versé, ni e-mail par dossier.
 // Sans `options`, rien ne change.
+const sansAccentsMotif = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/**
+ * Durée d'utilisation d'un dossier selon le motif de la demande (réglage
+ * motifs_durees : { "Remboursement": 30, "Appel à garantie": "indéterminée" }).
+ * Rend un nombre de jours, ou null (durée par défaut). Une durée
+ * « indéterminée » compte un an : le dossier reste suivi.
+ */
+function dureeMotif(reglage, motif) {
+  let table = reglage;
+  if (typeof table === 'string') { try { table = JSON.parse(table); } catch { return null; } }
+  if (!table || typeof table !== 'object' || !motif) return null;
+  const cle = Object.keys(table).find((k) => sansAccentsMotif(k) === sansAccentsMotif(motif));
+  if (!cle) return null;
+  const v = table[cle];
+  if (typeof v === 'string' && /ind[eé]termin/i.test(v)) return 365;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 3650) : null;
+}
+
 async function remettre(tenantId, requestId, user, { date_retour_prevue, observation, nature = 'original', document_id: documentId = null, emplacement_id: emplacementId = null } = {},
   { client: clientExterne = null, avecNotification = true, avecSuites = true } = {}) {
   const settings = await settingsService.getAll(tenantId);
-  const date = lireDateRetour(date_retour_prevue, { defautJours: settings.loan_default_days });
+  let date = lireDateRetour(date_retour_prevue, { defautJours: settings.loan_default_days });
   if (date.erreur) throw erreur(400, date.erreur);
+  const sansDate = date_retour_prevue === undefined || date_retour_prevue === null || String(date_retour_prevue).trim() === '';
   const obs = texte(observation, 1000);
   if (!NATURES_PRET.includes(nature)) throw erreur(400, 'Nature du prêt attendue : original, copie ou consultation sur place.');
 
@@ -162,6 +182,11 @@ async function remettre(tenantId, requestId, user, { date_retour_prevue, observa
     }
     const existant = await client.query('SELECT id FROM request_loans WHERE request_id = $1', [requestId]);
     if (existant.rows[0]) throw erreur(409, 'Ce dossier a déjà été remis pour cette demande.', 'DEJA_REMIS');
+    // Sans date choisie : la durée d'utilisation du motif (grille de transmission), sinon la durée par défaut.
+    if (sansDate) {
+      const jours = dureeMotif(settings.motifs_durees, request.motif);
+      if (jours) date = lireDateRetour(null, { defautJours: jours });
+    }
     // Document et boîte prêtés, s'ils sont connus (registre, récolement).
     let docId = documentId ? Number(documentId) : null;
     let boiteId = emplacementId ? Number(emplacementId) : null;
@@ -488,6 +513,7 @@ async function annoterListe(tenantId, rows) {
 }
 
 module.exports = {
+  dureeMotif,
   ETATS, etatPret, lireDateRetour,
   remettre, retourner, signaler, confirmer, registre, relancerRetards, pretDeLaDemande, annoterListe,
   enTransaction, notifier,

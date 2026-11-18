@@ -77,10 +77,40 @@ const Detail = ({ e, archiviste }) => (
  * à vérifier. Il s'allume à son arrivée (lumière, halo). `archiviste` ajoute
  * la lettre de classement et le n° d'acte tel qu'écrit.
  */
+// Un dossier en carton (057), en quelques mots : le fonds, l'année, et pour l'archive le carton.
+const enCarton = (c, archiviste) => [
+  c.fonds === 'ouverture_compte' ? 'ouverture de compte' : (c.statut === 'annule' ? 'dossier annulé' : 'dossier non retiré / annulé'),
+  c.fonds === 'ouverture_compte' ? (archiviste && c.matricule ? `n° ${c.matricule}` : null) : [c.typologie, c.annee].filter(Boolean).join(' '),
+  archiviste && c.carton ? `carton ${c.carton}` : null,
+].filter(Boolean).join(', ');
+
+/** Les dossiers en cartons : en complément des points, sur une ligne discrète. */
+const Cartons = ({ cartons, archiviste, seul }) => {
+  if (!cartons?.length) return null;
+  const liste = cartons.map((c) => `${archiviste ? `${c.denomination} — ` : ''}${enCarton(c, archiviste)}`);
+  return seul ? (
+    <div className="text-sm text-slate-700 space-y-0.5">
+      <div><strong className="font-bold text-slate-900">Aux archives, en carton</strong> : {cartons[0].denomination}</div>
+      <div>{enCarton(cartons[0], archiviste)}{cartons.length > 1 ? ` (+ ${cartons.length - 1})` : ''}</div>
+    </div>
+  ) : (
+    <div className="mt-1 text-xs text-slate-500">Aussi en carton : {liste.join(' ; ')}</div>
+  );
+};
+
 export const Presence = ({ resultat, archiviste = false, className = '' }) => {
   const [ouvert, setOuvert] = useState(false);
   if (!resultat?.recherche) return null;
-  const { total, entrees } = resultat;
+  const { total, entrees, cartons } = resultat;
+  // Pas dans les points, mais dans un carton (non retirés, ouvertures de compte).
+  if (!total && cartons?.length) {
+    return (
+      <div className={`animate-fade-in flex items-start gap-2 border-l-4 border-slate-500 bg-slate-50 rounded-r-md px-3 py-2 ${className}`}>
+        <Archive size={15} className="mt-0.5 flex-shrink-0 text-slate-600" />
+        <Cartons cartons={cartons} archiviste={archiviste} seul />
+      </div>
+    );
+  }
   if (!total) {
     return (
       <div className={`flex items-center gap-2 border-l-4 border-slate-300 bg-slate-50 rounded-r-md px-3 py-2 text-sm text-slate-700 ${className}`}>
@@ -113,6 +143,7 @@ export const Presence = ({ resultat, archiviste = false, className = '' }) => {
           )}
         </div>
       </div>
+      <div className="ml-6"><Cartons cartons={cartons} archiviste={archiviste} /></div>
       {ouvert && autres.length > 0 && (
         <ul className="mt-2 ml-9 space-y-2 text-sm text-slate-800 animate-fade-in-up">
           {autres.map((x) => (

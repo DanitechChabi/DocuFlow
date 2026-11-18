@@ -193,6 +193,9 @@ const SEUIL_APPRIS = 0.6;
  */
 function regleSure(question) {
   const s = plat(question);
+  // Plan de classement, calendrier de conservation : durées, sort final, cote, où classer.
+  if (a(s, /\bconserv/, 'sort final', /\belimin/, /\bdetrui/, 'plan de classement', 'calendrier', /\bou (classer|ranger)\b/, /\bcote\b/, /\bclasse t on\b/, /\bduree d utilite\b/)
+    && !a(s, /\bmon dossier\b/, /\bma demande\b/)) return 'conservation';
   // Un numéro seul : un n° d'acte.
   if (/^\s*(?:acte\s*)?(?:n\s*[°o.]?\s*)?\d{2,6}(?:\s*\/\s*\d{1,6})?\s*\??\s*$/i.test(question)) return 'ou_est';
   if (a(s, 'mes prets', 'mes emprunts', 'chez moi', 'dossiers que j ai', 'j ai combien de dossiers', 'ai je des dossiers', 'dossiers que je dois rendre', 'je dois rendre')) return 'mes_prets';
@@ -457,7 +460,9 @@ const MOTS_TYPOLOGIE = /\b(attestations?|cautions?|avances? de d[ée]marrage|ava
 
 /** Ce que la question vise : { nom, acte, annee, typologie } (typologie et année retirées du nom). */
 function cibleDans(question) {
-  const acte = ia.acteDans(question) || (/^\s*(?:n\s*[°o.]?\s*)?(\d{2,6}(?:\s*\/\s*\d{1,6})?)\s*\??\s*$/i.exec(question)?.[1] || null);
+  const acte = ia.acteDans(question) || (/^\s*(?:n\s*[°o.]?\s*)?(\d{2,6}(?:\s*\/\s*\d{1,6})?)\s*\??\s*$/i.exec(question)?.[1] || null)
+    // « dossier 13692 », « le 13692 svp » : un nombre qui n'est pas une année.
+    || ([...String(question).matchAll(/(?<![\d/])(\d{3,7})(?![\d/])/g)].map((m) => m[1]).find((n) => !/^(19|20)\d{2}$/.test(n)) || null);
   const an = /\b((?:19|20)\d{2})\b(?!\s*\/)/.exec(String(question).replace(acte || '§', ' '));
   const types = String(question).match(MOTS_TYPOLOGIE);
   const sansType = String(question).replace(MOTS_TYPOLOGIE, ' ').replace(/\s+de\s+(la\s+|l')?(?=\s|$)/gi, ' ');
@@ -489,7 +494,7 @@ async function cibleConnue(tenantId, cible, droits) {
   const reference = cible.acte || cible.nom;
   const sorties = await sortiesDe(tenantId, reference, { userId: null });
   const demandes = cible.nom ? await demandesDe(tenantId, cible.nom, { archive: true }) : [];
-  if (!presence.total && !sorties.length && !demandes.length) return null;
+  if (!presence.total && !sorties.length && !demandes.length && !(presence.cartons || []).length) return null;
   return { presence, sorties, demandes };
 }
 
@@ -524,12 +529,29 @@ async function repondreFiche(tenantId, cible, droits, connu) {
         note: x.approche ? 'Nom proche : vérifiez qu\'il s\'agit de la même entreprise.' : (!x.nom_concorde ? 'Acte entré sous un autre nom : à vérifier.' : null),
       });
     }
-  } else if (!sorties.length && !connu.demandes.length) {
+  } else if (!sorties.length && !connu.demandes.length && !(p.cartons || []).length) {
     lignes.push(`« **${libelle}** » n'est pas dans les entrées des archives.`);
   } else {
     lignes.push(`**${sorties[0]?.nom_entreprise || connu.demandes[0]?.nom_entreprise || libelle}**${droits.archive ? ' (pas d\'entrée enregistrée aux archives)' : ''} :`);
   }
   const chezMoi = sorties.some((x) => x.chez_id === droits.userId);
+  // Les dossiers en cartons (non retirés / annulés, ouvertures de compte) : en complément des points.
+  const cartons = p.cartons || [];
+  if (cartons.length) {
+    const quoi = (c) => (c.fonds === 'ouverture_compte' ? 'ouverture de compte' : c.statut === 'annule' ? 'dossier annulé' : 'dossier non retiré / annulé');
+    lignes.push(`${entrees.length ? 'Aussi en carton' : `**${cartons[0].denomination}** est aux archives, en carton`} : ${cartons.map((c) => [quoi(c), c.annee, droits.archive && c.carton && `carton **${c.carton}**`].filter(Boolean).join(', ')).join(' ; ')}.`);
+    for (const c of cartons) {
+      elements.push({
+        titre: c.denomination || 'Dossier',
+        lignes: [
+          c.fonds === 'ouverture_compte' ? `Ouverture de compte${droits.archive && c.matricule ? ` · n° ${c.matricule}` : ''}` : [c.num_actes && `Acte ${c.num_actes}`, c.typologie, c.annee].filter(Boolean).join(' · '),
+          c.fonds === 'non_retires' ? (c.statut === 'annule' ? 'Dossier annulé' : 'Non retiré / annulé') : null,
+          droits.archive && (c.carton ? `**Carton ${String(c.carton).replace(/^Carton /, '')}**` : 'Sans carton'),
+        ].filter(Boolean),
+        ton: 'gris',
+      });
+    }
+  }
   // Sorti ? Pour un agent : chez lui, ou « sorti » sans dire chez qui.
   if (sorties.length) {
     const miens = sorties.filter((x) => x.chez_id === droits.userId);
@@ -646,6 +668,28 @@ async function repondreMesDemandes(tenantId, question, droits) {
       return { titre: [d.nom_entreprise, d.type_document].filter(Boolean).join(' · ') || 'Dossier', lignes: [d.num_acte && `Acte ${d.num_acte}`, `Demandé le ${jourAff(d.demande_le)}`, `**${e.texte}**`].filter(Boolean), ton: e.ton };
     }),
     actions: [{ type: 'lien', libelle: 'Mes dossiers', vers: '/demandes/mes-demandes' }],
+  };
+}
+
+/** Plan de classement et calendrier de conservation : la rubrique, sa cote, sa règle. */
+function repondreConservation(question, droits) {
+  const plan = require('./planService');
+  const [r, ...autres] = plan.chercher(question);
+  if (!r) {
+    return {
+      texte: 'Je n\'ai pas trouvé ce type de document dans le **plan de classement**. Précisez-le, par exemple « combien de temps conserver les contrats de travail ? » ou « où classer les PV du comité de mise en jeu ? ».',
+      actions: droits.archive ? [{ type: 'lien', libelle: 'Plan de classement', vers: '/archives/plan' }] : [],
+    };
+  }
+  const lignes = [`**${r.cote ? `${r.cote} — ` : ''}${r.intitule}** (${r.nom_departement})`];
+  if (r.regle) lignes.push(`Conservation : **${r.regle}**.`);
+  else lignes.push('Rubrique de regroupement : la durée se lit sur ses sous-rubriques.');
+  if (r.consigne) lignes.push(`Classement : ${r.consigne}`);
+  if (r.observations) lignes.push(r.observations);
+  return {
+    texte: lignes.join('\n'),
+    elements: autres.filter((x) => x.regle).map((x) => ({ titre: `${x.cote ? `${x.cote} — ` : ''}${x.intitule}`, lignes: [x.nom_departement, x.regle], ton: x.sort === 'C' ? 'vert' : 'gris' })),
+    actions: droits.archive ? [{ type: 'lien', libelle: 'Plan de classement', vers: '/archives/plan' }] : [],
   };
 }
 
@@ -819,7 +863,7 @@ async function repondre(user, question, contexte = {}) {
   // Un dossier connu est nommé (« Credo BTP », « 15370 », « attestation Credo BTP 2025 »,
   // « est-il disponible ? ») : sa fiche complète, quelle que soit la tournure.
   const parleDemande = /\b(ma|mes|la|une)\s+demandes?\b|\bdemand[ée]/i.test(q);
-  if ((!['salut', 'merci', 'mes_demandes', 'retards', 'journee', 'semaine', 'mes_prets', 'sorties_jour'].includes(quoi)
+  if ((!['salut', 'merci', 'mes_demandes', 'retards', 'journee', 'semaine', 'mes_prets', 'sorties_jour', 'conservation'].includes(quoi)
       || (quoi === 'mes_demandes' && !parleDemande && lecture.source !== 'regles')) && !agent.complexe(q)) {
     const cible = cibleDans(q);
     if (!(quoi === 'chiffres' && /\b(combien|nombre|total|stat)/i.test(q) && !cible.acte)) {
@@ -880,6 +924,7 @@ async function repondre(user, question, contexte = {}) {
     // « Mes prêts », « chez moi » : ses propres dossiers, archiviste compris.
     case 'mes_prets': res = await repondreRetards(tenantId, { ...droits, archive: false }); break;
     case 'sorties_jour': res = await repondreSortiesDuJour(tenantId, droits); break;
+    case 'conservation': res = repondreConservation(q, droits); break;
     case 'journee': res = await repondreJournee(tenantId); break;
     case 'qui_a': res = await repondreQuiA(tenantId, q, droits, contexte, indices); break;
     case 'mes_demandes': res = await repondreMesDemandes(tenantId, q, droits); break;
