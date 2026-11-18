@@ -64,6 +64,9 @@ const MODELES = {
     'Le dossier de la {P} {E} n\'est pas dans l\'armoire, qui l\'a ?', 'qui garde l\'acte {A}', 'à qui on a transmis {E} ?',
   ],
   mes_demandes: [
+    "quand est-ce que je reçois mon dossier ?", "je n'ai toujours rien reçu", "pourquoi on ne m'a pas encore donné le dossier",
+    "mon dossier arrive quand", "ça fait trois jours que j'attends le dossier {E}", "on m'a oublié ?", "je l'aurai quand le dossier {E}",
+    "le dossier que j'ai demandé n'est pas encore arrivé", "vous avez vu ma demande ?", "toujours pas de nouvelles de ma demande",
     "ce que j'ai demandé, ça avance ?", "les dossiers que j'ai demandés", 'ma requête pour {E} est traitée ?', "où en est ce que j'ai demandé pour {E}", "l'archive a bien reçu ce que j'ai demandé ?", "j'attends le dossier {E} depuis hier", 'ma demande a été rejetée ?', "je n'ai pas encore reçu le dossier que j'ai demandé",
     'Où en sont mes demandes ?', 'où en est ma demande {E} ?', 'mes demandes', 'quel est le statut de ma demande ?', 'ma demande pour {E} a été traitée ?',
     'Est-ce que l\'archive a reçu ma demande ?', 'suivi de mes dossiers', 'qu\'est devenue ma demande de {E}', 'j\'ai demandé {E} hier, c\'est en cours ?',
@@ -81,6 +84,7 @@ const MODELES = {
     'les demandes à transmettre', 'nouvelles demandes ?', 'le travail du jour', 'quelles demandes sont arrivées ?', 'résumé de la journée',
   ],
   chiffres: [
+    'stat', 'stats', 'les chiffres', 'bilan du mois', 'un bilan svp',
     'les statistiques de la semaine', 'donne-moi les chiffres du mois', 'combien au total cette année', 'le nombre de dossiers sortis ce mois', 'combien de dossiers la semaine dernière', 'quel volume de demandes ce mois-ci', 'compte les dossiers entrés', "combien d'actes enregistrés en {Y}",
     'Combien de dossiers entrés ce mois ?', 'combien de dossiers sortis ?', 'nombre de demandes cette semaine', 'combien de dossiers en {M} {Y} ?',
     'combien de dossiers retournés aujourd\'hui', 'combien de demandes en {Y}', 'total des dossiers entrés cette année', 'combien d\'agents ?',
@@ -101,6 +105,7 @@ const MODELES = {
     'c\'est quoi une typologie ?', 'qui peut créer des comptes ?', 'comment envoyer une liste de soldes créditeurs',
   ],
   salut: [
+    'slt', 'bjr', 'bsr', 'ok', "d'accord", 'super', 'parfait', 'ok merci', 'cc', 'salam',
     'bonjour à vous', 'salut, ça va ?', 'bonne journée', 'merci pour ton aide', 'coucou', "ok c'est noté, merci",'Bonjour', 'bonsoir', 'merci', 'merci beaucoup', 'salut DocuBot', 'ok merci', 'bonjour docubot'],
   autre: [
     'quelle est la capitale de la France ?', 'il fera beau ce week-end ?', 'combien coûte une voiture neuve', 'qui a gagné la coupe du monde', 'donne-moi une recette de riz', 'écris une lettre de motivation', 'traduis bonjour en anglais', 'quel âge a le président ?', 'combien de jours dans une année bissextile', 'parle-moi de football', 'quelle est la population de Cotonou', "tu peux m'aider pour mes devoirs", 'envoie un message à mon chef', 'quels sont les horaires de la banque',

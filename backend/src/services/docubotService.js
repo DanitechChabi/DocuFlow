@@ -113,9 +113,11 @@ const COURANTS = new Set(('tu sais peux pouvez pourriez voudrais veux vouloir fa
   + 'montre-moi dis-moi donne-moi retrouve retrouver trouve trouver cherche chercher localiser arrive arriver arrivé arrive recu reçu recus '
   + 'range rangé rangee classé classe classer entre entré pris prendre parti partie rapporte rapporté ramene ramené restitue restitué '
   + 'remis rendre rendu revient revenir revenu emprunte emprunté garde garder détient detient possède possede travaille sorti sortie '
-  + 'transmis transmise traité traitée traite validé validée validées valide plus pas ou oui non ete été deja déjà toujours encore '
+  + 'transmis transmise traité traitée traite validé validée validées valide pas ou oui non ete été deja déjà toujours encore '
   + 'actuellement maintenant hier aujourd lundi mardi mercredi jeudi vendredi samedi dimanche quand depuis quelqu quelqu\'un un agent '
-  + 'casier rayon armoire semaine point date lettre mme m monsieur madame mr dans chez vous nous moi on c\'est est-ce n\'est').split(' '));
+  + 'casier rayon armoire semaine point date lettre mme m monsieur madame mr dans chez vous nous moi on c\'est est-ce n\'est '
+  + 'disponible disponibles dispo libre libres donne donnez donner apporte apportez envoie envoyez envoyer g jai j\'ai c svp stp '
+  + 'mon ma mes ton ta tes son sa ses notre votre leur reçois recois recevoir reçu quand pourquoi encore toujours').split(' '));
 const norm = (m) => sansAccents(m).replace(/^[ld]['’]/, '').replace(/['’].*$/, '');
 const inutile = (m) => /^[ldLDjJnNsScC]?['’]?$/.test(m) || BRUIT.has(norm(m)) || COURANTS.has(norm(m)) || COURANTS.has(sansAccents(m));
 
@@ -185,15 +187,36 @@ async function entrepriseDans(question) {
 // (mesurée : 96 % de questions libres comprises, contre 71 % pour les règles).
 const SEUIL_APPRIS = 0.6;
 
+/**
+ * Règles sûres : des tournures sans ambiguïté, que le modèle appris ne
+ * contredit pas. Rend une intention, ou null.
+ */
+function regleSure(question) {
+  const s = plat(question);
+  // Un numéro seul : un n° d'acte.
+  if (/^\s*(?:acte\s*)?(?:n\s*[°o.]?\s*)?\d{2,6}(?:\s*\/\s*\d{1,6})?\s*\??\s*$/i.test(question)) return 'ou_est';
+  if (a(s, 'mes prets', 'mes emprunts', 'chez moi', 'dossiers que j ai', 'j ai combien de dossiers', 'ai je des dossiers', 'dossiers que je dois rendre', 'je dois rendre')) return 'mes_prets';
+  if (a(s, /\bsorti?s? aujourd hui\b/, /\bsorti?e?s? ce matin\b/, 'transmis aujourd hui', 'sorties du jour', 'sorties d aujourd hui')) return 'sorties_jour';
+  if (a(s, 'dossiers de la semaine', 'entrees de la semaine', 'entres cette semaine', 'dossiers d aujourd hui', 'entres aujourd hui', 'point du jour', 'point d aujourd hui', 'semaine en cours', 'dossiers entres aujourd hui')) return 'semaine';
+  if (a(s, 'quand est ce que je recois', 'je recois quand', 'quand je recois', 'quand vais je recevoir', 'toujours rien recu', 'rien recu', 'pas encore recu', 'pas encore donne', 'on m a oublie', 'arrive quand', 'je l aurai quand', 'mon dossier', 'ma demande', 'mes demandes')) return 'mes_demandes';
+  return null;
+}
+
 /** L'intention de la question. */
 function intention(question, { archive }) {
   const s = plat(question);
-  if (/^\s*(bonjour|salut|bonsoir|hello|coucou)\s*$/.test(sansAccents(question).replace(/[^a-z ]/g, ''))) return 'salut';
+  const brut = sansAccents(question).replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (/^(bonjour|salut|bonsoir|hello|coucou|slt|bjr|bsr|cc|salam|yo|hey|bonjour docubot|salut docubot)( docubot| a vous| a toi| ca va| tout le monde)?$/.test(brut)) return 'salut';
+  if (/^(ok|okay|d accord|dac|super|parfait|tres bien|bien recu|compris|cool|top|nickel|merci|merci beaucoup|merci bcp|mrc|thanks)( merci| beaucoup| bcp| docubot)?$/.test(brut)) return 'merci';
+  if (/^(aide|help|aidez moi|aide moi|au secours|que sais tu faire|tu sers a quoi|que peux tu faire)$/.test(brut)) return 'aide';
+  // Un numéro seul : un n° d'acte.
+  if (/^\s*(?:acte\s*)?(?:n\s*[°o.]?\s*)?\d{2,6}(?:\s*\/\s*\d{1,6})?\s*\??\s*$/i.test(question)) return 'ou_est';
   if (a(s, 'merci') && s.trim().split(' ').length <= 4) return 'merci';
   if (a(s, /^ (comment|que faire|quoi faire|a quoi sert|c est quoi|qu est ce qu|ou trouver|aide|help|peut on|puis je|est il possible)\b/)) return 'aide';
   if (a(s, 'combien de temps', 'quel delai', 'quelle duree', 'jusqu a quand')) return 'aide';
-  if (a(s, 'combien', 'nombre de', 'nombre d', 'statistique', 'statistiques', 'total')) return 'chiffres';
+  if (a(s, 'combien', 'nombre de', 'nombre d', 'statistique', 'statistiques', 'total', 'stat', 'stats', 'chiffres', 'bilan')) return 'chiffres';
   if (a(s, /\bsemaine du\b/, /\bpoint du\b/, /\bentres? le\b/, /\bentrees? du\b/) && dateDans(question)) return 'semaine';
+
   if (a(s, 'retard', 'a recuperer', 'pas rendu', 'pas revenu', 'pas encore rendu', 'non rendus', 'a rendre', 'a retourner')) return 'retards';
   if (a(s, 'a traiter', 'ma journee', 'a transmettre', 'nouvelles demandes', 'en attente', 'quoi faire aujourd hui', 'que dois je faire', 'mon travail')) return archive ? 'journee' : 'mes_demandes';
   if (a(s, 'qui a', 'chez qui', 'qui detient', 'qui possede', 'qui l a', 'emprunte par', 'sorti chez', 'est revenu', 'est il revenu', 'est rentre', 'est il rentre', 'a ete rendu', 'est il rendu', 'est il sorti', 'est sorti')) return 'qui_a';
@@ -294,8 +317,11 @@ async function repondreAide(tenantId, question, droits) {
   if (!entree) {
     const redige = await rediger(tenantId, question, droits);
     if (redige) return redige;
+    const general = /^(aide|help|aidez moi|aide moi|au secours|que sais tu faire|tu sers a quoi|que peux tu faire)$/.test(plat(question).trim());
     return {
-      texte: 'Je n\'ai pas trouvé d\'aide sur ce point. Voici ce que je sais expliquer :',
+      texte: general
+        ? 'Je peux **trouver un dossier** (nom ou n° d\'acte), dire **s\'il est disponible** ou chez qui, suivre **vos demandes**, signaler **les retards**, donner **des chiffres**, et expliquer l\'application. Par exemple :'
+        : 'Je n\'ai pas trouvé d\'aide sur ce point. Voici ce que je sais expliquer :',
       suggestions: candidates.slice(0, 5).map((x) => QUESTION_AIDE[x.cle]).filter(Boolean),
     };
   }
@@ -354,7 +380,7 @@ async function sortiesDe(tenantId, nom, { userId = null } = {}) {
   const r = await db.query(
     `SELECT q.nom_entreprise, q.num_acte, q.type_document, to_char(l.remis_at, 'YYYY-MM-DD') AS remis_le,
             to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS retour_prevu, (l.date_retour_prevue < CURRENT_DATE) AS en_retard,
-            u.full_name AS chez
+            u.full_name AS chez, l.emprunteur_id AS chez_id
        FROM request_loans l JOIN requests q ON q.id = l.request_id AND q.tenant_id = l.tenant_id
        LEFT JOIN users u ON u.id = l.emprunteur_id
       WHERE l.tenant_id = $1 AND l.retourne_at IS NULL
@@ -421,6 +447,121 @@ async function repondreOuEst(tenantId, question, droits, contexte, indices = nul
   return res;
 }
 
+// ---------------------------------------------------------------------------
+// La fiche d'un dossier : tout ce qu'on sait de lui, quelle que soit la façon
+// de le demander (« Credo BTP », « est-il disponible ? », « donne-moi… »).
+// ---------------------------------------------------------------------------
+
+// Mots de typologie : un filtre, jamais une partie du nom (« attestation Credo BTP »).
+const MOTS_TYPOLOGIE = /\b(attestations?|cautions?|avances? de d[ée]marrage|avance|d[ée]marrage|bonne ex[ée]cution|ex[ée]cution|soumissions?|retenues? de garantie|retenue|garanties? bancaires?|garanties?|douani[èe]res?|en douane|pr[êe]ts?|march[ée]s?|att|cbe|cad|cd|cs|rg|gb)\b/gi;
+
+/** Ce que la question vise : { nom, acte, annee, typologie } (typologie et année retirées du nom). */
+function cibleDans(question) {
+  const acte = ia.acteDans(question) || (/^\s*(?:n\s*[°o.]?\s*)?(\d{2,6}(?:\s*\/\s*\d{1,6})?)\s*\??\s*$/i.exec(question)?.[1] || null);
+  const an = /\b((?:19|20)\d{2})\b(?!\s*\/)/.exec(String(question).replace(acte || '§', ' '));
+  const types = String(question).match(MOTS_TYPOLOGIE);
+  const sansType = String(question).replace(MOTS_TYPOLOGIE, ' ').replace(/\s+de\s+(la\s+|l')?(?=\s|$)/gi, ' ');
+  let nom = ia.entrepriseNommee(sansType) || nomDans(sansType);
+  if (nom && /^\d+$/.test(nom.replace(/\s/g, ''))) nom = null;
+  return { nom: nom && nom.length >= 2 ? nom : null, acte, annee: an ? Number(an[1]) : null, typologie: types ? types.join(' ').toLowerCase() : null };
+}
+
+/** Les demandes ouvertes qui concernent ce dossier (toutes pour l'archive, les siennes pour un agent). */
+async function demandesDe(tenantId, nom, droits) {
+  const params = [tenantId, `%${String(nom).replace(/[\\%_]/g, (c) => `\\${c}`)}%`, `%${nomSimple(nom).replace(/[\\%_]/g, (c) => `\\${c}`)}%`];
+  if (!droits.archive) params.push(droits.userId);
+  const r = await db.query(
+    `SELECT q.nom_entreprise, q.num_acte, q.type_document, q.statut, q.complement_demande_at, q.complement_fourni_at, to_char(q.created_at, 'YYYY-MM-DD') AS le, u.full_name AS agent
+       FROM requests q LEFT JOIN users u ON u.id = q.id_user
+      WHERE q.tenant_id = $1 AND q.statut = 'en attente'
+        AND (q.nom_entreprise ILIKE $2 OR q.num_acte ILIKE $2 OR ${NOM_SIMPLE.replace('lower(denomination)', 'lower(q.nom_entreprise)')} LIKE $3)
+        ${droits.archive ? '' : 'AND q.id_user = $4'}
+      ORDER BY q.created_at DESC LIMIT 5`,
+    params
+  );
+  return r.rows;
+}
+
+/** La cible est-elle connue (entrée, sortie ou demande) ? Rend ce qu'on en sait, ou null. */
+async function cibleConnue(tenantId, cible, droits) {
+  if (!cible.nom && !cible.acte) return null;
+  const presence = await entreeService.presence(tenantId, { nom_entreprise: cible.nom || '', num_acte: cible.acte || '', annee: cible.annee || '' });
+  const reference = cible.acte || cible.nom;
+  const sorties = await sortiesDe(tenantId, reference, { userId: null });
+  const demandes = cible.nom ? await demandesDe(tenantId, cible.nom, { archive: true }) : [];
+  if (!presence.total && !sorties.length && !demandes.length) return null;
+  return { presence, sorties, demandes };
+}
+
+async function repondreFiche(tenantId, cible, droits, connu) {
+  const { presence: p, sorties } = connu;
+  const libelle = [cible.nom, cible.acte && `acte ${cible.acte}`].filter(Boolean).join(', ');
+  // Typologie demandée : on garde les entrées de ce type s'il y en a.
+  const filtrer = (l, champ) => {
+    if (!cible.typologie) return l;
+    const mots = cible.typologie.split(' ').map((m) => sansAccents(m).slice(0, 5));
+    const f = l.filter((x) => mots.some((m) => sansAccents(x[champ] || '').toLowerCase().includes(m)));
+    return f.length ? f : l;
+  };
+  const entrees = filtrer(p.entrees, 'type_garantie');
+  const lignes = [];
+  const elements = [];
+  if (entrees.length) {
+    const e = entrees[0];
+    lignes.push(e.approche
+      ? `Je ne trouve pas « ${libelle} » écrit ainsi, mais un **nom proche** aux archives : **${e.denomination}**.`
+      : `**${e.denomination}** est aux archives${p.total > 1 ? ` (${pluriel(p.total, 'entrée')}, toutes années confondues)` : ''}.`);
+    for (const x of entrees.slice(0, 3)) {
+      elements.push({
+        titre: x.denomination || 'Dossier',
+        lignes: [
+          [x.num_actes && `Acte ${x.num_actes}`, x.type_garantie].filter(Boolean).join(' · '),
+          `Semaine du ${jourAff(x.semaine)} au ${jourAff(x.au)}`,
+          `Point du **${jourAff(x.date_point)}**`,
+          droits.archive && [x.lettre && `Lettre **${x.lettre}**`, x.armoire && `**${x.armoire}**`].filter(Boolean).join(' · '),
+        ].filter(Boolean),
+        ton: x.nom_concorde ? 'vert' : 'ambre',
+        note: x.approche ? 'Nom proche : vérifiez qu\'il s\'agit de la même entreprise.' : (!x.nom_concorde ? 'Acte entré sous un autre nom : à vérifier.' : null),
+      });
+    }
+  } else if (!sorties.length && !connu.demandes.length) {
+    lignes.push(`« **${libelle}** » n'est pas dans les entrées des archives.`);
+  } else {
+    lignes.push(`**${sorties[0]?.nom_entreprise || connu.demandes[0]?.nom_entreprise || libelle}**${droits.archive ? ' (pas d\'entrée enregistrée aux archives)' : ''} :`);
+  }
+  const chezMoi = sorties.some((x) => x.chez_id === droits.userId);
+  // Sorti ? Pour un agent : chez lui, ou « sorti » sans dire chez qui.
+  if (sorties.length) {
+    const miens = sorties.filter((x) => x.chez_id === droits.userId);
+    if (droits.archive) {
+      lignes.push(`**Sorti en ce moment** : ${sorties.map((x) => `chez **${x.chez || '?'}**, retour prévu le ${jourAff(x.retour_prevu)}${x.en_retard ? ' (**en retard**)' : ''}`).join(' ; ')}.`);
+      for (const x of sorties) elements.push({ ...ligneSortie(x, true), titre: `Sorti : ${ligneSortie(x).titre}` });
+    } else if (miens.length) {
+      lignes.push(`Ce dossier est **chez vous** : retour prévu le ${jourAff(miens[0].retour_prevu)}.`);
+    } else {
+      lignes.push(`Il est **actuellement sorti** (retour prévu le ${jourAff(sorties[0].retour_prevu)}). Vous pouvez le demander : l'archive vous le transmettra à son retour.`);
+    }
+  } else if (entrees.length && !entrees[0].approche) {
+    lignes.push('Il n\'est pas sorti : **disponible** aux archives.');
+  }
+  // Déjà demandé ?
+  const demandes = droits.archive ? connu.demandes : await demandesDe(tenantId, cible.nom || cible.acte, droits);
+  if (demandes.length) {
+    lignes.push(droits.archive
+      ? `**${pluriel(demandes.length, 'demande')} en attente** pour ce dossier (${demandes.map((d) => d.agent).filter(Boolean).slice(0, 3).join(', ')}).`
+      : `Vous l'avez **déjà demandé** le ${jourAff(demandes[0].le)} : l'archive va vous le transmettre.`);
+  }
+  // Numérisé ?
+  const annees = String((await settingsService.getAll(tenantId).catch(() => ({}))).mfiles_annees || '').match(/\d{4}/g) || [];
+  const anneeDossier = cible.annee || Number(entrees[0]?.date_point?.slice(0, 4)) || null;
+  if (anneeDossier && annees.includes(String(anneeDossier))) lignes.push(`Les dossiers de ${anneeDossier} sont **numérisés** : l'archive peut envoyer la copie M-Files.`);
+
+  const actions = [];
+  if (droits.demandeur && !(demandes.length && !droits.archive) && !chezMoi) actions.push({ type: 'demander', libelle: 'Demander ce dossier', saisie: [entrees[0]?.denomination || cible.nom, cible.acte].filter(Boolean).join(' ') });
+  if (droits.archive) actions.push({ type: 'lien', libelle: 'Ouvrir la recherche', vers: `/archives/entrees?q=${encodeURIComponent(cible.acte || cible.nom)}` });
+  return { texte: lignes.join('\n'), elements: elements.slice(0, 5), actions, contexte: { entreprise: entrees[0]?.denomination || cible.nom || null } };
+}
+
 async function repondreQuiA(tenantId, question, droits, contexte, indices = null) {
   const cible = indices?.entreprise || indices?.acte ? { nom: indices.entreprise, acte: indices.acte } : await entrepriseDans(question);
   const nom = cible.acte || cible.nom || contexte?.entreprise;
@@ -475,7 +616,8 @@ function etatDemande(d) {
 }
 
 async function repondreMesDemandes(tenantId, question, droits) {
-  const cible = nomDans(question, { majuscules: true }) || (/\bpour\s+(?:la\s+|le\s+)?(?:société\s+|ets\s+)?([a-z0-9][\w .&-]{1,60})$/i.exec(question.replace(/[?!.]+\s*$/, ''))?.[1] || null);
+  const cible = nomDans(question, { majuscules: true })
+    || (/\b(?:pour|demande\s+(?:de|du|d'|pour))\s+(?:la\s+|le\s+)?(?:société\s+|ets\s+)?([a-z0-9][\w .&-]{1,60})$/i.exec(question.replace(/[?!.]+\s*$/, ''))?.[1] || null);
   const params = [tenantId, droits.userId];
   let filtre = '';
   if (cible) { params.push(`%${cible.replace(/[\\%_]/g, (c) => `\\${c}`)}%`); filtre = 'AND (q.nom_entreprise ILIKE $3 OR q.num_acte ILIKE $3 OR q.num_dossier ILIKE $3)'; }
@@ -505,6 +647,21 @@ async function repondreMesDemandes(tenantId, question, droits) {
     }),
     actions: [{ type: 'lien', libelle: 'Mes dossiers', vers: '/demandes/mes-demandes' }],
   };
+}
+
+/** Les dossiers transmis aujourd'hui (archive ; un agent : les siens). */
+async function repondreSortiesDuJour(tenantId, droits) {
+  const params = [tenantId];
+  if (!droits.archive) params.push(droits.userId);
+  const r = await db.query(
+    `SELECT q.nom_entreprise, q.num_acte, q.type_document, to_char(l.remis_at, 'YYYY-MM-DD') AS remis_le,
+            to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS retour_prevu, false AS en_retard, u.full_name AS chez
+       FROM request_loans l JOIN requests q ON q.id = l.request_id AND q.tenant_id = l.tenant_id
+       LEFT JOIN users u ON u.id = l.emprunteur_id
+      WHERE l.tenant_id = $1 AND l.remis_at::date = CURRENT_DATE ${droits.archive ? '' : 'AND l.emprunteur_id = $2'}
+      ORDER BY l.remis_at DESC LIMIT 10`, params);
+  if (!r.rows.length) return { texte: 'Aucun dossier transmis aujourd\'hui.' };
+  return { texte: `**${pluriel(r.rows.length, 'dossier transmis', 'dossiers transmis')}** aujourd'hui :`, elements: r.rows.map((p) => ligneSortie(p, droits.archive)), actions: droits.archive ? [{ type: 'lien', libelle: 'Dossiers sortis', vers: '/demandes/prets' }] : [] };
 }
 
 async function compter(tenantId, sql, params) {
@@ -578,7 +735,8 @@ async function repondreChiffres(tenantId, question, droits) {
 }
 
 async function repondreSemaine(tenantId, question, indices = null) {
-  const date = indices?.date || dateDans(question);
+  // Sans date : la semaine en cours (« les dossiers de la semaine », « d'aujourd'hui »).
+  const date = indices?.date || dateDans(question) || new Date().toISOString().slice(0, 10);
   const w = await entreeService.semaine(tenantId, date).catch(() => null);
   if (!w) return { texte: 'Je n\'ai pas compris la date. Écrivez par exemple « semaine du 3 octobre 2025 ».' };
   const n = w.dossiers.length;
@@ -609,6 +767,8 @@ function suggestionsAccueil(droits) {
  * modèle appris quand il est sûr de lui. Rend une intention de repondre().
  */
 function comprendreDetail(q, droits) {
+  const sure = regleSure(q);
+  if (sure) return { quoi: sure === 'semaine' && !droits.archive ? 'mes_demandes' : sure, confiance: 1, source: 'regles' };
   let quoi = intention(q, droits);
   let source = 'regles';
   // Le modèle appris (jeu d'exemples + usage de l'organisation) lit les
@@ -618,7 +778,7 @@ function comprendreDetail(q, droits) {
     const avant = quoi;
     quoi = lu.intention === 'autre' ? 'hors_sujet' : lu.intention;
     if (quoi === 'journee' && !droits.archive) quoi = 'mes_demandes';
-    if (quoi === 'semaine' && !dateDans(q)) quoi = 'chiffres';
+    if (quoi === 'semaine' && !dateDans(q) && !/semaine|aujourd|du jour/i.test(q)) quoi = 'chiffres';
     if (quoi !== avant) source = 'appris';
   }
   // « Où est le plan des armoires ? » : ce n'est pas un dossier, c'est de l'aide.
@@ -656,6 +816,21 @@ async function repondre(user, question, contexte = {}) {
   if (!q) return { texte: 'Posez-moi une question.', suggestions: suggestionsAccueil(droits) };
   const lecture = comprendreDetail(q, droits);
   let quoi = lecture.quoi;
+  // Un dossier connu est nommé (« Credo BTP », « 15370 », « attestation Credo BTP 2025 »,
+  // « est-il disponible ? ») : sa fiche complète, quelle que soit la tournure.
+  const parleDemande = /\b(ma|mes|la|une)\s+demandes?\b|\bdemand[ée]/i.test(q);
+  if ((!['salut', 'merci', 'mes_demandes', 'retards', 'journee', 'semaine', 'mes_prets', 'sorties_jour'].includes(quoi)
+      || (quoi === 'mes_demandes' && !parleDemande && lecture.source !== 'regles')) && !agent.complexe(q)) {
+    const cible = cibleDans(q);
+    if (!(quoi === 'chiffres' && /\b(combien|nombre|total|stat)/i.test(q) && !cible.acte)) {
+      const connu = await cibleConnue(tenantId, cible, droits).catch(() => null);
+      if (connu) {
+        const res = await repondreFiche(tenantId, cible, droits, connu);
+        const echange = await apprentissage.noter(tenantId, user.id, q, { intention: 'ou_est', confiance: lecture.confiance, source: 'fiche' });
+        return { intention: 'fiche', ...res, echange };
+      }
+    }
+  }
   // Question complexe, ou non reconnue : si Ollama est là, DocuBot raisonne
   // en enchaînant ses recherches (docubotAgent).
   if ((agent.complexe(q) || quoi === 'inconnu') && !['salut', 'merci'].includes(quoi) && await ollama.regle(tenantId)) {
@@ -691,7 +866,7 @@ async function repondre(user, question, contexte = {}) {
       res = { texte: `Bonjour${nom ? ` ${String(nom).split(' ')[0]}` : ''} ! Que puis-je faire pour vous ?`, suggestions: suggestionsAccueil(droits) };
       break;
     }
-    case 'merci': res = { texte: 'Avec plaisir.' }; break;
+    case 'merci': res = { texte: /^(ok|okay|d.accord|super|parfait|compris|cool|top)/i.test(q) ? 'Très bien. Autre chose ?' : 'Avec plaisir.' }; break;
     case 'hors_sujet': {
       // Hors des archives : Ollama, s'il est là, peut s'appuyer sur les procédures ; sinon on le dit simplement.
       const redige = await rediger(tenantId, q, droits);
@@ -702,6 +877,9 @@ async function repondre(user, question, contexte = {}) {
     case 'chiffres': res = await repondreChiffres(tenantId, q, droits); break;
     case 'semaine': res = droits.archive ? await repondreSemaine(tenantId, q, indices) : { texte: 'Les semaines d\'entrée sont tenues par l\'archive. Dites-moi plutôt quel dossier vous cherchez.' }; break;
     case 'retards': res = await repondreRetards(tenantId, droits); break;
+    // « Mes prêts », « chez moi » : ses propres dossiers, archiviste compris.
+    case 'mes_prets': res = await repondreRetards(tenantId, { ...droits, archive: false }); break;
+    case 'sorties_jour': res = await repondreSortiesDuJour(tenantId, droits); break;
     case 'journee': res = await repondreJournee(tenantId); break;
     case 'qui_a': res = await repondreQuiA(tenantId, q, droits, contexte, indices); break;
     case 'mes_demandes': res = await repondreMesDemandes(tenantId, q, droits); break;
@@ -715,4 +893,4 @@ async function repondre(user, question, contexte = {}) {
   return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}), echange };
 }
 
-module.exports = { repondre, comprendre, comprendreDetail, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
+module.exports = { repondre, comprendre, comprendreDetail, cibleDans, regleSure, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
