@@ -403,13 +403,13 @@ async function registre(tenantId, { etat, cadre, liste, q, du, au, type } = {}) 
     pRecherche = `$${params.length}`;
   }
   const filtre = (listes) => (pRecherche
-    ? [...conds, `(q.nom_entreprise ILIKE ${pRecherche} OR q.num_dossier ILIKE ${pRecherche} OR q.num_acte ILIKE ${pRecherche} OR q.description ILIKE ${pRecherche} OR ue.full_name ILIKE ${pRecherche}${listes ? ` OR rl.libelle ILIKE ${pRecherche}` : ''})`]
+    ? [...conds, `(q.nom_entreprise ILIKE ${pRecherche} OR q.num_dossier ILIKE ${pRecherche} OR q.num_acte ILIKE ${pRecherche} OR q.description ILIKE ${pRecherche} OR ue.full_name ILIKE ${pRecherche} OR l.emprunteur_nom ILIKE ${pRecherche}${listes ? ` OR rl.libelle ILIKE ${pRecherche}` : ''})`]
     : conds);
   const requete = (listes) => db.query(
     `SELECT l.*, to_char(l.date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue,
             q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document, q.banque, q.montant, q.motif AS cadre,
             ${listes ? 'q.lot_id AS liste_id, rl.libelle AS liste_libelle,' : ''}
-            ue.full_name AS emprunteur_name, ur.full_name AS remis_par_name, ut.full_name AS retourne_par_name
+            COALESCE(ue.full_name, l.emprunteur_nom) AS emprunteur_name, ur.full_name AS remis_par_name, ut.full_name AS retourne_par_name
        FROM request_loans l
        JOIN requests q ON q.id = l.request_id AND q.tenant_id = l.tenant_id
        ${listes ? 'LEFT JOIN request_lots rl ON rl.id = q.lot_id' : ''}

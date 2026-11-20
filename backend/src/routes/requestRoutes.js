@@ -61,6 +61,15 @@ router.post('/listes/:listeId/retour', requirePermission('requests.process'), li
 // confirmer : gestes de l'agent — la permission ne fait qu'ouvrir la porte,
 // le service vérifie qu'il est bien l'emprunteur.
 router.get('/loans', requirePermission('requests.process'), loanController.registre);
+// Reprise du registre papier des sorties (059) : les sorties d'avant l'application, avec leurs dates.
+router.post('/loans/reprise', requirePermission('requests.process'), async (req, res) => {
+  try {
+    res.status(201).json(await require('../services/repriseRegistreService').importer(req.user.tenant_id, req.user, req.body || {}));
+  } catch (err) {
+    if (!err.statut) console.error('[reprise registre]', err.message);
+    res.status(err.statut || 500).json({ message: err.statut ? err.message : 'Reprise impossible.' });
+  }
+});
 router.post('/:id/loan', requirePermission('requests.process'), loanController.remettre);
 router.patch('/:id/loan/return', requirePermission('requests.process'), loanController.retourner);
 router.post('/:id/loan/report', requirePermission('requests.view'), loanController.signaler);
