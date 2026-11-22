@@ -1,5 +1,5 @@
 import {
-  GraduationCap, ArchiveX, UserPlus, BookMarked,
+  GraduationCap, ArchiveX, UserPlus, BookMarked, DatabaseZap,
   LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
 } from 'lucide-react';
 
@@ -61,6 +61,7 @@ const EDITIONS = {
       { section: 'Les fonds', to: '/archives/non-retires', label: 'Non retirés / annulés', icone: ArchiveX, permission: 'requests.process' },
       { section: 'Les fonds', to: '/archives/ouvertures-compte', label: 'Ouvertures de compte', icone: UserPlus, permission: 'requests.process' },
       { section: 'Les fonds', to: '/archives/plan', label: 'Plan de classement', icone: BookMarked, permission: 'requests.process' },
+      { section: 'Les fonds', to: '/archives/mfiles', label: 'Recherche M-Files', icone: DatabaseZap, permission: 'requests.process' },
       { section: 'Les fonds', to: '/documents/liste', label: 'Dossiers numérisés', icone: FolderOpen, permission: 'documents.view' },
       { section: 'Les fonds', to: '/documents/magasins', label: 'Boîtes et rayonnages', icone: Warehouse, permission: 'documents.view' },
       { section: 'Les fonds', to: '/documents/saisie', label: 'Saisie et import Excel', icone: Table2, permission: 'documents.index' },
@@ -109,6 +110,7 @@ const EDITIONS = {
       '/archives/ouvertures-compte': () => import('../pages/editions/afgc/CartonsAfgc'),
       '/archives/cartons': () => import('../pages/editions/afgc/CartonsAfgc'),
       '/archives/plan': () => import('../pages/editions/afgc/PlanClassementAfgc'),
+      '/archives/mfiles': () => import('../pages/editions/afgc/MfilesAfgc'),
       '/admin/comptes': () => import('../pages/editions/afgc/ComptesAfgc'),
       '/admin/reglages': () => import('../pages/editions/afgc/AdministrationAfgc'),
     },

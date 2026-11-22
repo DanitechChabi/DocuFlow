@@ -291,6 +291,34 @@ IA_LOCALE=non                    # aucun
 
 Redémarrez ensuite le serveur avec `scripts\redemarrer.ps1`. Pour voir l'état des modèles, allez dans **Réglages**, carte « Aide automatique ». Sans ces modèles, l'application fonctionne comme avant.
 
+## 8 ter. M-Files (recherche et DocuBot)
+
+L'application peut chercher dans M-Files (API REST de M-Files, « M-Files Web
+Service ») : menu **Les fonds → Recherche M-Files**, et DocuBot pour l'archive
+(« que dit le contrat de … », « cherche … dans M-Files »).
+
+1. Dans M-Files Admin, créez un **compte de service** (ex. `svc-docuflow`),
+   en lecture seule sur le coffre, et notez le **GUID du coffre**
+   (Propriétés du coffre).
+2. Vérifiez depuis ce serveur que l'API répond : ouvrez
+   `https://<serveur-mfiles>/REST/server/vaults` dans un navigateur.
+3. En administrateur :
+
+   ```powershell
+   C:\DocuFlow\scripts\raccorder-mfiles.ps1 -Adresse https://<serveur-mfiles>/REST -Coffre '{GUID}' -Utilisateur svc-docuflow
+   ```
+
+   Ajoutez `-Domaine AFGC` si le compte est un compte Windows. Le mot de passe
+   est demandé au clavier ; la connexion est testée **avant** d'écrire quoi
+   que ce soit dans `docuflow.env`.
+4. Pour que DocuBot réponde sur le **contenu** des documents, indexez-les :
+   depuis « Recherche M-Files » (bouton « Indexer ces résultats pour DocuBot »),
+   ou chaque nuit avec le réglage « Recherches M-Files à indexer pour DocuBot »
+   (ex. `2025; 2026`). Les scans sans texte sont lus par l'OCR.
+
+Le compte de service voit tout le coffre : la recherche M-Files et les
+réponses sur le contenu sont réservées à l'archive dans l'application.
+
 ## 9. Dépannage
 
 | Symptôme | Que faire |

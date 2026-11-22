@@ -193,6 +193,9 @@ const SEUIL_APPRIS = 0.6;
  */
 function regleSure(question) {
   const s = plat(question);
+  // Contenu des documents (RAG), recherche dans M-Files.
+  if (a(s, /\bm ?files\b/, 'que dit', 'que disent', /\bselon (le|la|les) (document|contrat|convention|acte|dossier)/, /\bd apres (le|la|les) (document|contrat|convention|acte)/,
+    /\bdans (le|la|les) (document|contrat|convention)s?\b/, /\bclauses?\b/, 'contenu du document', 'contenu des documents', 'cherche dans les documents')) return 'documents';
   // Plan de classement, calendrier de conservation : durées, sort final, cote, où classer.
   if (a(s, /\bconserv/, 'sort final', /\belimin/, /\bdetrui/, 'plan de classement', 'calendrier', /\bou (classer|ranger)\b/, /\bcote\b/, /\bclasse t on\b/, /\bduree d utilite\b/)
     && !a(s, /\bmon dossier\b/, /\bma demande\b/)) return 'conservation';
@@ -343,6 +346,39 @@ function passagesPour(question, droits, n = 4) {
   return tous
     .map((p) => ({ p, n: mots.filter((m) => plat(p).includes(` ${m.slice(0, 6)}`)).length }))
     .filter((x) => x.n > 0).sort((x, y) => y.n - x.n).slice(0, n).map((x) => x.p);
+}
+
+/**
+ * Questions sur le contenu des documents (RAG, 060) et recherche dans M-Files.
+ * Réservé à l'archive : le compte M-Files de l'application voit tout le coffre.
+ */
+async function repondreDocuments(tenantId, question, droits) {
+  if (!droits.archive) return { texte: 'La recherche dans le contenu des documents et dans M-Files est réservée à l\'archive. Demandez le dossier : l\'archive vous en enverra la copie.' };
+  const rag = require('./ragService');
+  const mfiles = require('./mfilesApiService');
+  const elements = [];
+  const lignes = [];
+  const reponse = await rag.repondre(tenantId, question).catch(() => null);
+  if (reponse) {
+    lignes.push(reponse.texte);
+    for (const src of reponse.sources) {
+      elements.push({ titre: `${src.n}. ${src.titre}`, lignes: [`${src.source} · « ${src.extrait.trim()}… »`], ton: src.source === 'M-Files' ? 'bleu' : 'gris', lien: src.lien, libelleLien: src.source === 'M-Files' ? 'Ouvrir dans M-Files' : 'Ouvrir le document' });
+    }
+  }
+  // M-Files en direct : la recherche rapide, sur les mots utiles de la question.
+  if (await mfiles.config(tenantId)) {
+    const termes = plat(question).replace(/\b(m ?files|cherche[rz]?|trouve[rz]?|dans|que|dit|disent|selon|le|la|les|des|du|de|un|une|document|documents|contrat|dossier|moi|svp|stp)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    if (termes.length >= 2) {
+      const r = await mfiles.rechercher(tenantId, termes, { limite: 5 }).catch((err) => ({ erreur: err.message }));
+      if (r.erreur) lignes.push(`M-Files ne répond pas : ${r.erreur}`);
+      else if (r.resultats.length) {
+        lignes.push(`Dans M-Files, ${r.resultats.length}${r.plus ? ' premiers' : ''} résultat${r.resultats.length > 1 ? 's' : ''} pour « ${termes} » :`);
+        for (const o of r.resultats) elements.push({ titre: o.titre, lignes: [[o.modifie_le && `Modifié le ${String(o.modifie_le).slice(0, 10).split('-').reverse().join('/')}`, o.fichiers.map((f) => f.nom).join(', ')].filter(Boolean).join(' · ')], ton: 'bleu', lien: o.lien, libelleLien: 'Ouvrir dans M-Files' });
+      } else lignes.push(`M-Files ne trouve rien pour « ${termes} ».`);
+    }
+  }
+  if (!lignes.length) return { texte: 'Je ne trouve rien dans les documents indexés. Vérifiez que M-Files est raccordé et que les documents ont été indexés (Recherche M-Files).', elements: [] };
+  return { texte: lignes.join('\n\n'), elements, actions: [{ type: 'lien', libelle: 'Recherche M-Files', vers: '/archives/mfiles' }] };
 }
 
 /** Réponse rédigée par Ollama à partir des passages ; null s'il n'est pas là. */
@@ -863,7 +899,7 @@ async function repondre(user, question, contexte = {}) {
   // Un dossier connu est nommé (« Credo BTP », « 15370 », « attestation Credo BTP 2025 »,
   // « est-il disponible ? ») : sa fiche complète, quelle que soit la tournure.
   const parleDemande = /\b(ma|mes|la|une)\s+demandes?\b|\bdemand[ée]/i.test(q);
-  if ((!['salut', 'merci', 'mes_demandes', 'retards', 'journee', 'semaine', 'mes_prets', 'sorties_jour', 'conservation'].includes(quoi)
+  if ((!['salut', 'merci', 'mes_demandes', 'retards', 'journee', 'semaine', 'mes_prets', 'sorties_jour', 'conservation', 'documents'].includes(quoi)
       || (quoi === 'mes_demandes' && !parleDemande && lecture.source !== 'regles')) && !agent.complexe(q)) {
     const cible = cibleDans(q);
     if (!(quoi === 'chiffres' && /\b(combien|nombre|total|stat)/i.test(q) && !cible.acte)) {
@@ -913,6 +949,8 @@ async function repondre(user, question, contexte = {}) {
     case 'merci': res = { texte: /^(ok|okay|d.accord|super|parfait|compris|cool|top)/i.test(q) ? 'Très bien. Autre chose ?' : 'Avec plaisir.' }; break;
     case 'hors_sujet': {
       // Hors des archives : Ollama, s'il est là, peut s'appuyer sur les procédures ; sinon on le dit simplement.
+      const doc = droits.archive ? await require('./ragService').repondre(tenantId, q).catch(() => null) : null;
+      if (doc) { res = await repondreDocuments(tenantId, q, droits); break; }
       const redige = await rediger(tenantId, q, droits);
       res = redige || { texte: 'Je réponds sur les dossiers et les demandes des archives de l\'AFGC. Cette question sort de mon domaine.', suggestions: suggestionsAccueil(droits) };
       break;
@@ -925,6 +963,7 @@ async function repondre(user, question, contexte = {}) {
     case 'mes_prets': res = await repondreRetards(tenantId, { ...droits, archive: false }); break;
     case 'sorties_jour': res = await repondreSortiesDuJour(tenantId, droits); break;
     case 'conservation': res = repondreConservation(q, droits); break;
+    case 'documents': res = await repondreDocuments(tenantId, q, droits); break;
     case 'journee': res = await repondreJournee(tenantId); break;
     case 'qui_a': res = await repondreQuiA(tenantId, q, droits, contexte, indices); break;
     case 'mes_demandes': res = await repondreMesDemandes(tenantId, q, droits); break;

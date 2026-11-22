@@ -46,6 +46,12 @@ const Fiche = ({ e }) => (
     <div className="text-sm font-semibold text-slate-900">{e.titre}</div>
     {e.lignes?.map((l, i) => <Texte key={i} texte={l} className="text-[13px] text-slate-600" />)}
     {e.note && <p className="mt-1 text-xs text-amber-800">{e.note}</p>}
+    {e.lien && (
+      <a href={e.lien} target={/^https?:/.test(e.lien) ? '_blank' : undefined} rel="noreferrer"
+        className="mt-1 inline-block text-xs font-semibold text-slate-700 underline hover:text-slate-900">
+        {e.libelleLien || 'Ouvrir'}
+      </a>
+    )}
   </div>
 );
 

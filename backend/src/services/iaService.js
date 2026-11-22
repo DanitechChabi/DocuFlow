@@ -151,10 +151,10 @@ function prechauffer() {
 // ---------------------------------------------------------------------------
 
 /** Vecteurs normalisés d'une liste de textes ; null si le modèle n'est pas prêt. */
-async function vecteurs(textes, { attendre = false } = {}) {
+async function vecteurs(textes, { attendre = false, prefixe = 'query' } = {}) {
   const p = attendre ? await charger('recherche') : siPret('recherche');
   if (!p || !textes.length) return null;
-  const sortie = await p(textes.map((t) => `query: ${t}`), { pooling: 'mean', normalize: true });
+  const sortie = await p(textes.map((t) => `${prefixe}: ${t}`), { pooling: 'mean', normalize: true });
   const dim = sortie.dims[sortie.dims.length - 1];
   return Array.from({ length: textes.length }, (_, i) => Float32Array.from(sortie.data.subarray(i * dim, (i + 1) * dim)));
 }
