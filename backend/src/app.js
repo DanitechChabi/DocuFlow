@@ -158,6 +158,7 @@ app.use('/api/entrees', require('./routes/entreeRoutes'));
 app.use('/api/ia', require('./routes/iaRoutes'));
 app.use('/api/cartons', require('./routes/cartonsRoutes'));
 app.use('/api/push', require('./routes/pushRoutes'));
+app.use('/api/mfiles', require('./routes/mfilesRoutes'));
 // Plan de classement et calendrier de conservation (AFGC) : consultables par tous les comptes.
 app.get('/api/plan-classement', require('./middlewares/authMiddleware'), (req, res) => res.json(require('./services/planService').lister()));
 app.use('/api/comptes', require('./routes/comptesRoutes'));
@@ -391,6 +392,8 @@ const server = ecouter(app, () => {
     require('./services/veilleService').demarrer();
     // Les notifications importantes, poussées sur les appareils abonnés (058).
     require('./services/pushService').demarrer();
+    // Le texte des documents, découpé pour DocuBot (RAG, 060) : GED, recherches M-Files réglées.
+    require('./services/ragService').demarrer();
     // Le modèle de langue (Ollama), s'il est réglé : chargé maintenant et
     // gardé chargé, pour que la première question n'attende pas.
     const prechauffer = async () => {
