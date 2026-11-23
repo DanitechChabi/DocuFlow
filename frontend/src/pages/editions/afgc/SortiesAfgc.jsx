@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpenCheck, Search, Printer, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { BookOpenCheck, Search, Printer, FileSpreadsheet, Loader2, Undo2, X } from 'lucide-react';
 import { listeService } from '../../../services/listeService';
 import { requestService } from '../../../services/requestService';
 import { authService } from '../../../services/authService';
 import { toast } from '../../../components/Toast';
+import { confirmer } from '../../../components/Confirmer';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { edition } from '../../../editions';
 import { EnTete, ChoixCadre, Pastille, Chargement } from './elements';
@@ -99,14 +100,40 @@ const SortiesAfgc = () => {
     return () => clearTimeout(t);
   }, [saisie]);
 
+  const [version, setVersion] = useState(0);
+  const [choisis, setChoisis] = useState(() => new Set());
+  const [retour, setRetour] = useState(false);
   useEffect(() => {
     setSorties(null);
+    setChoisis(new Set());
     const params = Object.fromEntries(Object.entries(filtres).filter(([, v]) => v !== ''));
     listeService.sorties(params).then((l) => setSorties(Array.isArray(l) ? l : [])).catch((e) => {
       setSorties([]);
       if (e.response?.status === 400) toast.error(e.response.data?.message || 'Critères invalides.');
     });
-  }, [filtres]);
+  }, [filtres, version]);
+
+  // Noter le retour d'un ou de plusieurs dossiers, depuis le registre.
+  const dehors = (sorties || []).filter((p) => !p.retourne_at);
+  const basculer = (id) => setChoisis((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const noterRetour = async (ids) => {
+    const lot = (sorties || []).filter((p) => ids.includes(p.request_id) && !p.retourne_at);
+    if (!lot.length) return;
+    if (!(await confirmer({
+      titre: lot.length > 1 ? `Noter le retour de ${lot.length} dossiers ?` : `Noter le retour de « ${intitule(lot[0])} » ?`,
+      message: 'Ils seront marqués « Retourné » à la date d\'aujourd\'hui.', libelle: 'Noter le retour', type: 'info',
+    }))) return;
+    setRetour(true);
+    let reussis = 0;
+    const refus = [];
+    for (const p of lot) {
+      try { await requestService.retournerDossier(p.request_id, { observation: lot.length > 1 ? 'Retour noté en lot depuis le registre' : '' }); reussis += 1; } catch (e) { refus.push(e.response?.data?.message || 'erreur'); }
+    }
+    setRetour(false);
+    if (reussis) toast.success(`${reussis} retour${reussis > 1 ? 's' : ''} noté${reussis > 1 ? 's' : ''}.`);
+    if (refus.length) toast.error(`${refus.length} non noté${refus.length > 1 ? 's' : ''} : ${[...new Set(refus)].join(' ; ')}`);
+    setVersion((v) => v + 1);
+  };
 
   const changer = (cle, valeur) => setFiltres((f) => ({ ...f, [cle]: valeur }));
   const listesDuCadre = listes.filter((l) => !filtres.cadre || l.cadre === filtres.cadre);
@@ -207,12 +234,29 @@ const SortiesAfgc = () => {
             {sorties.length} sortie{sorties.length > 1 ? 's' : ''}
             {sorties.length === 1000 && ' (les 1 000 plus récentes)'}
           </div>
+          {choisis.size > 0 && (
+            <div className="px-5 py-2.5 border-b border-slate-100 bg-green-50/70 flex flex-wrap items-center gap-3 text-sm animate-fade-in">
+              <span className="font-semibold text-slate-800">{choisis.size} dossier{choisis.size > 1 ? 's' : ''} sélectionné{choisis.size > 1 ? 's' : ''}</span>
+              <button type="button" onClick={() => noterRetour([...choisis])} disabled={retour}
+                className="px-3 py-1.5 rounded-md bg-docuflow-secondary text-white font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">
+                {retour ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />} Noter le retour
+              </button>
+              <button type="button" onClick={() => setChoisis(new Set())} className="text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"><X size={14} /> Tout désélectionner</button>
+            </div>
+          )}
           {sorties.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-[11px] text-slate-400">
-                    <th className="px-5 py-2.5 font-bold">Dossier</th>
+                    <th className="pl-5 py-2.5 w-8">
+                      {dehors.length > 0 && (
+                        <input type="checkbox" aria-label="Sélectionner tous les dossiers encore dehors"
+                          checked={dehors.every((p) => choisis.has(p.request_id))}
+                          onChange={(e) => setChoisis(e.target.checked ? new Set(dehors.map((p) => p.request_id)) : new Set())} />
+                      )}
+                    </th>
+                    <th className="px-3 py-2.5 font-bold">Dossier</th>
                     <th className="px-3 py-2.5 font-bold">Motif</th>
                     <th className="px-3 py-2.5 font-bold">Transmis à</th>
                     <th className="px-3 py-2.5 font-bold">Le</th>
@@ -225,8 +269,11 @@ const SortiesAfgc = () => {
                   {sorties.map((p) => {
                     const e = etatSortie(p);
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50/60">
-                        <td className="px-5 py-3 min-w-[240px] max-w-[360px]">
+                      <tr key={p.id} className={`hover:bg-slate-50/60 ${choisis.has(p.request_id) ? 'bg-green-50/50' : ''}`}>
+                        <td className="pl-5 py-3 w-8 align-top">
+                          {!p.retourne_at && <input type="checkbox" aria-label={`Sélectionner ${intitule(p)}`} checked={choisis.has(p.request_id)} onChange={() => basculer(p.request_id)} />}
+                        </td>
+                        <td className="px-3 py-3 min-w-[240px] max-w-[360px]">
                           <div className="font-semibold text-slate-800 line-clamp-2">{intitule(p)}</div>
                           <div className="text-xs text-slate-400 truncate">{references(p) || 'Sans référence'}</div>
                         </td>
@@ -238,7 +285,20 @@ const SortiesAfgc = () => {
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{dateCourte(p.remis_at)}</td>
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{dateCourte(p.date_retour_prevue)}</td>
                         <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{p.retourne_at ? dateCourte(p.retourne_at) : '—'}</td>
-                        <td className="px-5 py-3"><Pastille ton={e.ton}>{e.texte}</Pastille></td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <Pastille ton={e.ton}>{e.texte}</Pastille>
+                            {!p.retourne_at && p.rapporte_annonce_at && (
+                              <span className="text-[11px] font-bold text-docuflow-secondary whitespace-nowrap" title={`L'agent dit l'avoir rapporté le ${dateCourte(p.rapporte_annonce_at)}`}>Rapporté ?</span>
+                            )}
+                            {!p.retourne_at && (
+                              <button type="button" onClick={() => noterRetour([p.request_id])} disabled={retour} title="Noter le retour de ce dossier"
+                                className="p-1.5 rounded-md text-slate-500 hover:bg-green-50 hover:text-docuflow-secondary print:hidden" aria-label={`Noter le retour de ${intitule(p)}`}>
+                                <Undo2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}

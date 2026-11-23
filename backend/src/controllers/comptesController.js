@@ -17,3 +17,5 @@ exports.modifier = geste((req) => comptesService.modifier(req.user.tenant_id, re
 exports.desactiver = geste((req) => comptesService.activer(req.user.tenant_id, req.user, req.params.id, false), 'la désactivation du compte');
 exports.reactiver = geste((req) => comptesService.activer(req.user.tenant_id, req.user, req.params.id, true), 'la réactivation du compte');
 exports.motDePasse = geste((req) => comptesService.motDePasseProvisoire(req.user.tenant_id, req.user, req.params.id), 'la création du mot de passe provisoire');
+
+exports.debloquer = geste((req) => comptesService.debloquer(req.user.tenant_id, req.user, req.params.id), 'le déblocage du compte');

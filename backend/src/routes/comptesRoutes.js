@@ -11,5 +11,6 @@ router.patch('/:id', requirePermission('users.edit'), c.modifier);
 router.post('/:id/desactivation', requirePermission('users.disable'), c.desactiver);
 router.post('/:id/reactivation', requirePermission('users.disable'), c.reactiver);
 router.post('/:id/mot-de-passe', requirePermission('users.edit'), c.motDePasse);
+router.post('/:id/deblocage', requirePermission('users.edit'), c.debloquer);
 
 module.exports = router;

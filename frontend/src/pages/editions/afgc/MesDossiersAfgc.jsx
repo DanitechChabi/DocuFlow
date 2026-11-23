@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { FileSearch, ListChecks, Search, ChevronRight, X, Loader2, PlusCircle, FileSpreadsheet } from 'lucide-react';
+import { FileSearch, ListChecks, Search, ChevronRight, X, Loader2, PlusCircle, FileSpreadsheet, Undo2 } from 'lucide-react';
 import { exporterListe } from './exportListe';
 import { requestService } from '../../../services/requestService';
 import { listeService } from '../../../services/listeService';
@@ -43,6 +43,16 @@ const MesDossiersAfgc = () => {
   const [cadre, setCadre] = useState('');
   const [q, setQ] = useState('');
   const [ouverte, setOuverte] = useState(null);
+  const [annonce, setAnnonce] = useState(null);
+  // « Je l'ai rapporté » : l'archive est prévenue, elle confirmera le retour.
+  const annoncer = async (d) => {
+    setAnnonce(d.id);
+    try {
+      await requestService.annoncerRetour(d.id);
+      toast.success('C\'est noté : l\'archive est prévenue et confirmera le retour.');
+      setDemandes((l) => l.map((x) => (x.id === d.id ? { ...x, loan_rapporte_le: new Date().toISOString() } : x)));
+    } catch (e) { toast.error(e.response?.data?.message || 'L\'annonce n\'a pas pu être envoyée.'); } finally { setAnnonce(null); }
+  };
   const [annulation, setAnnulation] = useState(null);
   const [types, setTypes] = useState([]);
 
@@ -143,6 +153,14 @@ const MesDossiersAfgc = () => {
                         {etat.cle === 'transmis' && d.loan_retour_prevu && (
                           <span className="text-xs text-slate-500">retour prévu le <strong>{dateCourte(d.loan_retour_prevu)}</strong></span>
                         )}
+                        {etat.cle === 'transmis' && (d.loan_rapporte_le ? (
+                          <span className="text-xs font-semibold text-slate-600">Rapporté le {dateCourte(d.loan_rapporte_le)} : l'archive va le confirmer</span>
+                        ) : (
+                          <button type="button" onClick={() => annoncer(d)} disabled={annonce === d.id}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:border-docuflow-secondary hover:text-docuflow-secondary inline-flex items-center gap-1">
+                            {annonce === d.id ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} Je l'ai rapporté
+                          </button>
+                        ))}
                         {etat.cle === 'demande' && (
                           <button type="button" onClick={() => annuler(d)} disabled={annulation === d.id}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-red-50 hover:text-red-600 inline-flex items-center gap-1">

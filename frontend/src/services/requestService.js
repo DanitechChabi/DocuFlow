@@ -40,6 +40,8 @@ export const requestService = {
     const response = await api.patch(`/requests/${requestId}/loan/return`, { observation });
     return response.data;
   },
+  /** L'agent annonce avoir rapporté le dossier ; l'archive confirmera. */
+  annoncerRetour: async (requestId) => (await api.post(`/requests/${requestId}/loan/rapporte`)).data,
   /** L'agent conteste la remise (« je ne l'ai pas reçu »). */
   signalerPret: async (requestId, message) => {
     const response = await api.post(`/requests/${requestId}/loan/report`, { message });

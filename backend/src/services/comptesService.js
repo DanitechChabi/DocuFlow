@@ -33,7 +33,7 @@ async function roles(tenantId) {
 async function lister(tenantId) {
   const r = await db.query(
     `SELECT u.id, u.username, u.full_name, u.email, u.section, u.role, u.created_at,
-            u.desactive_le, u.desactive_par, u.derniere_connexion,
+            u.desactive_le, u.desactive_par, u.derniere_connexion, u.mdp_a_changer,
             (SELECT count(*)::int FROM request_loans p WHERE p.emprunteur_id = u.id AND p.retourne_at IS NULL) AS dossiers_chez_lui,
             (SELECT count(*)::int FROM requests q LEFT JOIN request_loans p ON p.request_id = q.id
               WHERE q.id_user = u.id AND p.id IS NULL AND q.statut IN ('en attente', 'a traiter', 'a completer')) AS demandes_en_cours
@@ -41,7 +41,8 @@ async function lister(tenantId) {
       ORDER BY (u.desactive_le IS NOT NULL), lower(u.full_name), u.id`,
     [tenantId]
   );
-  return { comptes: r.rows, roles: await roles(tenantId) };
+  const t = require('../helpers/tentativesConnexion');
+  return { comptes: r.rows.map((c) => ({ ...c, bloque_minutes: t.blocageDe(c.username) })), roles: await roles(tenantId) };
 }
 
 async function cible(tenantId, auteur, id) {
@@ -119,8 +120,18 @@ async function motDePasseProvisoire(tenantId, auteur, id) {
   await db.query('UPDATE users SET password_hash = $1, mdp_a_changer = TRUE, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2',
     [await bcrypt.hash(mdp, 10), u.id]);
   roleService.invalidateUser(u.id);
+  require('../helpers/tentativesConnexion').debloquer(u.username);
   await journal(tenantId, auteur, `A donné un mot de passe provisoire à ${u.full_name}`);
   return { mot_de_passe: mdp };
 }
 
-module.exports = { lister, modifier, activer, motDePasseProvisoire, roles };
+/** Lève le blocage après trop d'essais de connexion (061). */
+async function debloquer(tenantId, auteur, id) {
+  const u = await cible(tenantId, auteur, id);
+  require('../helpers/tentativesConnexion').debloquer(u.username);
+  await journal(tenantId, auteur, `A débloqué la connexion de ${u.full_name}`);
+  return { ok: true };
+}
+
+module.exports = {
+  debloquer, lister, modifier, activer, motDePasseProvisoire, roles };

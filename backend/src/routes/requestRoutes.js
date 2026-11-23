@@ -73,6 +73,7 @@ router.post('/loans/reprise', requirePermission('requests.process'), async (req,
 router.post('/:id/loan', requirePermission('requests.process'), loanController.remettre);
 router.patch('/:id/loan/return', requirePermission('requests.process'), loanController.retourner);
 router.post('/:id/loan/report', requirePermission('requests.view'), loanController.signaler);
+router.post('/:id/loan/rapporte', requirePermission('requests.view'), loanController.annoncerRetour);
 router.post('/:id/loan/confirm', requirePermission('requests.view'), loanController.confirmer);
 
 // --- Recherche automatique dans la GED (migration 027) ---

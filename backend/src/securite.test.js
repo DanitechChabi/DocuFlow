@@ -84,6 +84,17 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     const loans = require('./services/loanService');
     ok(await loans.rappelerEcheances(tid) === 1 && await loans.rappelerEcheances(tid) === 0, 'rappel « à rendre demain » envoyé une seule fois');
     ok((await db.query("SELECT count(*)::int n FROM notifications WHERE id_user = $1 AND type = 'loan_due_soon'", [uid])).rows[0].n === 1, 'l\'agent est prévenu');
+    // « Je l'ai rapporté » : annoncé par l'agent, l'archive prévenue, pas encore retourné.
+    const arch = (await db.query("INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) VALUES ($1, $2, 'x', 'Archiviste Essai', $3, 'archiviste') RETURNING id", [tid, `a.${s}`, `a${s}@exemple.test`])).rows[0].id;
+    const an = await loans.annoncerRetour(tid, rq, { id: uid, tenant_id: tid, full_name: 'Paul Essai' });
+    ok(an.pret.rapporte_annonce_at && !an.pret.retourne_at, 'retour annoncé par l\'agent, en attente de l\'archive');
+    ok((await db.query("SELECT count(*)::int n FROM notifications WHERE id_user = $1 AND type = 'loan_reported'", [arch])).rows[0].n === 1, 'l\'archive est prévenue');
+    ok((await loans.annoncerRetour(tid, rq, { id: uid, tenant_id: tid })).deja === true, 'annonce répétée : sans double notification');
+    // Déblocage par l'administrateur.
+    const tent = require('./helpers/tentativesConnexion');
+    ok(tent.blocageDe(ident) === 15, 'l\'administrateur voit le blocage');
+    tent.debloquer(ident);
+    ok(tent.blocageDe(ident) === 0 && (await appel('POST', '/auth/login', { username: ident, password: 'Mon-cafe-de-7h30', tenant_slug: slug })).statut === 200, 'débloqué : la connexion repart');
     await db.query('DELETE FROM tenants WHERE id = $1', [tid]).catch(() => {});
     server.close();
   }

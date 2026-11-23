@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Send, RotateCcw, ArrowRight, MessageSquareText } from 'lucide-react';
 import api from '../services/api';
+import { usePermissions } from '../hooks/usePermissions';
 
 // ============================================================================
 // DocuBot, édition AFGC : l'assistant des archives.
@@ -133,15 +134,18 @@ const DocuBotAfgc = () => {
   }, [ouvert, accueil]);
 
   // La veille du matin, pour l'archive : chargée une fois par session (10 min), son nombre d'alertes sur le bouton.
+  const { charge: droitsCharges, can } = usePermissions();
+  const archive = droitsCharges && can('requests.process');
   useEffect(() => {
+    if (!archive) return; // la veille est celle de l'archive : un agent n'a rien à charger
     let frais = null;
     try { frais = JSON.parse(sessionStorage.getItem('afgc.docubot.veille')); } catch { /* sans stockage */ }
     if (frais && Date.now() - frais.le < 10 * 60 * 1000) { setVeille(frais.veille); return; }
     api.get('/ia/docubot/veille').then((r) => {
       setVeille(r.data);
       try { sessionStorage.setItem('afgc.docubot.veille', JSON.stringify({ le: Date.now(), veille: r.data })); } catch { /* sans stockage */ }
-    }).catch(() => setVeille(null)); // un agent n'y a pas accès : pas de veille
-  }, []);
+    }).catch(() => setVeille(null));
+  }, [archive]);
 
   useEffect(() => {
     if (!ouvert) return undefined;

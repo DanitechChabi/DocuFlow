@@ -4,6 +4,7 @@ import { Compass, ArrowLeft, LayoutDashboard, FolderOpen } from 'lucide-react';
 import { authService } from '../services/authService';
 import Topbar from '../components/Topbar';
 import { useTitrePage } from '../hooks/useTitrePage';
+import { edition } from '../editions';
 
 /**
  * Page introuvable.
@@ -71,11 +72,11 @@ const NotFoundPage = () => {
         </button>
         {connecte ? (
           <>
-            <Link to="/dashboard" className="btn btn-primary">
-              <LayoutDashboard size={16} /> Tableau de bord
+            <Link to={edition ? '/' : '/dashboard'} className="btn btn-primary">
+              <LayoutDashboard size={16} /> {edition ? 'Accueil' : 'Tableau de bord'}
             </Link>
-            <Link to="/documents" className="btn btn-secondary">
-              <FolderOpen size={16} /> Documents
+            <Link to={edition ? '/demandes/mes-demandes' : '/documents'} className="btn btn-secondary">
+              <FolderOpen size={16} /> {edition ? 'Mes dossiers' : 'Documents'}
             </Link>
           </>
         ) : (

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, FileText, FolderOpen, User, Command, ArrowRight } from 'lucide-react';
+import { Search, FileText, FolderOpen, User, Command, ArrowRight, MessageSquareText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { documentService } from '../services/documentService';
 import { useSettings } from '../contexts/SettingsContext';
 import { authService } from '../services/authService';
 import Modal from './ui/Modal';
+import { edition } from '../editions';
+import { usePermissions } from '../hooks/usePermissions';
 
 /**
  * Recherche globale style Cmd+K (Notion, Linear, Vercel).
@@ -56,6 +58,8 @@ const GlobalSearch = () => {
   // Recherche debounce
   useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
+    // Édition dédiée (AFGC) : on cherche des dossiers, pas des documents de la GED.
+    if (edition) { setResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
@@ -97,9 +101,28 @@ const GlobalSearch = () => {
     { type: 'page', title: 'Mon profil', subtitle: '/profile', icon: User, action: () => { navigate('/profile'); setIsOpen(false); } },
   ];
 
-  const allResults = query.trim()
-    ? results
-    : quickPages;
+  // Édition dédiée : toutes les pages du menu permises, et le dossier cherché demandé à DocuBot.
+  const { can } = usePermissions();
+  const plat = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const pagesEdition = edition ? (edition.menu || []).filter((m) => !m.permission || can(m.permission)).map((m) => ({
+    type: 'page', title: m.label, subtitle: m.section || 'Accueil', icon: m.icone || ArrowRight, cle: m.to,
+    action: () => { navigate(m.to); setIsOpen(false); },
+  })) : [];
+  const resultatsEdition = () => {
+    const q = query.trim();
+    const pages = pagesEdition.filter((pg) => plat(`${pg.title} ${pg.subtitle}`).includes(plat(q))).slice(0, 6);
+    const dossier = q.length >= 2 ? [{
+      type: 'docubot', title: `Où est le dossier « ${q} » ?`, subtitle: 'DocuBot : point d\'entrée, carton, qui l\'a', icon: MessageSquareText, cle: 'docubot',
+      action: () => { setIsOpen(false); window.dispatchEvent(new CustomEvent('afgc:docubot', { detail: `Où est le dossier ${q} ?` })); },
+    }] : [];
+    return [...dossier, ...pages];
+  };
+
+  const allResults = edition
+    ? (query.trim() ? resultatsEdition() : pagesEdition.slice(0, 8))
+    : query.trim()
+      ? results
+      : quickPages;
 
   // Navigation au clavier
   const handleKeyDown = (e) => {
@@ -129,7 +152,7 @@ const GlobalSearch = () => {
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Rechercher un document, naviguer…"
+            placeholder={edition ? 'Un dossier (entreprise, n° d\'acte) ou une page…' : 'Rechercher un document, naviguer…'}
             className="flex-1 text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
           />
           <div className="flex items-center gap-1">

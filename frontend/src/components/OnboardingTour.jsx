@@ -287,26 +287,21 @@ const OnboardingTour = ({ steps = [], actif = false, onFermer }) => {
   const centre = targetRect.centre === true;
   const valid = !centre && targetRect.width > 0 && targetRect.height > 0;
 
-  // Masque sombre percé d'un « trou » sur la cible.
+  // Masque sombre percé d'un « trou » sur la cible : un cadre posé sur la
+  // cible, dont l'ombre (immense) assombrit tout le reste de l'écran. Un
+  // polygon() avec trou devait se refermer sur lui-même ; mal refermé, il
+  // dessinait un grand triangle clair au lieu du masque.
   const spotlightStyle = valid ? {
     position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100vw',
-    height: '100vh',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    top: Math.max(0, targetRect.top - 8),
+    left: Math.max(0, targetRect.left - 8),
+    width: Math.min(window.innerWidth, targetRect.right + 8) - Math.max(0, targetRect.left - 8),
+    height: Math.min(window.innerHeight, targetRect.bottom + 8) - Math.max(0, targetRect.top - 8),
+    borderRadius: 10,
+    boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.85)',
     pointerEvents: 'none',
     zIndex: 9997,
-    clipPath: `
-      polygon(
-        0 0, 100vw 0, 100vw 100vh, 0 100vh,
-        ${Math.max(0, targetRect.left - 8)}px ${Math.max(0, targetRect.top - 8)}px,
-        ${Math.min(window.innerWidth, targetRect.right + 8)}px ${Math.max(0, targetRect.top - 8)}px,
-        ${Math.min(window.innerWidth, targetRect.right + 8)}px ${Math.min(window.innerHeight, targetRect.bottom + 8)}px,
-        ${Math.max(0, targetRect.left - 8)}px ${Math.min(window.innerHeight, targetRect.bottom + 8)}px
-      )
-    `,
-    transition: 'clip-path 0.3s var(--df-ease)',
+    transition: 'top 0.3s var(--df-ease), left 0.3s var(--df-ease), width 0.3s var(--df-ease), height 0.3s var(--df-ease)',
   } : null;
 
   // Flèche : carré blanc pivoté à 45°, bordé sur les deux faces tournées vers la

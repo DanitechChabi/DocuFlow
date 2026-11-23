@@ -45,4 +45,18 @@ function echec(req, identifiant) {
 
 function reussite(req, identifiant) { const k = cles(req, identifiant); echecs.delete(k[0]); echecs.delete(k[2]); }
 
-module.exports = { bloque, echec, reussite, _echecs: echecs, MAX_COMPTE };
+/** Minutes de blocage d'un identifiant, toutes adresses confondues (pour l'administrateur). */
+function blocageDe(identifiant) {
+  const id = String(identifiant || '').trim().toLowerCase();
+  let fin = 0;
+  for (const [k] of echecs) if (k.endsWith(`|${id}`)) fin = Math.max(fin, lire(k)?.jusqua || 0);
+  return fin > Date.now() ? Math.ceil((fin - Date.now()) / 60000) : 0;
+}
+
+/** L'administrateur lève le blocage d'un identifiant. */
+function debloquer(identifiant) {
+  const id = String(identifiant || '').trim().toLowerCase();
+  for (const k of [...echecs.keys()]) if (k.endsWith(`|${id}`)) echecs.delete(k);
+}
+
+module.exports = { bloque, echec, reussite, blocageDe, debloquer, _echecs: echecs, MAX_COMPTE };

@@ -7,4 +7,5 @@ export const comptesService = {
   desactiver: async (id) => (await api.post(`/comptes/${id}/desactivation`)).data,
   reactiver: async (id) => (await api.post(`/comptes/${id}/reactivation`)).data,
   motDePasse: async (id) => (await api.post(`/comptes/${id}/mot-de-passe`)).data,
+  debloquer: async (id) => (await api.post(`/comptes/${id}/deblocage`)).data,
 };
