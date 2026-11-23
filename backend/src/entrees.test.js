@@ -19,7 +19,9 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
   ok(e.actesDe('1963-1964-1965').join() === '1963,1964,1965', 'actes séparés par des tirets');
   ok(e.actesDe('71 à 74').join() === '71,72,73,74', 'plage « 71 à 74 »');
   ok(e.actesDe('2026/58').join() === '58' && e.actesDe(16638).join() === '16638', '« 2026/58 » : l\'année n\'est pas un acte');
-  ok(e.lettreDe('Éts Lumière') === 'E' && e.lettreDe('2HR') === '#' && e.lettreDe('') === null, 'lettre de classement');
+  ok(e.lettreDe('Éts Lumière') === 'L' && e.lettreDe('Société Gbèdé Équipements') === 'G' && e.lettreDe('Entreprise Kanvô') === 'K' && e.lettreDe('') === null, 'lettre : « Ets », « Société », « Entreprise » sautés');
+  ok(e.lettreDe('2SND') === 'S' && e.lettreDe('Ste 2SND') === 'S' && e.lettreDe('123') === '#', 'lettre : les chiffres de tête sautés (« 2SND » → S)');
+  ok(e.lettreDe('Société Générale') === 'S' && e.lettreDe('Société de Gestion Fictive') === 'S' && e.lettreDe('SOCIETE') === 'S', 'lettre : « Société » gardé quand il fait partie du nom');
   ok(e.paques(2026).toISOString().slice(0, 10) === '2026-04-05' && e.paques(2025).toISOString().slice(0, 10) === '2025-04-20', 'Pâques');
   const routes = require('./routes/entreeRoutes');
   ok(routes.stack.some((l) => l.route?.path === '/import') && routes.stack.some((l) => l.route?.path === '/recherche'), 'routes déclarées');
@@ -97,6 +99,35 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     ok(absent === 404 && vide === 400, 'classeur absent : 404 ; rien d\'indiqué : 400');
     ok((await e.importer(t, u, { fichier: 'autre.xlsx', lignes: [{ date: '2026-02-03', ordre: 1, actes: '500', denomination: 'Delta Fictif' }] })).ajoutees === 1, 'réimportable aussitôt');
     ok((await e.supprimerFichier(t, u, { tous: true })).supprimees === 5 && (await e.fichiers(t)).length === 0, 'tout supprimer');
+
+    console.log('\n4 bis. Lettre de classement corrigée à la main');
+    await e.importer(t, u, { fichier: 'lettres.xlsx', lignes: [
+      { date: '2026-03-02', ordre: 1, actes: '701', denomination: 'Société Gbèdé Fictif' },
+      { date: '2026-03-02', ordre: 2, actes: '702', denomination: '2SND Fictif' },
+      { date: '2026-03-02', ordre: 3, actes: '703', denomination: 'Société Fictive Unie' },
+      { date: '2026-03-02', ordre: 4, actes: '704', denomination: 'Gamma Fictif' },
+    ] });
+    const lettres = async () => Object.fromEntries((await e.semaine(t, '2026-03-02')).dossiers.map((d) => [d.denomination, d.lettre]));
+    let l1 = await lettres();
+    ok(l1['Société Gbèdé Fictif'] === 'G' && l1['2SND Fictif'] === 'S' && l1['Société Fictive Unie'] === 'F', 'import : G, S, F selon la règle');
+    ok((await e.semaine(t, '2026-03-02')).dossiers.map((d) => d.denomination).slice(1, 3).join('|') === 'Gamma Fictif|Société Gbèdé Fictif', 'dans la lettre G : « Gamma » avant « (Société) Gbèdé »');
+    const c1 = await e.corrigerLettre(t, u, { denomination: 'Société Fictive Unie', lettre: 's' });
+    ok(c1.lettre === 'S' && c1.modifiees === 1 && (await lettres())['Société Fictive Unie'] === 'S', 'correction à la main : « Société » fait partie du nom → S');
+    await e.importer(t, u, { fichier: 'lettres.xlsx', lignes: [{ date: '2026-03-03', ordre: 1, actes: '705', denomination: 'SOCIETE FICTIVE UNIE' }] });
+    ok((await lettres())['SOCIETE FICTIVE UNIE'] === 'S', 'la correction vaut pour les entrées suivantes');
+    const c2 = await e.corrigerLettre(t, u, { denomination: 'Société Fictive Unie', lettre: null });
+    l1 = await lettres();
+    ok(c2.automatique && c2.modifiees === 2 && l1['Société Fictive Unie'] === 'F' && l1['SOCIETE FICTIVE UNIE'] === 'F', '« selon la règle » : retour à F pour toutes ses entrées');
+    // Une entrée importée sous l'ancienne règle (« 2SND » en #) : vue dans l'aperçu, puis mise à jour.
+    await db.query("UPDATE dossiers_entres SET lettre = '#' WHERE tenant_id = $1 AND denomination = '2SND Fictif'", [t]);
+    await e.corrigerLettre(t, u, { denomination: 'Gamma Fictif', lettre: 'Z' });
+    await db.query("UPDATE dossiers_entres SET lettre = 'G' WHERE tenant_id = $1 AND denomination = 'Gamma Fictif'", [t]);
+    const ap = await e.lettresAnciennes(t, u);
+    ok(ap.total === 2 && ap.exemples.some((x) => x.denomination === '2SND Fictif' && x.actuelle === '#' && x.nouvelle === 'S'), 'aperçu : les lettres de l\'ancienne règle, corrections comprises');
+    ok((await e.lettresAnciennes(t, u, { appliquer: true })).modifiees === 2 && (await lettres())['2SND Fictif'] === 'S' && (await e.lettresAnciennes(t, u)).total === 0, 'appliquer : 2SND passe en S, plus rien d\'ancien');
+    let mauvaise = null; try { await e.corrigerLettre(t, u, { denomination: 'Gamma Fictif', lettre: 'AB' }); } catch (err) { mauvaise = err.statut; }
+    ok(mauvaise === 400, 'lettre invalide refusée');
+    await e.supprimerFichier(t, u, { tous: true });
 
     console.log('\n5. Plan de rangement (armoires)');
     const rg = require('./services/rangementService');

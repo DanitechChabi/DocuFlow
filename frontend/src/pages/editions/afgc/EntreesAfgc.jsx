@@ -188,6 +188,58 @@ const BordereauImprime = ({ detail, groupes }) => (
  * périmé ou importé par erreur se supprime (toutes ses lignes) ; le classeur
  * corrigé peut ensuite être réimporté.
  */
+/**
+ * Les entrées importées avant la règle actuelle des lettres (« 2SND » en #,
+ * « Société Gbèdé » en S…) : l'aperçu, puis la mise à jour, sur décision.
+ */
+const LettresAnciennes = ({ onChange }) => {
+  const [apercu, setApercu] = useState(null);
+  const [voir, setVoir] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const charger = useCallback(() => entreeService.lettresApercu().then(setApercu).catch(() => setApercu(null)), []);
+  useEffect(() => { charger(); }, [charger]);
+  if (!apercu?.total) return null;
+  const appliquer = async () => {
+    setEnvoi(true);
+    try {
+      const r = await entreeService.lettresAppliquer();
+      toast.success(`${r.modifiees.toLocaleString('fr-FR')} entrée${r.modifiees > 1 ? 's' : ''} reclassée${r.modifiees > 1 ? 's' : ''}.`);
+      setVoir(false); charger(); onChange?.();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'La mise à jour a échoué.');
+    } finally {
+      setEnvoi(false);
+    }
+  };
+  return (
+    <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+      <p className="text-sm font-semibold text-amber-900">
+        {apercu.total.toLocaleString('fr-FR')} entrée{apercu.total > 1 ? 's' : ''} ({apercu.entreprises} entreprise{apercu.entreprises > 1 ? 's' : ''}) {apercu.total > 1 ? 'ont' : 'a'} encore la lettre de l'ancienne règle
+        (chiffre de tête, « Société », « Ets »… non sautés). Rien n'est changé sans votre accord : vérifiez d'abord que cela correspond au rangement réel.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={() => setVoir((v) => !v)} className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-sm font-bold text-amber-900">{voir ? 'Masquer' : 'Voir les changements'}</button>
+        <button type="button" onClick={appliquer} disabled={envoi} className="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-sm font-bold disabled:opacity-60 inline-flex items-center gap-1.5">
+          {envoi && <Loader2 size={14} className="animate-spin" />} Appliquer la nouvelle règle
+        </button>
+      </div>
+      {voir && (
+        <ul className="mt-3 max-h-72 overflow-y-auto divide-y divide-amber-100 rounded-lg border border-amber-200 bg-white text-sm">
+          {apercu.exemples.map((x) => (
+            <li key={`${x.denomination}|${x.actuelle}`} className="px-3 py-1.5 flex flex-wrap gap-x-3">
+              <span className="font-semibold text-slate-900 flex-1 min-w-0">{x.denomination}</span>
+              <span className="text-slate-700">{x.actuelle || '—'} → <strong>{x.nouvelle}</strong></span>
+              <span className="text-slate-500 w-20 text-right">{x.entrees} entrée{x.entrees > 1 ? 's' : ''}</span>
+            </li>
+          ))}
+          {apercu.entreprises > apercu.exemples.length && <li className="px-3 py-1.5 text-slate-500">… et {apercu.entreprises - apercu.exemples.length} autres entreprises.</li>}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+
 const ClasseursImportes = ({ onChange, onImporter }) => {
   const [liste, setListe] = useState(null);
   const [aSupprimer, setASupprimer] = useState(null); // { fichier, lignes } ou { tous: true, lignes }
@@ -227,6 +279,7 @@ const ClasseursImportes = ({ onChange, onImporter }) => {
           </button>
         )}
       </div>
+      <LettresAnciennes onChange={onChange} />
       {liste.length ? (
         <ul className="space-y-2">
           {liste.map((f) => (
@@ -530,6 +583,19 @@ const EntreesAfgc = () => {
     return () => clearTimeout(t);
   }, [lettreVisee, detail]);
 
+  // Lettre mal devinée (« Société » faisant partie du nom…) : corrigée pour toute l'entreprise.
+  const corrigerLettre = async (d, valeur) => {
+    if (!d.denomination || valeur === (d.lettre || '')) return;
+    try {
+      const r = await entreeService.corrigerLettre(d.denomination, valeur === 'auto' ? null : valeur);
+      toast.success(`${d.denomination} : lettre ${r.lettre}${r.automatique ? ' (règle)' : ''}, ${r.modifiees} entrée${r.modifiees > 1 ? 's' : ''} mise${r.modifiees > 1 ? 's' : ''} à jour.`);
+      setLettreVisee(r.lettre);
+      entreeService.semaine(choisie).then(setDetail).catch(() => {});
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'La lettre n\'a pas pu être corrigée.');
+    }
+  };
+
   const exporter = () => exporterClasseur(nomFichier('classement', choisie), [{
     nom: `Semaine du ${dateCourte(choisie).replace(/\//g, '-')}`,
     entetes: ['Lettre', 'Dénomination', 'N° actes', 'Type de garantie', 'Point du', 'Rubrique', 'Montant engagement', 'Agent'],
@@ -575,7 +641,7 @@ const EntreesAfgc = () => {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <EnTete titre="Entrée des dossiers" icone={PackageOpen}
-        aide="Les points des dossiers retirés, classés par semaine de production (du vendredi au jeudi, jours fériés exclus), puis par lettre.">
+        aide="Les points des dossiers retirés, classés par semaine de production (du vendredi au jeudi, jours fériés exclus), puis par lettre. La lettre ne tient pas compte de « Société », « Entreprise », « Ets », « Sarl »… ni des chiffres de tête (« 2SND » → S) ; si elle est mal devinée, corrigez-la au bout de la ligne.">
         <button type="button" onClick={() => setImportOuvert(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold">
           <Upload size={16} /> Importer des points (Excel)
@@ -681,6 +747,15 @@ const EntreesAfgc = () => {
                             <Pastille ton={/att/i.test(d.type_garantie || '') ? 'gris' : 'vert'}>{d.type_garantie || '—'}</Pastille>
                             <span className="text-sm font-semibold text-slate-700 w-28">{jourLong(d.date_point)}</span>
                             <span className="text-sm text-slate-600 w-24 truncate">{d.agent}</span>
+                            {d.denomination && (
+                              <select value={d.lettre || ''} onChange={(e) => corrigerLettre(d, e.target.value)}
+                                title="Corriger la lettre de classement (vaut pour toutes les entrées de cette entreprise)"
+                                aria-label={`Lettre de classement de ${d.denomination}`}
+                                className="text-xs font-bold text-slate-600 border border-slate-200 rounded-md px-1.5 py-1 bg-white hover:border-docuflow-secondary">
+                                {LETTRES.map((x) => <option key={x} value={x}>Lettre {x}</option>)}
+                                <option value="auto">Selon la règle</option>
+                              </select>
+                            )}
                           </li>
                         ))}
                       </ul>
