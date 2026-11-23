@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, Loader2, Reply, Pencil, Trash2, Send } from 'lucide-react';
 import { collaborationService } from '../../services/collaborationService';
 import { toast } from '../Toast';
+import { confirmer } from '../Confirmer';
 
 /**
  * Carte « Commentaires » de la fiche (migration 033) : fil avec réponses sur
@@ -96,7 +97,7 @@ const Commentaire = ({ c, documentId, onChange, onRepondre }) => {
     return <p className="text-xs italic text-slate-400 py-1">Commentaire supprimé{c.supprime_at ? ` le ${quand(c.supprime_at)}` : ''}.</p>;
   }
   const supprimer = async () => {
-    if (!window.confirm('Supprimer ce commentaire ?')) return;
+    if (!(await confirmer('Supprimer ce commentaire ?'))) return;
     try {
       await collaborationService.supprimerCommentaire(documentId, c.id);
       onChange();

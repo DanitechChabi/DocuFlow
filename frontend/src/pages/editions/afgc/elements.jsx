@@ -9,11 +9,40 @@ export const Pastille = ({ ton = 'gris', children, className = '' }) => (
   </span>
 );
 
-export const Chargement = () => (
-  <div className="py-8 text-center">
-    <div className="w-6 h-6 border border-slate-200 border-t-docuflow-secondary rounded-full animate-spin mx-auto" />
+/** Chargement : quelques lignes grises qui scintillent, à la forme d'une liste. */
+export const Chargement = ({ lignes = 4 }) => (
+  <div className="py-4 space-y-3" role="status" aria-label="Chargement">
+    {Array.from({ length: lignes }, (_, i) => (
+      <div key={i} className="flex items-center gap-3">
+        <div className="squelette w-9 h-9 rounded-full shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="squelette h-3.5" style={{ width: `${70 - i * 9}%` }} />
+          <div className="squelette h-3" style={{ width: `${45 - i * 5}%` }} />
+        </div>
+      </div>
+    ))}
   </div>
 );
+
+/** Un nombre qui monte jusqu'à sa valeur (tableaux de bord) ; immédiat si les animations sont réduites. */
+export const Compteur = ({ valeur }) => {
+  const [n, setN] = React.useState(typeof valeur === 'number' ? 0 : valeur);
+  React.useEffect(() => {
+    if (typeof valeur !== 'number') { setN(valeur); return undefined; }
+    const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduit || valeur <= 1) { setN(valeur); return undefined; }
+    let image;
+    const debut = performance.now();
+    const pas = (t) => {
+      const k = Math.min((t - debut) / 600, 1);
+      setN(Math.round(valeur * (1 - (1 - k) ** 3)));
+      if (k < 1) image = requestAnimationFrame(pas);
+    };
+    image = requestAnimationFrame(pas);
+    return () => cancelAnimationFrame(image);
+  }, [valeur]);
+  return n;
+};
 
 /** En-tête de page : titre, phrase d'aide, actions à droite. */
 export const EnTete = ({ titre, aide, icone: Icone, children }) => (
@@ -27,7 +56,8 @@ export const EnTete = ({ titre, aide, icone: Icone, children }) => (
       <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{titre}</h1>
       {aide && <p className="text-sm text-slate-500 mt-1">{aide}</p>}
     </div>
-    {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    {/* Sur téléphone, les boutons passent sous le titre : il garde toute la largeur. */}
+    {children && <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">{children}</div>}
   </div>
 );
 

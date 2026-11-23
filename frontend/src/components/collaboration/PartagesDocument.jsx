@@ -3,6 +3,7 @@ import { Link2, Loader2, Copy, Ban, Lock, Plus } from 'lucide-react';
 import { collaborationService } from '../../services/collaborationService';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../Toast';
+import { confirmer } from '../Confirmer';
 
 /**
  * Carte « Liens de partage » de la fiche (migration 033) : lien public vers
@@ -69,7 +70,7 @@ const PartagesDocument = ({ documentId, fichiers = [] }) => {
   };
 
   const revoquer = async (p) => {
-    if (!window.confirm('Révoquer ce lien ? Il cessera immédiatement de fonctionner.')) return;
+    if (!(await confirmer('Révoquer ce lien ? Il cessera immédiatement de fonctionner.'))) return;
     try {
       await collaborationService.revoquerPartage(documentId, p.id);
       toast.success('Lien révoqué');

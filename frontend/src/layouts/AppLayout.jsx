@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, MessageCircle, Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -37,7 +37,10 @@ const DemandeRapide = edition?.demandeRapide ? lazy(edition.demandeRapide) : nul
  */
 const AppLayout = () => {
   const navigate = useNavigate();
+  const zone = useRef(null);
   const location = useLocation();
+  // Nouvelle page : on repart du haut (la zone qui défile est <main>, pas la fenêtre).
+  useEffect(() => { zone.current?.scrollTo({ top: 0 }); }, [location.pathname]);
   const settings = useSettings();
   const { charge, can } = usePermissions();
   // Chercher un document qu'on ne peut pas ouvrir n'a pas de sens : sur le
@@ -144,12 +147,12 @@ const AppLayout = () => {
         </header>
 
         <BandeauConnexion />
-        <main className="flex-1 overflow-y-auto relative">
+        <main ref={zone} className="flex-1 overflow-y-auto relative">
           {!estBureau() && <InviteNotifications />}
           {/* `key` sur le chemin : React remonte le contenu à chaque navigation,
               ce qui rejoue `page-enter` — sans ça, l'Outlet remplace le contenu
               sans aucune transition. */}
-          <div key={location.pathname} className="animate-page-enter">
+          <div key={location.pathname} className="animate-page-enter pb-28 sm:pb-20">
             <Outlet />
           </div>
         </main>

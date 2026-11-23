@@ -8,6 +8,7 @@ import { physiqueService, TYPES_EMPLACEMENT, ENFANT_DE, RESULTATS, COULEURS } fr
 import { usePermissions } from '../hooks/usePermissions';
 import { useTitrePage } from '../hooks/useTitrePage';
 import { toast } from '../components/Toast';
+import { confirmer } from '../components/Confirmer';
 
 /**
  * Magasins — archives papier (migration 038) : où sont les originaux.
@@ -120,7 +121,7 @@ const Emplacements = () => {
   }, [liste]);
   const basculer = (id) => setOuverts((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const supprimer = async (e) => {
-    if (!window.confirm(`Supprimer ${TYPES_EMPLACEMENT[e.type].toLowerCase()} ${e.cote} ?`)) return;
+    if (!(await confirmer(`Supprimer ${TYPES_EMPLACEMENT[e.type].toLowerCase()} ${e.cote} ?`))) return;
     try { await physiqueService.supprimer(e.id); toast.success('Emplacement supprimé'); charger(); } catch (err) { toast.error(err.response?.data?.message || 'Suppression impossible'); }
   };
   const noeud = (e) => (

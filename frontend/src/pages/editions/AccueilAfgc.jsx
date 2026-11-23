@@ -42,7 +42,7 @@ const joursDeRetard = (date) => {
 const CarteAction = ({ to, icone: Icone, titre, texte, principale = false, children }) => (
   <Link
     to={to}
-    className={`group relative rounded-lg border bg-white p-6 flex flex-col transition-colors hover:border-slate-400 ${
+    className={`group carte-cliquable relative rounded-lg border bg-white p-6 flex flex-col hover:border-slate-400 ${
       principale ? 'border-slate-200 border-t-4 border-t-[#2C9C0A]' : 'border-slate-200'
     }`}
   >
@@ -172,7 +172,7 @@ const AccueilAfgc = () => {
       {traite ? (
         <>
           <MaJournee demandes={demandesArchive} enRetard={enRetard.length} admin={can('users.view')} configure={configure} />
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="liste-anim grid gap-5 md:grid-cols-3">
             <CarteAction to="/demandes/a-traiter" icone={ClipboardList} titre="À traiter" principale
               texte="Les demandes et les listes reçues : transmettre le dossier, puis noter son retour.">
               {aTraiter !== null && (
@@ -240,7 +240,7 @@ const AccueilAfgc = () => {
             <BoiteDemande grande autoFocus onEnvoye={charger} />
           </section>
 
-          <div className="grid gap-4 sm:grid-cols-2 mt-5">
+          <div className="liste-anim grid gap-4 sm:grid-cols-2 mt-5">
             <Link to="/demandes/mes-demandes" className="glass-card-premium rounded-lg p-5 flex items-center gap-4 hover:border-slate-400 transition-colors group">
               <div className="text-docuflow-secondary flex-shrink-0"><FileSearch size={22} /></div>
               <div className="min-w-0">

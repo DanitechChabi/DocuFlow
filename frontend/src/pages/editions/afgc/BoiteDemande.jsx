@@ -317,7 +317,7 @@ const BoiteDemande = ({
 
   return (
     <div>
-      <form onSubmit={valider} className={`flex gap-2 ${grande ? 'flex-col sm:flex-row' : ''}`}>
+      <form onSubmit={valider} className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search size={grande ? 22 : 18} className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${grande ? 'left-5' : 'left-4'}`} />
           <input
