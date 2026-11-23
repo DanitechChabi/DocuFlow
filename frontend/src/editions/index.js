@@ -1,6 +1,6 @@
 import {
   GraduationCap, ArchiveX, UserPlus, BookMarked, DatabaseZap,
-  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Mail, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
+  LayoutDashboard, PlusCircle, FileSearch, ClipboardList, BookOpenCheck, Warehouse, FolderOpen, Table2, PackageOpen, ScanBarcode, BarChart3, Users, Settings2,
 } from 'lucide-react';
 
 /**
@@ -56,7 +56,6 @@ const EDITIONS = {
       { section: 'Au quotidien', to: '/demandes/a-traiter', label: 'À traiter', icone: ClipboardList, permission: 'requests.process' },
       { section: 'Au quotidien', to: '/archives/douchette', label: 'Douchette', icone: ScanBarcode, permission: 'requests.process' },
       { section: 'Au quotidien', to: '/demandes/prets', label: 'Dossiers sortis', icone: BookOpenCheck, permission: 'requests.process' },
-      { section: 'Au quotidien', to: '/courrier', label: 'Courrier', icone: Mail, permission: 'mail.view' },
       { section: 'Les fonds', to: '/archives/entrees', label: 'Entrée des dossiers', icone: PackageOpen, permission: 'requests.process' },
       { section: 'Les fonds', to: '/archives/non-retires', label: 'Non retirés / annulés', icone: ArchiveX, permission: 'requests.process' },
       { section: 'Les fonds', to: '/archives/ouvertures-compte', label: 'Ouvertures de compte', icone: UserPlus, permission: 'requests.process' },

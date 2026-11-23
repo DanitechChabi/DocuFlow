@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  PlusCircle, FileSearch, Undo2, ClipboardList, BookOpenCheck, BookOpen, Mail, Warehouse, ListChecks,
+  PlusCircle, FileSearch, Undo2, ClipboardList, BookOpenCheck, BookOpen, Warehouse, ListChecks,
   ArrowRight, AlertTriangle, Settings2, Check, Loader2,
 } from 'lucide-react';
 import { requestService } from '../../services/requestService';
@@ -199,7 +199,6 @@ const AccueilAfgc = () => {
               <div className="space-y-1">
                 {[
                   { to: '/demandes/prets', label: 'Sorties et retours', icone: BookOpenCheck, visible: true },
-                  { to: '/courrier/registre', label: 'Courrier arrivée et départ', icone: Mail, visible: can('mail.register') },
                   { to: '/documents/magasins', label: 'Inventaire des boîtes', icone: Warehouse, visible: can('documents.view') },
                 ].filter((r) => r.visible).map((r) => (
                   <Link key={r.to} to={r.to} className="flex items-center gap-3 px-3 py-2 -mx-3 rounded-md text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors">
