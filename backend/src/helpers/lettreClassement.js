@@ -2,12 +2,12 @@
 // Lettre de classement d'un dossier entré (édition AFGC).
 //
 //   « Sarl Kanvô BTP »            → S   (la forme juridique compte, « Ets » aussi)
-//   « Groupe Nonvi Services »     → N   (« Groupe », « Groupement » sautés)
+//   « Groupe Afrique Espoir »     → G   (« Groupe », « Groupement » comptent)
 //   « Société Gbèdé Équipements » → G   (« Société » n'est qu'une étiquette)
 //   « Société Générale »          → S   (ici « Société » fait partie du nom)
 //   « 2SND »                      → S   (le chiffre ne compte pas)
 //
-// Un mot générique de tête (Entreprise, Société, Groupe, Groupement) est sauté, sauf
+// Un mot générique de tête (Entreprise, Société) est sauté, sauf
 // s'il fait partie de la dénomination sociale : suivi d'un « de / des / du »
 // (« Société de Gestion… ») ou d'un adjectif (« Générale », « Béninoise »…),
 // ou s'il est seul. Les cas que la règle ne devine pas se corrigent à la main
@@ -15,8 +15,9 @@
 // entrées de l'entreprise (table lettres_classement, migration 063).
 // ============================================================================
 
-// Les formes juridiques (Sarl, SA…) et « Ets / Établissements » COMPTENT : « Sarl Kanvô » va en S.
-const GENERIQUES = new Set('entreprise entreprises societe societes ste groupe groupes groupement groupements'.split(' '));
+// Seuls « Entreprise » et « Société » sont sautés. Les formes juridiques (Sarl, SA…),
+// « Ets / Établissements », « Groupe » et « Groupement » COMPTENT : « Groupe Afrique Espoir » va en G.
+const GENERIQUES = new Set('entreprise entreprises societe societes ste'.split(' '));
 
 // « Société Générale », « Entreprise Nationale… » : le mot générique fait partie du nom.
 const LIAISONS = new Set(['de', 'des', 'du', 'd', 'l', 'la', 'le', 'les', 'et', 'pour', 'a', 'au', 'aux']);

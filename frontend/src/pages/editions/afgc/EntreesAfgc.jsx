@@ -215,7 +215,7 @@ const LettresAnciennes = ({ onChange }) => {
     <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
       <p className="text-sm font-semibold text-amber-900">
         {apercu.total.toLocaleString('fr-FR')} entrée{apercu.total > 1 ? 's' : ''} ({apercu.entreprises} entreprise{apercu.entreprises > 1 ? 's' : ''}) {apercu.total > 1 ? 'ont' : 'a'} encore la lettre de l'ancienne règle
-        (chiffre de tête, « Société », « Entreprise », « Groupe »… non sautés). Rien n'est changé sans votre accord : vérifiez d'abord que cela correspond au rangement réel.
+        (chiffre de tête, « Société », « Entreprise » non sautés, ou « Groupe » sauté). Rien n'est changé sans votre accord : vérifiez d'abord que cela correspond au rangement réel.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" onClick={() => setVoir((v) => !v)} className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-sm font-bold text-amber-900">{voir ? 'Masquer' : 'Voir les changements'}</button>
@@ -641,7 +641,7 @@ const EntreesAfgc = () => {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       <EnTete titre="Entrée des dossiers" icone={PackageOpen}
-        aide="Les points des dossiers retirés, classés par semaine de production (du vendredi au jeudi, jours fériés exclus), puis par lettre. La lettre ne tient pas compte de « Société », « Entreprise », « Groupe », « Groupement » (sauf s'ils font partie du nom officiel) ni des chiffres de tête (« 2SND » → S) ; si elle est mal devinée, corrigez-la au bout de la ligne.">
+        aide="Les points des dossiers retirés, classés par semaine de production (du vendredi au jeudi, jours fériés exclus), puis par lettre. La lettre ne tient pas compte de « Société » ni d'« Entreprise » (sauf s'ils font partie du nom officiel) ni des chiffres de tête (« 2SND » → S) ; si elle est mal devinée, corrigez-la au bout de la ligne.">
         <button type="button" onClick={() => setImportOuvert(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-docuflow-secondary text-white text-sm font-bold">
           <Upload size={16} /> Importer des points (Excel)
