@@ -83,7 +83,7 @@ async function pourAgent(tenantId, user, corps = {}) {
       `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_dossier, num_acte, annee, motif, priorite, statut, description, type_document, banque, montant)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'en attente', $9, $10, $11, $12) RETURNING *`,
       [tenantId, agent.id, values.nom_entreprise, values.num_dossier, values.num_acte, values.annee, cadre, priorite, values.description, type,
-        values.banque, values.montant]
+        exigencesTypologie.banqueAdmise(type) ? values.banque : null, values.montant]
     )).rows[0];
     await client.query(
       `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)

@@ -138,7 +138,7 @@ async function completer(tenantId, user, id, corps = {}) {
     `UPDATE requests SET statut = 'en attente', nom_entreprise = $1, num_dossier = $2, num_acte = $3, annee = $4, banque = $5,
             montant = $6, description = $7, type_document = $8, complement_fourni_at = CURRENT_TIMESTAMP, complement_reponse = $9
       WHERE id = $10 AND tenant_id = $11`,
-    [fusion.nom_entreprise, fusion.num_dossier, fusion.num_acte, fusion.annee, fusion.banque, fusion.montant, fusion.description, type, reponse, request.id, tenantId]
+    [fusion.nom_entreprise, fusion.num_dossier, fusion.num_acte, fusion.annee, exigencesTypologie.banqueAdmise(type) ? fusion.banque : null, fusion.montant, fusion.description, type, reponse, request.id, tenantId]
   );
   const apres = { ...request, ...fusion, statut: 'en attente' };
   await historiser(tenantId, { requestId: request.id, user, action: 'Demande complétée', avant: A_COMPLETER, apres: 'en attente', commentaire: reponse });

@@ -102,7 +102,7 @@ function lireLignes(lignes, { types = null, exigences = null } = {}) {
       if (manque) errors.push(manque);
     }
     if (errors.length) erreurs.push({ ligne: i + 1, message: errors.join(' ') });
-    else valeurs.push({ ...values, type_document: type });
+    else valeurs.push({ ...values, type_document: type, banque: require('../helpers/exigencesTypologie').banqueAdmise(type) ? values.banque : null });
   });
   return { valeurs, erreurs };
 }

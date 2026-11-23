@@ -56,4 +56,9 @@ function manque(values, type, exigences) {
   return `Pour un dossier « ${type} », indiquez ${texte}.`;
 }
 
-module.exports = { exigencesDe, champsExiges, manque, LIBELLES };
+/** La banque ne concerne que les garanties bancaires : ailleurs, elle n'est pas gardée. */
+function banqueAdmise(type) {
+  return /garantie\s*bancaire|^gb$/.test(plat(type));
+}
+
+module.exports = { exigencesDe, champsExiges, manque, banqueAdmise, LIBELLES };
