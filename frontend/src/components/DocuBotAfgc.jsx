@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Send, RotateCcw, ArrowRight, MessageSquareText } from 'lucide-react';
+import { X, Send, RotateCcw, ArrowRight, MessageSquareText, Check, Loader2 } from 'lucide-react';
 import api from '../services/api';
 import { usePermissions } from '../hooks/usePermissions';
+import { confirmer } from './Confirmer';
 
 // ============================================================================
 // DocuBot, édition AFGC : l'assistant des archives.
@@ -10,12 +11,19 @@ import { usePermissions } from '../hooks/usePermissions';
 // Les questions partent au serveur (POST /api/ia/docubot), qui répond avec
 // les données de l'organisation et selon les droits de la personne : où est
 // un dossier, qui l'a, l'état de mes demandes, les retards, les chiffres, et
-// l'aide « comment faire ». La conversation reste le temps de la session
+// l'aide « comment faire ». Il propose aussi des actions (enregistrer un
+// retour, transmettre, annuler, demander) : elles ne partent qu'au clic, par
+// les routes habituelles de l'API. La conversation reste le temps de la session
 // (sessionStorage) ; « ce dont on parlait » (l'entreprise) suit, pour
 // enchaîner « et qui l'a ? ».
 // ============================================================================
 
 const CLE = 'afgc.docubot';
+
+// Les actions que DocuBot peut proposer d'exécuter : seulement ces adresses de
+// l'API, qui vérifient elles-mêmes les droits de la personne.
+const APPELS = [/^\/requests$/, /^\/requests\/\d+\/loan$/, /^\/requests\/\d+\/loan\/(return|rapporte)$/, /^\/requests\/\d+\/status$/];
+const appelPermis = (a) => a?.type === 'appel' && ['post', 'patch'].includes(a.methode) && APPELS.some((r) => r.test(String(a.url || '')));
 const lire = () => {
   try { return JSON.parse(sessionStorage.getItem(CLE)) || null; } catch { return null; }
 };
@@ -193,7 +201,25 @@ const DocuBotAfgc = () => {
     return () => window.removeEventListener('afgc:docubot', surDemande);
   }, [envoyer]);
 
-  const agir = (a) => {
+  // Un bouton « appel » : DocuBot fait l'action au clic, puis dit ce qui s'est passé.
+  const [enCours, setEnCours] = useState(null);
+  const executer = async (m, a) => {
+    if (!appelPermis(a) || enCours) return;
+    if (a.danger && !(await confirmer({ message: `${a.libelle} ?`, libelle: 'Confirmer', type: 'danger' }))) return;
+    setEnCours(a);
+    try {
+      await api[a.methode](a.url, a.corps || {});
+      setMessages((l) => [...l.map((x) => (x === m ? { ...x, fait: a.libelle } : x)), { de: 'bot', texte: a.succes || 'C\'est fait.' }]);
+    } catch (err) {
+      const raison = err?.response?.data?.message;
+      setMessages((l) => [...l, { de: 'bot', texte: raison ? `Je n'ai pas pu le faire : ${raison}` : 'Je n\'ai pas pu le faire. Réessayez dans un instant.' }]);
+    } finally {
+      setEnCours(null);
+    }
+  };
+
+  const agir = (a, m = null) => {
+    if (a.type === 'appel') { if (m) executer(m, a); return; }
     if (a.type === 'demander') navigate(`/demandes/nouvelle?q=${encodeURIComponent(a.saisie || '')}`);
     else if (a.vers) navigate(a.vers);
     setOuvert(false);
@@ -231,8 +257,8 @@ const DocuBotAfgc = () => {
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
             {messages.length === 0 && (
               <div>
-                <Texte texte={'Bonjour ! Je réponds sur les **dossiers** et les **demandes** : où se trouve un dossier, qui l\'a, où en est une demande, ce qui est en retard… et comment faire dans l\'application.'} />
-                <p className="mt-2 text-xs text-slate-500">Écrivez comme vous parlez, par exemple « où est le dossier Credo BTP ? ».</p>
+                <Texte texte={'Bonjour ! Je réponds sur les **dossiers** et les **demandes** : où se trouve un dossier, qui l\'a, où en est une demande, ce qui est en retard… et comment faire dans l\'application. Je peux aussi **agir** pour vous : transmettre un dossier, enregistrer un retour, demander ou annuler, toujours après votre clic.'} />
+                <p className="mt-2 text-xs text-slate-500">Écrivez comme vous parlez, par exemple « où est le dossier Credo BTP ? », puis « il revient quand ? ».</p>
                 {veille?.items?.length > 0 && <div className="mt-4"><Veille veille={veille} onLien={(vers) => agir({ vers })} /></div>}
               </div>
             )}
@@ -248,12 +274,13 @@ const DocuBotAfgc = () => {
                   <p className="text-[11px] text-slate-400">A consulté : {[...new Set(m.etapes)].map((e) => ETAPES[e] || e).join(', ')}.</p>
                 )}
                 {m.elements?.length > 0 && <div className="space-y-1.5">{m.elements.map((e, j) => <Fiche key={j} e={e} />)}</div>}
+                {m.fait && <p className="text-xs font-semibold text-[#2C9C0A] inline-flex items-center gap-1"><Check size={14} /> Fait : {m.fait}</p>}
                 {m.actions?.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {m.actions.map((a, j) => (
-                      <button key={j} type="button" onClick={() => agir(a)}
-                        className={`px-3 py-1.5 rounded-md text-sm font-semibold inline-flex items-center gap-1.5 ${a.type === 'demander' ? 'bg-[#2C9C0A] text-white hover:opacity-90' : 'border border-slate-300 bg-white text-slate-800 hover:border-slate-500'}`}>
-                        {a.libelle} <ArrowRight size={14} />
+                    {m.actions.filter((a) => a.type !== 'appel' || (!m.fait && appelPermis(a))).map((a, j) => (
+                      <button key={j} type="button" onClick={() => agir(a, m)} disabled={a.type === 'appel' && Boolean(enCours)}
+                        className={`px-3 py-1.5 rounded-md text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 ${a.type === 'appel' ? (a.danger ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-slate-800 text-white hover:bg-slate-900') : a.type === 'demander' ? 'bg-[#2C9C0A] text-white hover:opacity-90' : 'border border-slate-300 bg-white text-slate-800 hover:border-slate-500'}`}>
+                        {a.libelle} {a.type === 'appel' ? (enCours === a ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />) : <ArrowRight size={14} />}
                       </button>
                     ))}
                   </div>
