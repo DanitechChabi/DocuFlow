@@ -67,11 +67,13 @@ function actesDe(brut) {
   return [...res];
 }
 
-/** Lettre de classement : la première lettre du nom (A à Z), « # » s'il commence par un chiffre. */
-function lettreDe(nom) {
-  const c = String(nom || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().match(/[A-Z0-9]/);
-  if (!c) return null;
-  return /\d/.test(c[0]) ? '#' : c[0];
+// Lettre de classement : voir helpers/lettreClassement (mots génériques et chiffres sautés).
+const { lettreDe, nomDeClassement, cleDe, lettreValide } = require('../helpers/lettreClassement');
+
+/** Les lettres corrigées à la main, par nom simplifié (migration 063 ; vide si absente). */
+async function lettresCorrigees(tenantId) {
+  const r = await db.query('SELECT nom_simple, lettre FROM lettres_classement WHERE tenant_id = $1', [tenantId]).catch(() => ({ rows: [] }));
+  return new Map(r.rows.map((x) => [x.nom_simple, x.lettre]));
 }
 
 /** Dimanche de Pâques (algorithme grégorien). */
@@ -110,6 +112,7 @@ async function importer(tenantId, user, { fichier, lignes } = {}) {
   if (!Array.isArray(lignes) || !lignes.length) throw erreur(400, 'Aucune ligne à importer.');
   if (lignes.length > LIMITE) throw erreur(400, `Au plus ${LIMITE} lignes par envoi.`);
   const nomFichier = texte(fichier, 255);
+  const corrigees = await lettresCorrigees(tenantId);
   const valeurs = [];
   let rejetees = 0;
   for (const l of lignes) {
@@ -119,7 +122,7 @@ async function importer(tenantId, user, { fichier, lignes } = {}) {
     if (!date || (!denomination && !numActes)) { rejetees += 1; continue; }
     const v = {
       date, semaine: semaineDe(date), rubrique: texte(l.rubrique, 150), ordre: Number.isInteger(Number(l.ordre)) && l.ordre !== '' && l.ordre !== null ? Number(l.ordre) : null,
-      numActes, actes: actesDe(numActes), denomination, lettre: lettreDe(denomination), type: texte(l.type, 100),
+      numActes, actes: actesDe(numActes), denomination, lettre: corrigees.get(cleDe(denomination)) || lettreDe(denomination), type: texte(l.type, 100),
       montant: nombre(l.montant), ht: nombre(l.ht), ttc: nombre(l.ttc), agent: texte(l.agent, 100),
     };
     v.empreinte = crypto.createHash('md5').update([v.date, v.rubrique, v.ordre, v.numActes, v.denomination, v.type].join('|')).digest('hex');
@@ -187,7 +190,76 @@ async function semaine(tenantId, debut) {
     [tenantId, s]
   );
   const fin = jour(s); fin.setUTCDate(fin.getUTCDate() + 6);
-  return { semaine: s, au: iso(fin), dossiers: r.rows };
+  // Dans une lettre, l'ordre suit le nom de classement (« Société Gbèdé » parmi les G, à « Gbèdé »).
+  const cle = (d) => nomDeClassement(d.denomination);
+  const dossiers = r.rows.map((d, i) => ({ d, i, l: d.lettre || '~', c: cle(d) }))
+    .sort((x, y) => (x.l === y.l ? (x.c === y.c ? x.i - y.i : x.c < y.c ? -1 : 1) : x.l < y.l ? -1 : 1))
+    .map((x) => x.d);
+  return { semaine: s, au: iso(fin), dossiers };
+}
+
+/**
+ * Entrées déjà importées dont la lettre diffère de la règle actuelle (les
+ * corrections à la main sont respectées). `appliquer` : les met à jour.
+ */
+async function lettresAnciennes(tenantId, user, { appliquer = false } = {}) {
+  const corrigees = await lettresCorrigees(tenantId);
+  const r = await db.query('SELECT id, denomination, lettre FROM dossiers_entres WHERE tenant_id = $1 AND denomination IS NOT NULL', [tenantId]);
+  const parNom = new Map();
+  for (const d of r.rows) {
+    const nouvelle = corrigees.get(cleDe(d.denomination)) || lettreDe(d.denomination);
+    if (!nouvelle || nouvelle === d.lettre) continue;
+    const cle = `${d.denomination}|${d.lettre || ''}|${nouvelle}`;
+    if (!parNom.has(cle)) parNom.set(cle, { denomination: d.denomination, actuelle: d.lettre, nouvelle, ids: [] });
+    parNom.get(cle).ids.push(d.id);
+  }
+  const liste = [...parNom.values()].sort((x, y) => y.ids.length - x.ids.length || String(x.denomination).localeCompare(String(y.denomination), 'fr'));
+  const total = liste.reduce((n, x) => n + x.ids.length, 0);
+  if (!appliquer) return { total, entreprises: liste.length, exemples: liste.slice(0, 50).map(({ ids, ...x }) => ({ ...x, entrees: ids.length })) };
+  if (!total) return { total: 0, modifiees: 0 };
+  const ids = liste.flatMap((x) => x.ids);
+  const lettres = liste.flatMap((x) => x.ids.map(() => x.nouvelle));
+  const u = await db.query(
+    `UPDATE dossiers_entres d SET lettre = x.l FROM unnest($2::int[], $3::text[]) AS x(id, l) WHERE d.tenant_id = $1 AND d.id = x.id`,
+    [tenantId, ids, lettres]);
+  await db.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
+    [user.id, `A appliqué la règle des lettres de classement aux entrées déjà importées (${u.rowCount} entrée${u.rowCount > 1 ? 's' : ''})`, tenantId]);
+  return { total, modifiees: u.rowCount };
+}
+
+/**
+ * Corrige la lettre de classement d'une entreprise : toutes ses entrées, et
+ * les suivantes (la correction est retenue). `lettre` vide : retour à la règle.
+ */
+async function corrigerLettre(tenantId, user, { denomination, lettre } = {}) {
+  const nom = texte(denomination, 255);
+  if (!nom) throw erreur(400, 'Indiquez l\'entreprise dont la lettre change.');
+  const automatique = lettre === null || lettre === undefined || String(lettre).trim() === '';
+  const choisie = automatique ? lettreDe(nom) : lettreValide(lettre);
+  if (!choisie) throw erreur(400, 'Lettre invalide : une lettre de A à Z, ou « # ».');
+  const cle = cleDe(nom);
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (automatique) await client.query('DELETE FROM lettres_classement WHERE tenant_id = $1 AND nom_simple = $2', [tenantId, cle]);
+    else {
+      await client.query(
+        `INSERT INTO lettres_classement (tenant_id, nom_simple, lettre, corrige_par) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (tenant_id, nom_simple) DO UPDATE SET lettre = EXCLUDED.lettre, corrige_par = EXCLUDED.corrige_par, corrige_le = now()`,
+        [tenantId, cle, choisie, user.id]);
+    }
+    const r = await client.query(`UPDATE dossiers_entres SET lettre = $3 WHERE tenant_id = $1 AND ${NOM_SIMPLE} = $2 AND lettre IS DISTINCT FROM $3`, [tenantId, cle, choisie]);
+    await client.query('INSERT INTO audit_logs (id_user, action, request_id, tenant_id) VALUES ($1, $2, NULL, $3)',
+      [user.id, `A classé « ${nom} » ${automatique ? 'selon la règle' : 'à la main'} sous la lettre ${choisie} (${r.rowCount} entrée${r.rowCount > 1 ? 's' : ''})`.slice(0, 500), tenantId]);
+    await client.query('COMMIT');
+    return { lettre: choisie, automatique, modifiees: r.rowCount };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (e.code === '42P01') throw erreur(503, 'La correction des lettres arrive avec la prochaine mise à jour de la base.');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** Recherche : nom, n° d'acte (« 1964 », « 2026/58 »), type, agent, période. */
@@ -424,5 +496,5 @@ async function supprimerFichier(tenantId, user, { fichier, tous } = {}) {
 module.exports = {
   fichiers, supprimerFichier,
   importer, semaines, semaine, rechercher, filtres, presence, presences,
-  semaineDe, actesDe, lettreDe, feriesDe, paques, nomSimple, acteDemande, LIMITE, MAX_PRESENCES,
+  semaineDe, actesDe, lettreDe, corrigerLettre, lettresAnciennes, feriesDe, paques, nomSimple, acteDemande, LIMITE, MAX_PRESENCES,
 };

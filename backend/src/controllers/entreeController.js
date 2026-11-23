@@ -15,6 +15,9 @@ const geste = (fn, contexte) => async (req, res) => {
 exports.importer = geste((req) => entreeService.importer(req.user.tenant_id, req.user, req.body || {}), 'l\'import');
 exports.semaines = geste((req) => entreeService.semaines(req.user.tenant_id, req.query), 'la lecture des semaines');
 exports.semaine = geste((req) => entreeService.semaine(req.user.tenant_id, req.params.debut), 'la lecture de la semaine');
+exports.corrigerLettre = geste((req) => entreeService.corrigerLettre(req.user.tenant_id, req.user, req.body || {}), 'la correction de la lettre');
+exports.lettresApercu = geste((req) => entreeService.lettresAnciennes(req.user.tenant_id, req.user), 'l\'aperçu des lettres');
+exports.lettresAppliquer = geste((req) => entreeService.lettresAnciennes(req.user.tenant_id, req.user, { appliquer: true }), 'la mise à jour des lettres');
 exports.rechercher = geste((req) => entreeService.rechercher(req.user.tenant_id, req.query), 'la recherche');
 exports.filtres = geste((req) => entreeService.filtres(req.user.tenant_id), 'la lecture des filtres');
 exports.presence = geste((req) => entreeService.presence(req.user.tenant_id, req.query), 'la recherche de présence');
