@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const tentatives = require('../helpers/tentativesConnexion');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const settingsService = require('../services/settingsService');
@@ -85,7 +86,7 @@ exports.register = async (req, res) => {
     // et password_require_symbols). Contrôlée après résolution du tenant, car
     // chaque organisation fixe ses propres exigences.
     const passwordPolicy = await settingsService.getPasswordPolicy(tenantId);
-    const passwordError = passwordPolicy.validate(password);
+    const passwordError = passwordPolicy.validate(password, { identifiant: username, nom: full_name });
     if (passwordError) {
       return res.status(400).json({ message: passwordError });
     }
@@ -188,6 +189,10 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   const { username, password, tenant_slug } = req.body;
+  const bloque = tentatives.bloque(req, username);
+  if (bloque) {
+    return res.status(429).json({ message: `Trop de tentatives de connexion. Réessayez dans ${bloque} minute${bloque > 1 ? 's' : ''}, ou demandez un nouveau mot de passe à l'administrateur.`, code: 'TROP_DE_TENTATIVES' });
+  }
 
   try {
     let userResult;
@@ -236,12 +241,27 @@ exports.login = async (req, res) => {
     const user = userResult.rows[0];
 
     if (!user) {
+      // Même durée de réponse qu'un mauvais mot de passe : on ne révèle pas quels identifiants existent.
+      await bcrypt.compare(String(password || ''), '$2a$10$CwTycUXWue0Thq9StjUM0uJ8DPLKXt1FYlwYpQW0G2lJ5D5tIWS6e').catch(() => {});
+      tentatives.echec(req, username);
       return res.status(400).json({ message: 'Identifiant ou mot de passe incorrect' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Identifiant ou mot de passe incorrect' });
+      const reste = tentatives.echec(req, username);
+      return res.status(400).json({ message: reste > 0 && reste <= 2
+        ? `Identifiant ou mot de passe incorrect. Encore ${reste} essai${reste > 1 ? 's' : ''} avant un blocage de 15 minutes.`
+        : 'Identifiant ou mot de passe incorrect' });
+    }
+    tentatives.reussite(req, username);
+    // Mot de passe égal à l'identifiant (comptes créés ainsi) : à changer tout de suite.
+    const simple = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    let aChanger = user.mdp_a_changer === true;
+    if (!aChanger && simple(password) === simple(user.username)) {
+      aChanger = true;
+      await db.query('UPDATE users SET mdp_a_changer = TRUE WHERE id = $1', [user.id]).catch(() => {});
+      require('../services/roleService').invalidateUser(user.id);
     }
     if (user.desactive_le) {
       return res.status(403).json({ message: 'Ce compte a été désactivé. Adressez-vous à l\'administrateur des archives.', code: 'COMPTE_DESACTIVE' });
@@ -268,7 +288,8 @@ exports.login = async (req, res) => {
         full_name: user.full_name,
         role: user.role,
         section: user.section,
-        tenant_id: tenantId
+        tenant_id: tenantId,
+        mdp_a_changer: aChanger,
       }
     });
   } catch (err) {

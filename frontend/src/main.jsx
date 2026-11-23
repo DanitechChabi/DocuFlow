@@ -14,3 +14,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
 }
+
+// Une page chargée sans erreur : le prochain « nouvelle version » pourra recharger à nouveau.
+window.addEventListener('load', () => { setTimeout(() => { try { sessionStorage.removeItem('rechargement-version'); } catch { /* sans gravité */ } }, 10000); });

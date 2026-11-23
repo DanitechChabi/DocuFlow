@@ -116,7 +116,7 @@ async function motDePasseProvisoire(tenantId, auteur, id) {
   const alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const octets = crypto.randomBytes(10);
   const mdp = Array.from(octets, (b) => alphabet[b % alphabet.length]).join('');
-  await db.query('UPDATE users SET password_hash = $1, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2',
+  await db.query('UPDATE users SET password_hash = $1, mdp_a_changer = TRUE, token_version = COALESCE(token_version, 0) + 1 WHERE id = $2',
     [await bcrypt.hash(mdp, 10), u.id]);
   roleService.invalidateUser(u.id);
   await journal(tenantId, auteur, `A donné un mot de passe provisoire à ${u.full_name}`);

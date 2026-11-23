@@ -114,9 +114,10 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: "L'utilisateur ou l'email existe déjà dans cette entreprise" });
     }
 
-    // Validation de la force du mot de passe
+    // Mot de passe provisoire : 6 caractères au moins ; l'agent choisit le sien
+    // à sa première connexion (061).
     if (String(password).length < 6) {
-      return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+      return res.status(400).json({ message: 'Le mot de passe provisoire doit contenir au moins 6 caractères' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -125,8 +126,8 @@ exports.createUser = async (req, res) => {
     const newUser = await tenantDb.insert(
       tenantId,
       'users',
-      ['username', 'password_hash', 'full_name', 'email', 'section', 'role'],
-      [username, hashedPassword, full_name, email, section, role],
+      ['username', 'password_hash', 'full_name', 'email', 'section', 'role', 'mdp_a_changer'],
+      [username, hashedPassword, full_name, email, section, role, true],
       'id, username, email, role'
     );
 
@@ -327,12 +328,8 @@ exports.changePassword = async (req, res) => {
     return res.status(400).json({ message: 'Les mots de passe sont requis' });
   }
 
-  if (new_password.length < 6) {
-    return res.status(400).json({ message: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
-  }
-
   try {
-    const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    const userResult = await db.query('SELECT password_hash, username, full_name FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
 
     if (!user) {
@@ -343,11 +340,18 @@ exports.changePassword = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Le mot de passe actuel est incorrect' });
     }
+    const politique = await require('../services/settingsService').getPasswordPolicy(req.user.tenant_id);
+    const refus = politique.validate(new_password, { identifiant: user.username, nom: user.full_name });
+    if (refus) return res.status(400).json({ message: refus });
+    if (await bcrypt.compare(new_password, user.password_hash)) {
+      return res.status(400).json({ message: 'Choisissez un mot de passe différent de l\'actuel' });
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(new_password, salt);
 
-    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, userId]);
+    await db.query('UPDATE users SET password_hash = $1, mdp_a_changer = FALSE WHERE id = $2', [hashedPassword, userId]);
+    require('../services/roleService').invalidateUser(userId);
     res.json({ message: 'Mot de passe modifié avec succès' });
   } catch (err) {
     console.error(err);

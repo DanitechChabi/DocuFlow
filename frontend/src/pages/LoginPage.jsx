@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
+import { allerApresConnexion } from './ChoisirMotDePasse';
 import { authService } from '../services/authService';
 import { googleAuthService } from '../services/googleAuthService';
 import { useSettings } from '../contexts/SettingsContext';
@@ -117,7 +118,7 @@ const LoginPage = () => {
       if (data.token) {
         // Recharge les réglages du tenant de l'utilisateur (branding du tableau de bord)
         await settings.refresh();
-        navigate('/');
+        allerApresConnexion(navigate, data.user, password);
       } else {
         setError(data.message || 'Identifiants invalides');
         setLoading(false);
