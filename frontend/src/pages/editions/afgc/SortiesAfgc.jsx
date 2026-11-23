@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { BookOpenCheck, Search, Printer, FileSpreadsheet, Loader2, Undo2, X } from 'lucide-react';
+import { BookOpenCheck, Search, Printer, FileSpreadsheet, Loader2, Undo2, X, FileUp } from 'lucide-react';
+import api from '../../../services/api';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { listeService } from '../../../services/listeService';
 import { requestService } from '../../../services/requestService';
 import { authService } from '../../../services/authService';
@@ -101,6 +103,38 @@ const SortiesAfgc = () => {
   }, [saisie]);
 
   const [version, setVersion] = useState(0);
+  // Reprise d'un registre papier transcrit (fichier .json préparé avec l'archive) :
+  // nouvelles sorties avec leurs vraies dates, ou corrections de lignes déjà reprises.
+  const { can } = usePermissions();
+  const fichierReprise = useRef(null);
+  const [reprise, setReprise] = useState(false);
+  const reprendre = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    let corps;
+    try { corps = JSON.parse(await f.text()); } catch { toast.error('Ce fichier n\'est pas un registre transcrit (.json).'); return; }
+    const lignes = Array.isArray(corps?.lignes) ? corps.lignes : [];
+    if (!lignes.length) { toast.error('Aucune ligne dans ce fichier.'); return; }
+    const corrections = lignes.filter((l) => l.correction).length;
+    if (!(await confirmer({
+      titre: `Reprendre « ${corps.fichier || f.name} » ?`,
+      message: corrections === lignes.length
+        ? `${corrections} ligne${corrections > 1 ? 's' : ''} déjà reprise${corrections > 1 ? 's' : ''} seront corrigées (typologie, banque, références). Les dates et les retours ne changent pas.`
+        : `${lignes.length - corrections} sortie${lignes.length - corrections > 1 ? 's' : ''} du registre papier, avec leurs dates${corrections ? `, et ${corrections} correction${corrections > 1 ? 's' : ''}` : ''}. Une ligne déjà reprise n'est pas recréée.`,
+      libelle: 'Reprendre', type: 'info',
+    }))) return;
+    setReprise(true);
+    const total = { ajoutees: 0, deja: 0, corrigees: 0, rejetees: 0 };
+    try {
+      for (let i = 0; i < lignes.length; i += 500) {
+        const r = (await api.post('/requests/loans/reprise', { fichier: corps.fichier || f.name, lignes: lignes.slice(i, i + 500) })).data;
+        total.ajoutees += r.ajoutees || 0; total.deja += r.deja || 0; total.corrigees += r.corrigees || 0; total.rejetees += (r.rejetees || []).length;
+      }
+      toast.success([total.ajoutees && `${total.ajoutees} sortie(s) reprise(s)`, total.corrigees && `${total.corrigees} correction(s)`, total.deja && `${total.deja} déjà là`, total.rejetees && `${total.rejetees} ligne(s) écartée(s)`].filter(Boolean).join(' · ') || 'Rien à reprendre.');
+      setVersion((v) => v + 1);
+    } catch (err) { toast.error(err.response?.data?.message || 'La reprise a échoué.'); } finally { setReprise(false); }
+  };
   const [choisis, setChoisis] = useState(() => new Set());
   const [retour, setRetour] = useState(false);
   useEffect(() => {
@@ -181,6 +215,15 @@ const SortiesAfgc = () => {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <EnTete titre="Dossiers sortis" icone={BookOpenCheck} aide="Qui a quel dossier, depuis quand, pour quel motif et pour quand il doit revenir.">
+        {can('requests.process') && (
+          <>
+            <button type="button" onClick={() => fichierReprise.current?.click()} disabled={reprise} title="Ajouter ou corriger des sorties transcrites du registre papier (.json)"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-docuflow-secondary hover:text-docuflow-secondary disabled:opacity-40">
+              {reprise ? <Loader2 size={16} className="animate-spin" /> : <FileUp size={16} />} Reprendre un registre papier
+            </button>
+            <input ref={fichierReprise} type="file" accept=".json,application/json" className="hidden" onChange={reprendre} />
+          </>
+        )}
         <button type="button" onClick={() => window.print()} disabled={!sorties?.length}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:border-docuflow-secondary hover:text-docuflow-secondary disabled:opacity-40">
           <Printer size={16} /> Imprimer
