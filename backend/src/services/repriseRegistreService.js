@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const settingsService = require('./settingsService');
 const { dureeMotif, enTransaction } = require('./loanService');
+const { banqueAdmise } = require('../helpers/exigencesTypologie');
 
 const LIMITE = 1000;
 function erreur(statut, message) { const e = new Error(message); e.statut = statut; return e; }
@@ -37,7 +38,7 @@ async function importer(tenantId, user, { fichier, lignes } = {}) {
   const reglages = await settingsService.getAll(tenantId);
   const defaut = Number(reglages.loan_default_days) > 0 ? Number(reglages.loan_default_days) : 15;
   const source = texte(fichier, 200) || 'registre papier';
-  const res = { ajoutees: 0, deja: 0, rejetees: [] };
+  const res = { ajoutees: 0, deja: 0, corrigees: 0, rejetees: [] };
   await enTransaction(async (client) => {
     for (const [i, l] of lignes.entries()) {
       const sortie = jour(l.date_sortie);
@@ -48,13 +49,34 @@ async function importer(tenantId, user, { fichier, lignes } = {}) {
       const motif = texte(l.motif, 100) || 'Non précisé';
       const annee = Number(l.annee) >= 1950 && Number(l.annee) <= 2100 ? Number(l.annee) : null;
       const empreinte = crypto.createHash('sha256').update(JSON.stringify([sortie, nom, texte(l.num_acte, 50), annee, motif, texte(l.emprunteur, 255)])).digest('hex');
-      const deja = await client.query('SELECT 1 FROM request_loans WHERE tenant_id = $1 AND reprise_empreinte = $2', [tenantId, empreinte]);
+      const deja = await client.query('SELECT id, request_id FROM request_loans WHERE tenant_id = $1 AND reprise_empreinte = $2', [tenantId, empreinte]);
+      if (deja.rows[0] && l.correction && typeof l.correction === 'object') {
+        // Ligne déjà reprise, à rectifier (typologie, banque, références) : retrouvée
+        // par l'empreinte de son import d'origine, elle garde ses dates et son retour.
+        const c = l.correction;
+        const req = (await client.query('SELECT * FROM requests WHERE id = $1 AND tenant_id = $2', [deja.rows[0].request_id, tenantId])).rows[0];
+        const val = (k, max) => (k in c ? texte(c[k], max) : req[k]);
+        const type = val('type_document', 100);
+        const nouveau = {
+          nom_entreprise: val('nom_entreprise', 255) || req.nom_entreprise, num_dossier: val('num_dossier', 100), num_acte: val('num_acte', 50),
+          type_document: type, banque: banqueAdmise(type) ? val('banque', 150) : null,
+        };
+        await client.query(
+          'UPDATE requests SET nom_entreprise = $1, num_dossier = $2, num_acte = $3, type_document = $4, banque = $5 WHERE id = $6 AND tenant_id = $7',
+          [nouveau.nom_entreprise, nouveau.num_dossier, nouveau.num_acte, nouveau.type_document, nouveau.banque, req.id, tenantId]
+        );
+        const empreinteCorrigee = crypto.createHash('sha256').update(JSON.stringify([sortie, nouveau.nom_entreprise, nouveau.num_acte, annee, motif, texte(l.emprunteur, 255)])).digest('hex');
+        await client.query('UPDATE request_loans SET reprise_empreinte = $1 WHERE id = $2', [empreinteCorrigee, deja.rows[0].id]).catch(() => {});
+        res.corrigees += 1;
+        continue;
+      }
       if (deja.rows[0]) { res.deja += 1; continue; }
       const obs = [texte(l.date_acte, 60) && `Acte du ${texte(l.date_acte, 60)}`, texte(l.observation, 600)].filter(Boolean).join(' · ');
       const q = (await client.query(
-        `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_acte, annee, motif, statut, description, type_document, banque, created_at, date_livraison)
-         VALUES ($1, NULL, $2, $3, $4, $5, 'livré', $6, $7, $8, $9::date + time '09:00', $9::date + time '09:00') RETURNING id`,
-        [tenantId, nom, texte(l.num_acte, 50), annee, motif, `Repris du registre papier (${source})`, texte(l.type_document, 100), texte(l.reference, 100), sortie]
+        `INSERT INTO requests (tenant_id, id_user, nom_entreprise, num_acte, num_dossier, annee, motif, statut, description, type_document, banque, created_at, date_livraison)
+         VALUES ($1, NULL, $2, $3, $4, $5, $6, 'livré', $7, $8, $9, $10::date + time '09:00', $10::date + time '09:00') RETURNING id`,
+        [tenantId, nom, texte(l.num_acte, 50), texte(l.num_dossier || l.reference, 100), annee, motif, `Repris du registre papier (${source})`, texte(l.type_document, 100),
+          banqueAdmise(l.type_document) ? texte(l.banque, 150) : null, sortie]
       )).rows[0];
       const prevue = plusJours(sortie, dureeMotif(reglages.motifs_durees, motif) || defaut);
       await client.query(

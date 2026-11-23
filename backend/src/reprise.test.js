@@ -42,6 +42,18 @@ const avecBase = Boolean(process.env.DB_HOST || process.env.DATABASE_URL);
     ok(reg.find((p) => p.nom_entreprise === 'Fictive Gamma').retourne_at !== null, 'retour sans date : noté retourné');
     ok((await loans.registre(t, { q: 'Engagement' })).length === 1, 'recherche par le nom de l\'emprunteur du registre');
     ok((await db.query('SELECT count(*)::int n FROM notifications WHERE tenant_id = $1', [t])).rows[0].n === 0, 'aucune notification pour des faits passés');
+    // La banque ne concerne que les garanties bancaires ; correction d'une ligne déjà reprise.
+    const gb = { date_sortie: '2026-11-11', nom_entreprise: 'Fictive Delta (Banque Fictive Togo)', type_document: 'Prêt', reference: 'Prêt (GB26) 012828.0001', motif: 'Consultation' };
+    await reprise.importer(t, u, { lignes: [gb] });
+    const avant = (await db.query("SELECT banque, num_dossier FROM requests WHERE tenant_id = $1 AND nom_entreprise LIKE 'Fictive Delta%'", [t])).rows[0];
+    ok(avant.banque === null && avant.num_dossier === 'Prêt (GB26) 012828.0001', 'prêt : pas de banque, la référence va au n° de dossier');
+    const corr = await reprise.importer(t, u, { lignes: [{ ...gb, correction: { nom_entreprise: 'Fictive Delta', type_document: 'Garantie bancaire', banque: 'Banque Fictive Togo', num_dossier: '012828.0001' } }] });
+    const apres = (await db.query("SELECT nom_entreprise, type_document, banque, num_dossier FROM requests WHERE tenant_id = $1 AND nom_entreprise LIKE 'Fictive Delta%'", [t])).rows;
+    ok(corr.corrigees === 1 && apres.length === 1 && apres[0].type_document === 'Garantie bancaire' && apres[0].banque === 'Banque Fictive Togo' && apres[0].num_dossier === '012828.0001',
+      'correction : garantie bancaire avec sa banque, sans doublon');
+    ok((await reprise.importer(t, u, { lignes: [{ ...gb, nom_entreprise: 'Fictive Delta', num_acte: null }] })).deja === 1, 'ligne corrigée : reconnue à la reprise suivante');
+    const { banqueAdmise } = require('./helpers/exigencesTypologie');
+    ok(banqueAdmise('Garantie bancaire') && !banqueAdmise('Prêt') && !banqueAdmise('Bonne exécution (CBE)') && !banqueAdmise(null), 'banque admise pour une garantie bancaire seulement');
     let refus = null; try { await reprise.importer(t, u, { lignes: [] }); } catch (e) { refus = e.statut; }
     ok(refus === 400, 'rien à reprendre : 400');
     await db.query('DELETE FROM tenants WHERE id = $1', [t]).catch(() => {});

@@ -183,7 +183,8 @@ exports.createRequest = async (req, res) => {
     const nouvelles = { description: v.description, date_souhaitee: v.date_souhaitee, beneficiaire: v.beneficiaire, source_request_id: v.source_request_id };
     // Banque et montant (048) : seulement s'ils sont donnés, pour qu'une base
     // pas encore migrée continue d'enregistrer les demandes ordinaires.
-    if (v.banque) nouvelles.banque = v.banque;
+    // La banque ne concerne que les garanties bancaires (une caution, un prêt n'en ont pas).
+    if (v.banque && exigencesTypologie.banqueAdmise(typeFourni)) nouvelles.banque = v.banque;
     if (v.montant !== null) nouvelles.montant = v.montant;
     let newRequest;
     try {
