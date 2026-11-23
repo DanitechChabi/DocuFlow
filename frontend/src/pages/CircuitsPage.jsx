@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import { circuitService, quand } from '../services/circuitService';
 import { useTitrePage } from '../hooks/useTitrePage';
 import { toast } from '../components/Toast';
+import { confirmer } from '../components/Confirmer';
 
 /**
  * Circuits de validation (migration 034) : les modèles d'étapes, rattachés
@@ -122,7 +123,7 @@ const CircuitsPage = () => {
   useEffect(() => { charger(); }, [charger]);
 
   const supprimer = async (m) => {
-    if (!window.confirm(`Supprimer le circuit « ${m.nom} » ? Les circuits déjà lancés ne sont pas touchés.`)) return;
+    if (!(await confirmer(`Supprimer le circuit « ${m.nom} » ? Les circuits déjà lancés ne sont pas touchés.`))) return;
     try { await circuitService.supprimer(m.id); charger(); } catch (err) { toast.error(err.response?.data?.message || 'Suppression impossible'); }
   };
 

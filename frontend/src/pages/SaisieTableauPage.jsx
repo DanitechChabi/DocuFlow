@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import { toast } from '../components/Toast';
 import { physiqueService, COULEURS } from '../services/physiqueService';
 import ImportClasseur from '../components/archives/ImportClasseur';
+import { confirmer } from '../components/Confirmer';
 
 /**
  * Saisie en tableau des dossiers papier. Une ligne par dossier : sa cote, ses
@@ -260,8 +261,8 @@ const SaisieTableauPage = () => {
     });
   });
 
-  const vider = () => {
-    if (nbRemplies && !window.confirm('Vider le tableau ? Les lignes non enregistrées seront perdues.')) return;
+  const vider = async () => {
+    if (nbRemplies && !(await confirmer('Vider le tableau ? Les lignes non enregistrées seront perdues.'))) return;
     setLignes(Array.from({ length: LIGNES_DEPART }, ligneVide));
     setErreurs({}); setDoublons(null); setInconnues([]); setReprise(false);
   };

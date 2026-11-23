@@ -26,6 +26,7 @@ import CircuitDocument from './circuits/CircuitDocument';
 import EcheancesDocument from './recherche/EcheancesDocument';
 import { rechercheService, messageBlob } from '../services/rechercheService';
 import { STATUS_CLASSES, STATUS_LABELS } from '../utils/documentStatuses';
+import { confirmer } from './Confirmer';
 
 const formatSize = (bytes) => {
   if (!bytes && bytes !== 0) return '';
@@ -126,7 +127,7 @@ const DocumentDetailsModal = ({ documentId, isAdmin, folders = [], onClose, onCh
 
   const { can } = usePermissions();
   const restaurerVersion = async (f) => {
-    if (!window.confirm(`Restaurer la version ${f.version} ? Elle sera copiée en nouvelle version ; l'historique est conservé.`)) return;
+    if (!(await confirmer(`Restaurer la version ${f.version} ? Elle sera copiée en nouvelle version ; l'historique est conservé.`))) return;
     try {
       const r = await collaborationService.restaurerVersion(documentId, f.id);
       toast.success(r.message);

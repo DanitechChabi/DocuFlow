@@ -7,6 +7,7 @@ import {
 import ChoixDocument from './ChoixDocument';
 import { usePermissions } from '../../hooks/usePermissions';
 import { toast } from '../Toast';
+import { confirmer } from '../Confirmer';
 
 /**
  * Onglets « Sort final » et « Éliminations » de la page Archivage
@@ -173,7 +174,7 @@ const FormulaireExecution = ({ b, onFait, onAnnuler }) => {
   const maj = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const envoyer = async (e) => {
     e.preventDefault();
-    if (!window.confirm(`Exécuter l'élimination ? Les fichiers des documents visés seront DÉTRUITS définitivement.`)) return;
+    if (!(await confirmer(`Exécuter l'élimination ? Les fichiers des documents visés seront DÉTRUITS définitivement.`))) return;
     setEnvoi(true);
     try {
       const r = await archivageService.action(b.id, 'execution', f);
@@ -211,7 +212,7 @@ const DetailBordereau = ({ id, onRetour }) => {
   const charger = useCallback(() => archivageService.bordereau(id).then(setB).catch((err) => toast.error(err.response?.data?.message || 'Chargement impossible')), [id]);
   useEffect(() => { charger(); }, [charger]);
   const agir = async (action, corps, succes, confirmation) => {
-    if (confirmation && !window.confirm(confirmation)) return;
+    if (confirmation && !(await confirmer(confirmation))) return;
     setEnvoi(true);
     try { await archivageService.action(id, action, corps); toast.success(succes); charger(); } catch (err) { toast.error(err.response?.data?.message || 'Action impossible'); } finally { setEnvoi(false); }
   };

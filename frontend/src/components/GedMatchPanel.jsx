@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { requestService } from '../services/requestService';
 import { usePermissions } from '../hooks/usePermissions';
 import { toast } from './Toast';
+import { confirmer } from './Confirmer';
 
 /**
  * GedMatchPanel — « Ce document est-il déjà dans la GED ? » (migration 027).
@@ -41,7 +42,7 @@ const GedMatchPanel = ({ request, onDone }) => {
   if (!visible) return null;
 
   const transmettre = async (c) => {
-    if (!window.confirm(`Transmettre ${c.reference} au demandeur ? Une copie sera jointe à la demande, qui passera « Livré ».`)) return;
+    if (!(await confirmer(`Transmettre ${c.reference} au demandeur ? Une copie sera jointe à la demande, qui passera « Livré ».`))) return;
     setEnvoi(c.document_id);
     try {
       const r = await requestService.transmettreDepuisGed(request.id, c.document_id);

@@ -7,6 +7,7 @@ import {
 import { usePermissions } from '../../hooks/usePermissions';
 import ChoixDocument from './ChoixDocument';
 import { toast } from '../Toast';
+import { confirmer } from '../Confirmer';
 
 /**
  * Onglet « Versements » de la page Archivage (migration 036) : bordereaux de
@@ -63,7 +64,7 @@ const Detail = ({ id, onRetour }) => {
   const charger = useCallback(() => archivageService.versement(id).then(setV).catch((err) => toast.error(err.response?.data?.message || 'Chargement impossible')), [id]);
   useEffect(() => { charger(); }, [charger]);
   const agir = async (action, corps, succes, confirmation) => {
-    if (confirmation && !window.confirm(confirmation)) return;
+    if (confirmation && !(await confirmer(confirmation))) return;
     setEnvoi(true);
     try { await archivageService.actionVersement(id, action, corps); toast.success(succes); charger(); } catch (err) { toast.error(err.response?.data?.message || 'Action impossible'); } finally { setEnvoi(false); }
   };

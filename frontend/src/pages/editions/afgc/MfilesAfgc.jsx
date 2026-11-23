@@ -4,6 +4,7 @@ import api from '../../../services/api';
 import { toast } from '../../../components/Toast';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { EnTete, Chargement } from './elements';
+import { confirmer } from '../../../components/Confirmer';
 
 // ============================================================================
 // Recherche M-Files (060) : la recherche rapide de M-Files depuis
@@ -58,7 +59,7 @@ const MfilesAfgc = () => {
   };
 
   const indexerRecherche = async () => {
-    if (!window.confirm(`Lire le contenu des ${res.resultats.length} résultats pour que DocuBot puisse répondre dessus ? Cela peut prendre plusieurs minutes.`)) return;
+    if (!(await confirmer(`Lire le contenu des ${res.resultats.length} résultats pour que DocuBot puisse répondre dessus ? Cela peut prendre plusieurs minutes.`))) return;
     setIndexation(true);
     try {
       const r = (await api.post('/mfiles/indexer', { q: q.trim(), limite: 500 })).data;

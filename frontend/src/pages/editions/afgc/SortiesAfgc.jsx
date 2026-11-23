@@ -166,10 +166,10 @@ const SortiesAfgc = () => {
 
       <div className="glass-card-premium rounded-xl p-5 space-y-4 mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex p-1 rounded-lg bg-slate-100">
+          <div className="inline-flex max-w-full overflow-x-auto p-1 rounded-lg bg-slate-100">
             {ETATS.map(([cle, label]) => (
               <button key={cle || 'tous'} type="button" onClick={() => changer('etat', cle)}
-                className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-colors ${filtres.etat === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                className={`px-3.5 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${filtres.etat === cle ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 {label}
               </button>
             ))}

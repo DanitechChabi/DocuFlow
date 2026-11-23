@@ -124,7 +124,7 @@ const MesDossiersAfgc = () => {
               <section className="rounded-xl p-5 md:p-6 bg-amber-50/70 border border-amber-300">
                 <h2 className="text-lg font-bold text-amber-900 mb-1">À compléter <span className="text-amber-600">({aCompleter.length})</span></h2>
                 <p className="text-sm font-semibold text-amber-900/80 mb-4">L'archive ne peut pas retrouver ces dossiers : complétez-les puis renvoyez-les.</p>
-                <ul className="space-y-4">
+                <ul className="liste-anim space-y-4">
                   {aCompleter.map((d, i) => (
                     <CarteACompleter key={`${d.id}-${d.complement_demande_at}`} d={d} types={types} delai={Math.min(i, 5) * 0.1}
                       onFait={charger} onAnnuler={annuler} annulation={annulation} />

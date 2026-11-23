@@ -7,6 +7,7 @@ import { useTitrePage } from '../../../hooks/useTitrePage';
 import { lireClasseur } from '../../../utils/classeur';
 import { EnTete, Chargement } from './elements';
 import { lireCartons, FONDS } from './cartonsExcel';
+import { confirmer } from '../../../components/Confirmer';
 
 // ============================================================================
 // Deux fonds (057), une page chacun : les dossiers non retirés / annulés
@@ -99,7 +100,7 @@ const CartonsAfgc = () => {
   };
 
   const supprimer = async (c) => {
-    if (!window.confirm(`Supprimer les ${c.lignes} lignes du classeur « ${c.fichier || 'sans nom'} » ?`)) return;
+    if (!(await confirmer(`Supprimer les ${c.lignes} lignes du classeur « ${c.fichier || 'sans nom'} » ?`))) return;
     try {
       await api.delete('/cartons/fichiers', { data: { fichier: c.fichier, fonds: c.fonds } });
       toast.success('Classeur supprimé.');

@@ -1316,3 +1316,46 @@ button:disabled, [disabled] { cursor: not-allowed; }
   box-shadow: none;
 }
 [data-edition="afgc"] .resultat-lumiere::after { display: none; }
+
+/* ==========================================================================
+   Finition de l'interface (effets légers, dans les couleurs du thème).
+   Tout s'efface avec « réduire les animations » (règle plus haut).
+   ========================================================================== */
+
+/* Retour tactile : un bouton s'enfonce à peine quand on appuie. */
+button:not(:disabled), a.bouton, [role='button'] {
+  transition: transform 0.12s var(--df-ease), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+button:not(:disabled):active, a.bouton:active, [role='button']:active { transform: translateY(1px) scale(0.985); }
+
+/* Carte qu'on peut ouvrir : elle se soulève légèrement au survol. */
+.carte-cliquable { transition: transform 0.18s var(--df-ease), box-shadow 0.18s var(--df-ease), border-color 0.15s ease; }
+@media (hover: hover) {
+  .carte-cliquable:hover { transform: translateY(-2px); box-shadow: 0 6px 18px -8px rgb(15 23 42 / 0.25); }
+}
+
+/* Listes : les éléments arrivent l'un après l'autre (les dix premiers). */
+.liste-anim > * { animation: fade-in-up 0.32s var(--df-ease) both; }
+.liste-anim > *:nth-child(2) { animation-delay: 30ms; }
+.liste-anim > *:nth-child(3) { animation-delay: 60ms; }
+.liste-anim > *:nth-child(4) { animation-delay: 90ms; }
+.liste-anim > *:nth-child(5) { animation-delay: 120ms; }
+.liste-anim > *:nth-child(6) { animation-delay: 150ms; }
+.liste-anim > *:nth-child(7) { animation-delay: 180ms; }
+.liste-anim > *:nth-child(8) { animation-delay: 210ms; }
+.liste-anim > *:nth-child(9) { animation-delay: 240ms; }
+.liste-anim > *:nth-child(n + 10) { animation-delay: 270ms; }
+
+/* Chargement : des lignes grises qui scintillent, à la place d'un rond qui tourne. */
+.squelette {
+  background: linear-gradient(90deg, rgb(226 232 240) 0%, rgb(241 245 249) 50%, rgb(226 232 240) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+/* Alerte qui demande l'attention (retards) : une respiration discrète. */
+.alerte-douce { animation: pulse-soft 2.4s ease-in-out infinite; }
+
+/* Texte sélectionné, dans le vert de l'AFGC. */
+::selection { background: rgb(44 156 10 / 0.18); }

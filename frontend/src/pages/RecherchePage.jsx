@@ -8,6 +8,7 @@ import { rechercheService, messageBlob } from '../services/rechercheService';
 import { usePermissions } from '../hooks/usePermissions';
 import { useTitrePage } from '../hooks/useTitrePage';
 import { toast } from '../components/Toast';
+import { confirmer } from '../components/Confirmer';
 
 /**
  * Recherche avancée (migration 035) : critères combinés (texte du contenu et
@@ -116,7 +117,7 @@ const RecherchePage = () => {
     } catch (err) { toast.error(err.response?.data?.message || 'Action impossible'); }
   };
   const supprimer = async (r) => {
-    if (!window.confirm(`Supprimer la recherche « ${r.nom} » ?`)) return;
+    if (!(await confirmer(`Supprimer la recherche « ${r.nom} » ?`))) return;
     try { await rechercheService.supprimer(r.id); if (courante?.id === r.id) setCourante(null); chargerEnregistrees(); } catch (err) { toast.error(err.response?.data?.message || 'Suppression impossible'); }
   };
   const exporter = async () => {

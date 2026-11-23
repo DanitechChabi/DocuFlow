@@ -51,6 +51,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import AppLayout from './layouts/AppLayout';
 import MessagingFloatingButton from './components/MessagingFloatingButton';
 import ToastContainer from './components/Toast';
+import { ConfirmerHote } from './components/Confirmer';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { PermissionsProvider } from './hooks/usePermissions';
 import { LicenseProvider, useLicense } from './contexts/LicenseContext';
@@ -218,6 +219,7 @@ function App() {
       </Routes>
       <FloatingLayer />
       <ToastContainer />
+      <ConfirmerHote />
       </ErrorBoundary>
       </LicenseProvider>
       </PermissionsProvider>

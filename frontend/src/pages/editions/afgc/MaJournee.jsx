@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Send, MessageSquareWarning, AlertTriangle, Database, Users, Settings2, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { entreeService } from '../../../services/entreeService';
 import { Presence } from './presence';
+import { Compteur } from './elements';
 import { useMfiles, estNumerise } from './mfiles';
 import { etatDemande } from './vocabulaire';
 
@@ -19,9 +20,9 @@ const Tache = ({ to, icone: Icone, nombre, titre, detail, ton }) => {
     vert: 'text-[#2C9C0A]', bleu: 'text-slate-600', ambre: 'text-amber-600', rouge: 'text-red-600', gris: 'text-slate-500',
   };
   return (
-    <Link to={to} className="group rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-400">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Icone size={16} className={tons[ton] || tons.gris} /> {titre}<ArrowRight size={14} className="ml-auto opacity-40 group-hover:opacity-100" /></div>
-      <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">{nombre}</div>
+    <Link to={to} className="group carte-cliquable rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-400">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Icone size={16} className={`${tons[ton] || tons.gris} ${ton === 'rouge' ? 'alerte-douce' : ''}`} /> {titre}<ArrowRight size={14} className="ml-auto opacity-40 group-hover:opacity-100" /></div>
+      <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums"><Compteur valeur={nombre} /></div>
       {detail && <div className="text-xs text-slate-500">{detail}</div>}
     </Link>
   );
