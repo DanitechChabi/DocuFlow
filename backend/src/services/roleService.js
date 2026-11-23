@@ -96,10 +96,10 @@ async function getUserAuth(userId) {
     try {
       // Compte désactivé (054) : traité comme un compte disparu — session refusée.
       const { rows } = await db.query(
-        'SELECT role, token_version, desactive_le FROM users WHERE id = $1',
+        'SELECT role, token_version, desactive_le, mdp_a_changer FROM users WHERE id = $1',
         [userId]
       );
-      value = rows[0] && !rows[0].desactive_le ? { role: rows[0].role, token_version: rows[0].token_version } : null;
+      value = rows[0] && !rows[0].desactive_le ? { role: rows[0].role, token_version: rows[0].token_version, mdp_a_changer: rows[0].mdp_a_changer === true } : null;
     } catch (e) {
       if (e.code !== '42703') throw e;
       const { rows } = await db.query('SELECT role, token_version FROM users WHERE id = $1', [userId]);

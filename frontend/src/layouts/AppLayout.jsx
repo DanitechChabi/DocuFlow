@@ -9,6 +9,7 @@ import ContextualTooltips from '../components/ContextualTooltips';
 import VisiteGuidee from '../components/onboarding/VisiteGuidee';
 import NotificationBell from '../components/NotificationBell';
 import { InviteNotifications } from '../components/NotificationsAppareil';
+import BandeauConnexion from '../components/BandeauConnexion';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { estBureau } from '../utils/plateforme';
@@ -142,6 +143,7 @@ const AppLayout = () => {
           </div>
         </header>
 
+        <BandeauConnexion />
         <main className="flex-1 overflow-y-auto relative">
           {!estBureau() && <InviteNotifications />}
           {/* `key` sur le chemin : React remonte le contenu à chaque navigation,

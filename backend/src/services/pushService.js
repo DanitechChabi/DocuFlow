@@ -18,6 +18,7 @@ const TYPES = {
   delivered: '/demandes/mes-demandes',        // le document est envoyé
   complement: '/demandes/mes-demandes',       // un complément est demandé / reçu
   loan_overdue: '/demandes/prets',            // un dossier est en retard
+  loan_due_soon: '/demandes/mes-demandes',    // à rendre demain
   loan_reported: '/demandes/prets',           // un retour est signalé
   courrier: '/courrier',
   circuits: '/',

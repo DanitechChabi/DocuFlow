@@ -13,6 +13,9 @@ const roleService = require('../services/roleService');
 // entière — les contrôleurs échoueront de toute façon sur leurs propres
 // requêtes si la base est vraiment indisponible.
 const RAFRAICHIR_DEPUIS_LA_BASE = true;
+// Ce qu'un compte au mot de passe provisoire peut encore faire (061) : le changer,
+// et charger ce dont la page de changement a besoin.
+const ROUTES_MDP = [/^PUT \/api\/users\/profile\/password\/?$/, /^GET \/api\/users\/profile\/?$/, /^GET \/api\/(settings|roles|permissions)(\/|$)/, /^GET \/api\/auth\/me/];
 
 module.exports = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -42,6 +45,9 @@ module.exports = async (req, res, next) => {
           return res.status(401).json({ message: 'Vos droits ont changé, reconnectez-vous.', code: 'SESSION_INVALIDEE' });
         }
         role = actuel.role;
+        if (actuel.mdp_a_changer && !ROUTES_MDP.some((r) => r.test(`${req.method} ${req.baseUrl}${req.path}`))) {
+          return res.status(403).json({ message: 'Choisissez d\'abord votre propre mot de passe.', code: 'MDP_A_CHANGER' });
+        }
       } catch (err) {
         console.warn('[auth] Rôle non rafraîchi, jeton fait foi :', err.message);
       }
@@ -54,6 +60,6 @@ module.exports = async (req, res, next) => {
     };
     next();
   } catch (err) {
-    return res.status(403).json({ message: 'Token invalide ou expiré.' });
+    return res.status(401).json({ message: 'Votre session a expiré : reconnectez-vous.', code: 'SESSION_EXPIREE' });
   }
 };

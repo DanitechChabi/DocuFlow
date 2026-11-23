@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogIn, Eye, EyeOff, AlertCircle, Loader2, UserPlus } from 'lucide-react';
 import { authService } from '../../../services/authService';
+import { allerApresConnexion } from '../../ChoisirMotDePasse';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useTitrePage } from '../../../hooks/useTitrePage';
 import { edition } from '../../../editions';
@@ -21,7 +22,7 @@ const ConnexionAfgc = () => {
   const [identifiant, setIdentifiant] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [voir, setVoir] = useState(false);
-  const [erreur, setErreur] = useState('');
+  const [erreur, setErreur] = useState(() => { try { const r = sessionStorage.getItem('raison-deconnexion'); sessionStorage.removeItem('raison-deconnexion'); return r || ''; } catch { return ''; } });
   const [envoi, setEnvoi] = useState(false);
 
   const connecter = async (e) => {
@@ -32,7 +33,7 @@ const ConnexionAfgc = () => {
       const data = await authService.login(identifiant.trim(), motDePasse, edition?.organisation);
       if (data.token) {
         await settings.refresh();
-        navigate('/');
+        allerApresConnexion(navigate, data.user, motDePasse);
         return;
       }
       setErreur(data.message || 'Identifiant ou mot de passe incorrect.');

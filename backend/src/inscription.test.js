@@ -37,7 +37,7 @@ const appel = (handler, req) => new Promise((resolve) => {
     const chemin = (m, p) => routes.stack.find((l) => l.route && l.route.path === p && l.route.methods[m]);
     ok(Boolean(chemin('get', '/company/:slug/departements')), 'route publique GET /auth/company/:slug/departements');
     ok(chemin('post', '/register')?.route.stack.length === 2, 'inscription : limitée en débit, puis le contrôleur');
-    const sans = (corps) => appel(auth.register, { body: { username: 'a.b', full_name: 'A B', email: 'a.b@exemple.test', password: 'motdepasse1', ...corps } });
+    const sans = (corps) => appel(auth.register, { body: { username: 'a.b', full_name: 'A B', email: 'a.b@exemple.test', password: 'Fictif-Sesame-2026', ...corps } });
     ok((await sans({ password: '' })).code === 400, 'sans mot de passe : 400');
     ok((await sans({ username: '  ' })).code === 400, 'sans identifiant : 400');
     const r = await sans({ full_name: ' ' });
@@ -75,7 +75,7 @@ const appel = (handler, req) => new Promise((resolve) => {
 
     // --- Inscription simple ---
     const inscrire = (corps) => appel(auth.register, {
-      body: { tenant_slug: slug, password: 'motdepasse1', ...corps },
+      body: { tenant_slug: slug, password: 'Fictif-Sesame-2026', ...corps },
     });
     const r1 = await inscrire({ username: 'e.kpadonou', full_name: 'Éric Kpadonou', email: 'E.Kpadonou@Exemple-Afgc.test', section: 'DE — Engagement' });
     ok(r1.code === 201 && r1.body.user.role === 'demandeur', 'inscription : compte demandeur créé');
@@ -116,14 +116,14 @@ const appel = (handler, req) => new Promise((resolve) => {
       'un seul département « DSI »');
 
     // --- Connexion : identifiant ou adresse ---
-    const connecter = (username, password = 'motdepasse1', tenant = slug) => appel(auth.login, { body: { username, password, tenant_slug: tenant } });
+    const connecter = (username, password = 'Fictif-Sesame-2026', tenant = slug) => appel(auth.login, { body: { username, password, tenant_slug: tenant } });
     const c1 = await connecter('e.kpadonou');
     ok(c1.code === 200 && c1.body.token && c1.body.user.section === 'DE — Engagement', 'connexion par l\'identifiant');
     const c2 = await connecter('  e.KPADONOU@exemple-afgc.test ');
     ok(c2.code === 200 && c2.body.user.username === 'e.kpadonou', 'connexion par l\'adresse professionnelle (casse et espaces indifférents)');
     ok((await connecter('e.kpadonou@exemple-afgc.test', 'mauvais-mdp')).code === 400, 'adresse, mauvais mot de passe : 400');
     ok((await connecter('inconnu@exemple-afgc.test')).code === 400, 'adresse inconnue : 400');
-    ok((await appel(auth.login, { body: { username: 'e.kpadonou@exemple-afgc.test', password: 'motdepasse1' } })).code === 400,
+    ok((await appel(auth.login, { body: { username: 'e.kpadonou@exemple-afgc.test', password: 'Fictif-Sesame-2026' } })).code === 400,
       'hors d\'un espace, l\'adresse ne sert pas d\'identifiant');
     // Deux comptes anciens partageant une adresse : on demande l'identifiant.
     await db.query("INSERT INTO users (tenant_id, username, password_hash, full_name, email, role) SELECT $1, 'double', password_hash, 'Double', 'partage@exemple-afgc.test', 'demandeur' FROM users WHERE id = $2", [t, r1.body.user.id]);

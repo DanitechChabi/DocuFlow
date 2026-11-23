@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import ChoisirMotDePasse from './pages/ChoisirMotDePasse';
 import RegisterPage from './pages/RegisterPage';
 import CompanyRegisterPage from './pages/CompanyRegisterPage';
 import Dashboard from './pages/Dashboard';
@@ -80,6 +81,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+  // Mot de passe provisoire (061) : rien d'autre tant qu'il n'est pas remplacé.
+  if (user.mdp_a_changer) return <Navigate to="/mot-de-passe" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
@@ -108,6 +111,7 @@ function App() {
       <ErrorBoundary>
       <Routes>
         <Route path="/login" element={ecran('/login', <LoginPage />)} />
+        <Route path="/mot-de-passe" element={<ChoisirMotDePasse />} />
         <Route path="/:slug/login" element={<LoginPage />} />
         <Route path="/register" element={ecran('/register', <RegisterPage />)} />
         <Route path="/:slug/register" element={<RegisterPage />} />

@@ -27,8 +27,24 @@ const { UPLOADS_DIR } = require('./config/paths');
 
 const app = express();
 
-// Derrière un proxy (Render…) : req.protocol reflète le X-Forwarded-Proto (https)
-app.set('trust proxy', true);
+// Derrière un proxy (Render…) : req.protocol reflète le X-Forwarded-Proto (https).
+// Sur le serveur interne (sans proxy), faire confiance à X-Forwarded-For
+// permettrait à n'importe qui de choisir son adresse et de contourner la
+// limite des tentatives de connexion : seul le proxy local est cru.
+app.set('trust proxy', process.env.TRUST_PROXY || (process.env.RENDER ? 1 : 'loopback'));
+app.disable('x-powered-by');
+
+// En-têtes de sécurité : pas d'interprétation de type, pas d'affichage dans
+// un cadre d'un autre site, adresse d'origine réduite, HTTPS imposé.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // Middlewares — CORS (ouvert en dev, restreint en prod)
 const isDev = process.env.NODE_ENV !== 'production';
@@ -259,14 +275,38 @@ app.get('/api/health', async (req, res) => {
     await db.query('SELECT 1');
   } catch (err) {
     etat.base = 'injoignable';
-    etat.base_erreur = err.message;
+    etat.base_erreur = err.code || 'erreur';
   }
   res.status(etat.base === 'ok' ? 200 : 503).json(etat);
 });
 
+// Adresse d'API inconnue : une réponse claire plutôt que la page d'accueil.
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: 'Cette adresse n\'existe pas dans l\'application.', code: 'ADRESSE_INCONNUE' });
+});
+
 // Global error handler — prevents unhandled errors from crashing the process
 app.use((err, req, res, _next) => {
-  console.error('[global] Unhandled error:', err);
+  // Une référence courte, dans la réponse et dans le journal : l'administrateur
+  // retrouve l'erreur exacte à partir de ce que l'agent lui lit à l'écran.
+  const ref = require('crypto').randomBytes(3).toString('hex').toUpperCase();
+  console.error(`[global] Erreur ${ref} sur ${req.method} ${req.originalUrl} :`, err);
+  // Erreurs de la base, dites simplement.
+  const PG = {
+    '23505': [409, 'Cet élément existe déjà.'],
+    '23503': [409, 'Cet élément est lié à d\'autres données : il ne peut pas être supprimé ou modifié ainsi.'],
+    '23502': [400, 'Une information obligatoire manque.'],
+    '22P02': [400, 'Une valeur saisie n\'a pas le bon format.'],
+    '22001': [400, 'Un texte saisi est trop long.'],
+    '22007': [400, 'Une date saisie est invalide.'],
+    '22008': [400, 'Une date saisie est invalide.'],
+    '57014': [503, 'L\'opération a pris trop de temps. Réessayez dans un instant.'],
+    '53300': [503, 'Le serveur est très sollicité. Réessayez dans un instant.'],
+  };
+  if (err && PG[err.code]) return res.status(PG[err.code][0]).json({ message: PG[err.code][1], ref });
+  if (err && ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'].includes(err.code)) {
+    return res.status(503).json({ message: 'La base de données ne répond pas. Réessayez dans un instant ; si cela dure, prévenez l\'administrateur.', ref });
+  }
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ message: 'JSON invalide dans le corps de la requête' });
   }
@@ -295,7 +335,8 @@ app.use((err, req, res, _next) => {
   if (err.message && err.message.startsWith('Type de fichier non supporté')) {
     return res.status(400).json({ message: err.message });
   }
-  res.status(500).json({ message: 'Erreur interne du serveur' });
+  if (err && Number.isInteger(err.statut) && err.statut < 500) return res.status(err.statut).json({ message: err.message, ref });
+  res.status(500).json({ message: `Une erreur inattendue s'est produite. Si elle se répète, donnez cette référence à l'administrateur : ${ref}.`, ref });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -392,6 +433,8 @@ const server = ecouter(app, () => {
     require('./services/veilleService').demarrer();
     // Les notifications importantes, poussées sur les appareils abonnés (058).
     require('./services/pushService').demarrer();
+    // Rappels la veille du retour prévu, relances de retard : toutes les heures (061).
+    require('./services/loanService').demarrerRappels();
     // Le texte des documents, découpé pour DocuBot (RAG, 060) : GED, recherches M-Files réglées.
     require('./services/ragService').demarrer();
     // Le modèle de langue (Ollama), s'il est réglé : chargé maintenant et

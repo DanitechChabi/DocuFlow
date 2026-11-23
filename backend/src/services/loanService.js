@@ -467,6 +467,52 @@ async function relancerRetards(tenantId) {
   return r.rows.length;
 }
 
+/**
+ * Rappel la veille de la date de retour prévue (061) : une fois par prêt,
+ * à l'agent qui a le dossier. Les dossiers repris du registre papier (sans
+ * compte) ne reçoivent rien.
+ * @returns {Promise<number>} nombre de rappels envoyés
+ */
+async function rappelerEcheances(tenantId) {
+  let r;
+  try {
+    r = await db.query(
+      `UPDATE request_loans l SET rappel_echeance_at = now()
+         FROM requests q
+        WHERE q.id = l.request_id AND l.tenant_id = $1 AND l.emprunteur_id IS NOT NULL
+          AND l.retourne_at IS NULL AND l.signale_at IS NULL AND l.rappel_echeance_at IS NULL
+          AND l.date_retour_prevue = CURRENT_DATE + 1
+        RETURNING l.request_id, l.emprunteur_id, q.nom_entreprise, q.description, q.num_dossier, q.num_acte, q.annee, q.type_document`,
+      [tenantId]
+    );
+  } catch (err) {
+    if (err.code === '42703' || err.code === '42P01') return 0; // migration 061 non appliquée
+    throw err;
+  }
+  for (const p of r.rows) {
+    await notifier(db, tenantId, p.emprunteur_id, 'Dossier à rendre demain',
+      `Pensez à rapporter le dossier « ${libelleDemande({ ...p, id: p.request_id })} » aux archives demain. Besoin de plus de temps ? Prévenez l'archive.`,
+      'loan_due_soon', p.request_id);
+  }
+  return r.rows.length;
+}
+
+let minuterieRappels = null;
+/** Toutes les heures : rappels de la veille et relances de retard, pour chaque organisation. */
+function demarrerRappels() {
+  if (minuterieRappels) return;
+  const tour = async () => {
+    const t = (await db.query("SELECT id FROM tenants WHERE status = 'active'").catch(() => ({ rows: [] }))).rows;
+    for (const { id } of t) {
+      await rappelerEcheances(id).catch((e) => console.error('[prêts] rappels :', e.message));
+      await relancerRetards(id).catch((e) => console.error('[prêts] relances :', e.message));
+    }
+  };
+  minuterieRappels = setInterval(() => tour().catch(() => {}), 60 * 60 * 1000);
+  minuterieRappels.unref?.();
+  setTimeout(() => tour().catch(() => {}), 2 * 60 * 1000).unref?.();
+}
+
 /** Prêt d'une demande (fiche détaillée) ; null si aucun ou base non migrée. */
 async function pretDeLaDemande(tenantId, requestId) {
   try {
@@ -515,6 +561,6 @@ async function annoterListe(tenantId, rows) {
 module.exports = {
   dureeMotif,
   ETATS, etatPret, lireDateRetour,
-  remettre, retourner, signaler, confirmer, registre, relancerRetards, pretDeLaDemande, annoterListe,
+  remettre, retourner, signaler, confirmer, registre, relancerRetards, rappelerEcheances, demarrerRappels, pretDeLaDemande, annoterListe,
   enTransaction, notifier,
 };

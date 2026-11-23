@@ -78,6 +78,11 @@ async function getMaxUploadBytes(tenantId) {
   return safe * 1024 * 1024;
 }
 
+// Les mots de passe les plus essayés (listes publiques de fuites) et ceux du métier.
+const MOTS_DE_PASSE_COURANTS = new Set(['password', 'motdepasse', 'azerty', 'azertyuiop', 'qwerty', 'qwertyuiop', '123456', '12345678', '123456789',
+  '1234567890', 'iloveyou', 'admin', 'administrateur', 'bienvenue', 'welcome', 'soleil', 'bonjour', 'loulou', 'doudou', 'afgc', 'afgc2025', 'afgc2026',
+  'afgc2027', 'archives', 'archive', 'docuflow', 'docuflow2026', 'benin', 'cotonou', 'changeme', 'motdepasse1', 'password1', 'test1234', 'azerty123']);
+
 /**
  * Contraintes de mot de passe, avec le message d'erreur associé.
  * @returns {Promise<{minLength: number, requireSymbols: boolean, validate: function}>}
@@ -91,10 +96,21 @@ async function getPasswordPolicy(tenantId) {
     minLength,
     requireSymbols,
     /** @returns {string|null} message d'erreur, ou null si le mot de passe convient */
-    validate(password) {
+    validate(password, { identifiant, nom } = {}) {
       const value = String(password || '');
       if (value.length < minLength) {
         return `Le mot de passe doit contenir au moins ${minLength} caractères`;
+      }
+      const simple = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+      const v = simple(value);
+      if (identifiant && simple(identifiant).length >= 3 && v.includes(simple(identifiant))) {
+        return 'Le mot de passe ne doit pas contenir votre identifiant';
+      }
+      if (nom && String(nom).split(/\s+/).some((m) => simple(m).length >= 4 && v.includes(simple(m)))) {
+        return 'Le mot de passe ne doit pas contenir votre nom';
+      }
+      if (MOTS_DE_PASSE_COURANTS.has(v) || /^(.)\1+$/.test(v) || /^(0123456789|123456789|12345678|abcdefgh|azertyui|qwertyui)/.test(v)) {
+        return 'Ce mot de passe est trop courant : choisissez-en un plus personnel';
       }
       if (requireSymbols && !/[^A-Za-z0-9]/.test(value)) {
         return 'Le mot de passe doit contenir au moins un caractère spécial';
