@@ -27,6 +27,7 @@ const appris = require('./intentionService');
 const apprentissage = require('./apprentissageService');
 const agent = require('./docubotAgent');
 const CONNAISSANCES = require('../config/connaissancesAfgc');
+const capacites = require('./docubotCapacites');
 
 const sansAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const plat = (s) => ` ${sansAccents(s).replace(/[^a-z0-9/]+/g, ' ').trim()} `;
@@ -196,11 +197,17 @@ function regleSure(question) {
   // Contenu des documents (RAG), recherche dans M-Files.
   if (a(s, /\bm ?files\b/, 'que dit', 'que disent', /\bselon (le|la|les) (document|contrat|convention|acte|dossier)/, /\bd apres (le|la|les) (document|contrat|convention|acte)/,
     /\bdans (le|la|les) (document|contrat|convention)s?\b/, /\bclauses?\b/, 'contenu du document', 'contenu des documents', 'cherche dans les documents')) return 'documents';
+  // « Combien de temps garder les contrats de travail ? » : la conservation, pas le délai de prêt.
+  if (a(s, /\b(combien de temps|duree|delai)\b.*\b(garder|conserver|archiver)\b/) && !a(s, /\b(un|le|ce|mon|les|des) dossiers?\b/, /\bpret/, /\bemprunt/)) return 'conservation';
   // Plan de classement, calendrier de conservation : durées, sort final, cote, où classer.
   if (a(s, /\bconserv/, 'sort final', /\belimin/, /\bdetrui/, 'plan de classement', 'calendrier', /\bou (classer|ranger)\b/, /\bcote\b/, /\bclasse t on\b/, /\bduree d utilite\b/)
     && !a(s, /\bmon dossier\b/, /\bma demande\b/)) return 'conservation';
   // Un numéro seul : un n° d'acte.
   if (/^\s*(?:acte\s*)?(?:n\s*[°o.]?\s*)?\d{2,6}(?:\s*\/\s*\d{1,6})?\s*\??\s*$/i.test(question)) return 'ou_est';
+  // « Comment importer le point du jour ? » : de l'aide, même si un mot-clé suit.
+  if (/^ comment (faire|on|je|enregistrer|importer|demander|ajouter|creer|modifier|supprimer|imprimer|exporter|retrouver|marquer|transmettre|rendre|annuler|changer|saisir|scanner|utiliser|remettre|signaler|classer|ranger|reprendre|corriger|debloquer)\b/.test(s)) return 'aide';
+  // « Dossiers non retirés de Kanvô » : la fiche du dossier (ses cartons), pas les retards.
+  if (a(s, /\bnon retir/, /\bpas (ete )?retir/)) return 'ou_est';
   if (a(s, 'mes prets', 'mes emprunts', 'chez moi', 'dossiers que j ai', 'j ai combien de dossiers', 'ai je des dossiers', 'dossiers que je dois rendre', 'je dois rendre')) return 'mes_prets';
   if (a(s, /\bsorti?s? aujourd hui\b/, /\bsorti?e?s? ce matin\b/, 'transmis aujourd hui', 'sorties du jour', 'sorties d aujourd hui')) return 'sorties_jour';
   if (a(s, 'dossiers de la semaine', 'entrees de la semaine', 'entres cette semaine', 'dossiers d aujourd hui', 'entres aujourd hui', 'point du jour', 'point d aujourd hui', 'semaine en cours', 'dossiers entres aujourd hui')) return 'semaine';
@@ -464,6 +471,15 @@ async function repondreOuEst(tenantId, question, droits, contexte, indices = nul
   const sorties = cible.nom || cible.acte ? await sortiesDe(tenantId, cible.acte || cible.nom, { userId: droits.archive ? null : droits.userId }) : [];
   // « Et qui l'a ? » portera sur le nom trouvé, pas sur celui tapé.
   const res = { contexte: { entreprise: p.entrees[0]?.denomination || cible.nom || null } };
+  if (!p.total && cible.nom && !cible.acte && !sorties.length) {
+    // Une faute de frappe (« mawuli negosse ») : le nom enregistré le plus proche.
+    const proche = await capacites.nomProche(tenantId, cible.nom).catch(() => null);
+    const connu = proche && await cibleConnue(tenantId, { nom: proche }, droits).catch(() => null);
+    if (connu) {
+      const fiche = await repondreFiche(tenantId, { nom: proche }, droits, connu);
+      return { ...fiche, texte: `Je ne trouve pas « ${cible.nom} » écrit ainsi ; vous cherchez sans doute **${proche}**.\n${fiche.texte}` };
+    }
+  }
   if (!p.total) {
     res.texte = `Je ne trouve pas « **${libelle}** » dans les entrées des archives.${droits.archive ? ' Vérifiez l\'orthographe, ou cherchez par n° d\'acte.' : ' L\'archive vérifiera si vous le demandez.'}`;
     res.elements = [];
@@ -778,10 +794,21 @@ async function repondreChiffres(tenantId, question, droits) {
     return ` AND ${col} >= $${params.length - 1}::date AND ${col} < $${params.length}::date`;
   };
   const quand = periode ? ` ${periode.libelle}` : '';
+  const motif = await capacites.motifDans(tenantId, question).catch(() => null);
+  const duMotif = motif ? ` (motif « ${motif} »)` : '';
+  const filtreMotif = () => {
+    if (!motif) return '';
+    params.push(motif);
+    return ` AND motif = $${params.length}`;
+  };
+  if (!droits.archive && a(s, 'retard', 'en retard')) {
+    const n = await compter(tenantId, 'SELECT count(*)::int AS n FROM request_loans WHERE tenant_id = $1 AND emprunteur_id = $2 AND retourne_at IS NULL AND date_retour_prevue < CURRENT_DATE', [tenantId, droits.userId]);
+    return { texte: `Le total des archives est suivi par l'archive. De votre côté : **${pluriel(n, 'dossier')} en retard**.`, suggestions: n ? ['Ai-je des dossiers à rendre ?'] : [] };
+  }
   if (!droits.archive) {
     const reserve = a(s, 'entre', 'entres', 'entree', 'entrees', 'sorti', 'sortis', 'retard', 'agents', 'comptes');
-    const n = await compter(tenantId, `SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND id_user = $2 AND statut <> 'annulé'${(() => { params.push(droits.userId); return borne('created_at'); })()}`, params);
-    return { texte: `${reserve ? 'Les chiffres des archives sont tenus par l\'archive. ' : ''}Vous avez fait **${pluriel(n, 'demande')}**${quand}.` };
+    const n = await compter(tenantId, `SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND id_user = $2 AND statut <> 'annulé'${(() => { params.push(droits.userId); return borne('created_at'); })()}${filtreMotif()}`, params);
+    return { texte: `${reserve ? 'Les chiffres des archives sont tenus par l\'archive. ' : ''}Vous avez fait **${pluriel(n, 'demande')}**${duMotif}${quand}.` };
   }
   if (a(s, 'entre', 'entres', 'entree', 'entrees', 'point', 'points', 'classe', 'classes')) {
     const n = await compter(tenantId, `SELECT count(*)::int AS n FROM dossiers_entres WHERE tenant_id = $1${borne('date_point')}`, params);
@@ -807,9 +834,9 @@ async function repondreChiffres(tenantId, question, droits) {
     const n = await compter(tenantId, 'SELECT count(*)::int AS n FROM users WHERE tenant_id = $1 AND desactive_le IS NULL', params);
     return { texte: `**${pluriel(n, 'compte actif', 'comptes actifs')}**.` };
   }
-  const n = await compter(tenantId, `SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND statut <> 'annulé'${borne('created_at')}`, params);
+  const n = await compter(tenantId, `SELECT count(*)::int AS n FROM requests WHERE tenant_id = $1 AND statut <> 'annulé'${borne('created_at')}${filtreMotif()}`, params);
   return {
-    texte: `**${pluriel(n, 'demande')}**${quand || ' en tout'}.`,
+    texte: `**${pluriel(n, 'demande')}**${duMotif}${quand || ' en tout'}.`,
     suggestions: ['Combien de dossiers entrés ce mois ?', 'Combien de dossiers sortis ?'],
   };
 }
@@ -838,7 +865,7 @@ async function droitsDe(user) {
 /** Suggestions d'accueil, selon le rôle. */
 function suggestionsAccueil(droits) {
   return droits.archive
-    ? ['Qu\'est-ce que j\'ai à traiter ?', 'Quels dossiers sont en retard ?', 'Combien de dossiers entrés ce mois ?', 'Comment utiliser la douchette ?']
+    ? ['Qu\'est-ce que j\'ai à traiter ?', 'Demandes en attente', 'Qui a le plus de dossiers en retard ?', 'Comment utiliser la douchette ?']
     : ['Où en sont mes demandes ?', 'Ai-je des dossiers à rendre ?', 'Comment demander plusieurs dossiers ?', 'Combien de temps puis-je garder un dossier ?'];
 }
 
@@ -896,6 +923,14 @@ async function repondre(user, question, contexte = {}) {
   if (!q) return { texte: 'Posez-moi une question.', suggestions: suggestionsAccueil(droits) };
   const lecture = comprendreDetail(q, droits);
   let quoi = lecture.quoi;
+  // Ce que DocuBot sait faire (actions, suites de conversation, personnes…).
+  if (!['salut', 'merci'].includes(quoi)) {
+    const fait = await capacites.traiter({ tenantId, question: q, droits, contexte }).catch((e) => { console.warn('[docubot] capacités :', e.message); return null; });
+    if (fait) {
+      const echange = await apprentissage.noter(tenantId, user.id, q, { intention: fait.intention, confiance: lecture.confiance, source: 'capacites' });
+      return { ...fait, echange };
+    }
+  }
   // Un dossier connu est nommé (« Credo BTP », « 15370 », « attestation Credo BTP 2025 »,
   // « est-il disponible ? ») : sa fiche complète, quelle que soit la tournure.
   const parleDemande = /\b(ma|mes|la|une)\s+demandes?\b|\bdemand[ée]/i.test(q);
@@ -977,4 +1012,7 @@ async function repondre(user, question, contexte = {}) {
   return { intention: quoi, ...res, ...(indices ? { compris_par: indices.modele } : {}), echange };
 }
 
-module.exports = { repondre, comprendre, comprendreDetail, cibleDans, regleSure, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
+// Les outils partagés avec docubotCapacites.
+const _outils = { cibleDans, cibleConnue, repondreFiche, ligneSortie, jourAff, nomDans, ia };
+
+module.exports = { _outils, repondre, comprendre, comprendreDetail, cibleDans, regleSure, intention, nomDans, dateDans, periodeDans, suggestionsAccueil, droitsDe, passagesPour, AIDE };
