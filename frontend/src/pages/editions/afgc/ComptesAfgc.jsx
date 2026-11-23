@@ -115,6 +115,23 @@ const ComptesAfgc = () => {
                           : c.derniere_connexion ? `Dernière connexion le ${dateCourte(c.derniere_connexion)}` : 'Jamais connecté'}
                         {c.dossiers_chez_lui > 0 && <span className="ml-2 text-amber-700 font-bold">· {c.dossiers_chez_lui} dossier{c.dossiers_chez_lui > 1 ? 's' : ''} chez lui</span>}
                       </div>
+                      {!c.desactive_le && (c.mdp_a_changer || c.bloque_minutes > 0) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {c.mdp_a_changer && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-bold text-amber-800"
+                              title="Mot de passe provisoire ou égal à l'identifiant : l'agent devra choisir le sien à sa prochaine connexion">
+                              Mot de passe provisoire
+                            </span>
+                          )}
+                          {c.bloque_minutes > 0 && (
+                            <>
+                              <span className="px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-[11px] font-bold text-red-700">Connexion bloquée ({c.bloque_minutes} min)</span>
+                              <button type="button" onClick={() => faire(`d-${c.id}`, () => comptesService.debloquer(c.id), `${c.full_name} peut de nouveau se connecter.`)}
+                                className="text-[11px] font-bold text-slate-700 underline hover:text-slate-900">Débloquer</button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <label className="text-xs font-bold text-slate-600">Département
                       <select value={c.section || ''} disabled={Boolean(c.desactive_le) || Boolean(geste)}

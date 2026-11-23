@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useTitrePage } from '../hooks/useTitrePage';
+import { edition } from '../editions';
 
 /**
  * En-tête de page : où l'utilisateur se trouve, d'où il vient, ce qu'il peut y faire.
@@ -59,7 +60,9 @@ const PageHeader = ({
       {breadcrumb.length > 0 && (
         <nav aria-label="Fil d'Ariane" className="mb-2">
           <ol className="flex items-center gap-1 flex-wrap text-[13px]">
-            {breadcrumb.map((segment, i) => {
+            {breadcrumb.map((brut, i) => {
+              // Édition dédiée (AFGC) : son « tableau de bord » général, c'est l'accueil.
+              const segment = edition && brut.to === '/dashboard' ? { ...brut, label: 'Accueil', to: '/' } : brut;
               const dernier = i === breadcrumb.length - 1;
               return (
                 <li key={`${segment.to || segment.label}-${i}`} className="flex items-center gap-1">

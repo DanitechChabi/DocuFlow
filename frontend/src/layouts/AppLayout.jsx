@@ -10,6 +10,7 @@ import VisiteGuidee from '../components/onboarding/VisiteGuidee';
 import NotificationBell from '../components/NotificationBell';
 import { InviteNotifications } from '../components/NotificationsAppareil';
 import BandeauConnexion from '../components/BandeauConnexion';
+import AccesReserve from '../components/AccesReserve';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { estBureau } from '../utils/plateforme';
@@ -43,6 +44,12 @@ const AppLayout = () => {
   useEffect(() => { zone.current?.scrollTo({ top: 0 }); }, [location.pathname]);
   const settings = useSettings();
   const { charge, can } = usePermissions();
+  // Une adresse du menu réservée (permission) : un écran clair plutôt qu'une page
+  // qui se remplit de refus du serveur. L'API reste seule juge des données.
+  const entreeMenu = (edition?.menu || [])
+    .filter((m) => m.permission && m.to !== '/' && (location.pathname === m.to || location.pathname.startsWith(`${m.to}/`)))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+  const refusee = Boolean(charge && entreeMenu && !can(entreeMenu.permission));
   // Chercher un document qu'on ne peut pas ouvrir n'a pas de sens : sur le
   // site d'une édition, l'agent sans accès à la GED demande un dossier.
   const modeDemande = Boolean(DemandeRapide) && charge && can('requests.create') && !can('documents.view');
@@ -114,7 +121,7 @@ const AppLayout = () => {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un document… (Ctrl+K)"
+                placeholder={edition ? 'Rechercher un dossier ou une page… (Ctrl+K)' : 'Rechercher un document… (Ctrl+K)'}
                 className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-white/10 bg-white/10 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
               />
             </form>
@@ -153,7 +160,7 @@ const AppLayout = () => {
               ce qui rejoue `page-enter` — sans ça, l'Outlet remplace le contenu
               sans aucune transition. */}
           <div key={location.pathname} className="animate-page-enter pb-28 sm:pb-20">
-            <Outlet />
+            {refusee ? <AccesReserve /> : <Outlet />}
           </div>
         </main>
       </div>

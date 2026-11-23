@@ -72,3 +72,14 @@ exports.registre = async (req, res) => {
     res.json(prets);
   } catch (err) { repondreErreur(res, err, 'la lecture du registre des prêts'); }
 };
+
+/** L'agent annonce avoir rapporté le dossier (062). */
+exports.annoncerRetour = async (req, res) => {
+  try {
+    res.json(await loanService.annoncerRetour(req.user.tenant_id, Number(req.params.id), req.user));
+  } catch (err) {
+    if (err.statut) return res.status(err.statut).json({ message: err.message, code: err.code });
+    console.error('[prêts] retour annoncé :', err);
+    res.status(500).json({ message: 'L\'annonce du retour n\'a pas pu être enregistrée.' });
+  }
+};

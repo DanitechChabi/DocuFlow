@@ -19,6 +19,7 @@
 // à la place de la signature au registre.
 // ============================================================================
 const db = require('../config/db');
+const roleService = require('./roleService');
 const settingsService = require('./settingsService');
 const mailService = require('./mailService');
 const requestStateMachine = require('./requestStateMachine');
@@ -319,6 +320,33 @@ async function pretDeLEmprunteur(client, tenantId, requestId, user) {
   return pret;
 }
 
+/**
+ * L'agent annonce qu'il a rapporté le dossier (062). L'archive est prévenue et
+ * confirme le retour : un dossier n'est « Retourné » que constaté par elle.
+ */
+async function annoncerRetour(tenantId, requestId, user) {
+  return enTransaction(async (client) => {
+    const pret = await pretDeLEmprunteur(client, tenantId, requestId, user);
+    if (pret.rapporte_annonce_at) return { pret, deja: true };
+    const upd = await client.query('UPDATE request_loans SET rapporte_annonce_at = now() WHERE id = $1 RETURNING *', [pret.id]);
+    const request = (await client.query('SELECT * FROM requests WHERE id = $1 AND tenant_id = $2', [requestId, tenantId])).rows[0];
+    await client.query(
+      `INSERT INTO request_history (request_id, user_id, action, previous_status, new_status, user_name, tenant_id)
+       VALUES ($1, $2, 'Retour annoncé par l''agent', $3, $3, $4, $5)`,
+      [requestId, user.id, request.statut, user.full_name || null, tenantId]
+    );
+    await auditer(client, tenantId, user.id, `A annoncé avoir rapporté le dossier « ${libelleDemande(request)} »`, requestId);
+    const archive = await client.query("SELECT id, role FROM users WHERE tenant_id = $1 AND desactive_le IS NULL AND id <> $2", [tenantId, user.id]);
+    for (const u of archive.rows) {
+      if (!(await roleService.possede(tenantId, u.role, 'requests.process').catch(() => false))) continue;
+      await notifier(client, tenantId, u.id, 'Dossier rapporté',
+        `${user.full_name || 'Un agent'} dit avoir rapporté le dossier « ${libelleDemande(request)} ». Confirmez son retour dans « Dossiers sortis ».`,
+        'loan_reported', requestId);
+    }
+    return { pret: upd.rows[0], deja: false };
+  });
+}
+
 /** L'agent conteste la remise. */
 async function signaler(tenantId, requestId, user, { message } = {}) {
   const msg = texte(message, 1000);
@@ -542,25 +570,25 @@ async function annoterListe(tenantId, rows) {
   let r;
   try {
     r = await db.query(
-      `SELECT request_id, retourne_at, signale_at, to_char(date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue
+      `SELECT request_id, retourne_at, signale_at, rapporte_annonce_at, to_char(date_retour_prevue, 'YYYY-MM-DD') AS date_retour_prevue
          FROM request_loans WHERE tenant_id = $1 AND request_id = ANY($2::int[])`,
       [tenantId, rows.map((x) => x.id)]
     );
   } catch (err) {
-    if (err.code === '42P01') return rows;
+    if (err.code === '42P01' || err.code === '42703') return rows;
     throw err;
   }
   const jour = aujourdhui();
   const parDemande = new Map(r.rows.map((p) => [p.request_id, p]));
   return rows.map((x) => {
     const p = parDemande.get(x.id);
-    return p ? { ...x, loan_etat: etatPret(p, jour), loan_retour_prevu: p.date_retour_prevue } : x;
+    return p ? { ...x, loan_etat: etatPret(p, jour), loan_retour_prevu: p.date_retour_prevue, loan_rapporte_le: p.rapporte_annonce_at || null } : x;
   });
 }
 
 module.exports = {
   dureeMotif,
   ETATS, etatPret, lireDateRetour,
-  remettre, retourner, signaler, confirmer, registre, relancerRetards, rappelerEcheances, demarrerRappels, pretDeLaDemande, annoterListe,
+  remettre, retourner, signaler, confirmer, annoncerRetour, registre, relancerRetards, rappelerEcheances, demarrerRappels, pretDeLaDemande, annoterListe,
   enTransaction, notifier,
 };
